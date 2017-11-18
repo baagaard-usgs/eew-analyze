@@ -41,8 +41,11 @@ class DMLog(object):
         URL_TEMPLATE = "https://eew.geo.berkeley.edu:8443/[SERVER]/dmreview/dmlogs/dm_[YEARMMDD].txt"
 
         t = event.time
-        tstamp = "%d%0d%0d" % (t.year, t.month, t.day,)
+        tstamp = "%d%02d%02d" % (t.year, t.month, t.day,)
         url = URL_TEMPLATE.replace("[SERVER]", server).replace("[YEARMMDD]", tstamp)
+
+        import pdb
+        pdb.set_trace()
         
         try:
             fh = urllib2.urlopen(url, timeout=TIMEOUT_SECS)
@@ -59,7 +62,7 @@ class DMLog(object):
 
         with open(filename, "w") as fh:
             fh.write(data)
-        self._extractAlerts(event)
+        self._extract_alerts(event)
         return
 
     def load(self, filename):

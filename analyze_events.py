@@ -29,6 +29,7 @@ server = eew-bk-prod1
 [files]
 event = event.geojson
 shakemap = shakemap_shapefiles.zip
+dmlog = dmlog.txt
 """
 
 # ----------------------------------------------------------------------
@@ -123,9 +124,9 @@ class EEWAnalyzeApp(object):
         if args.fetch == "shakemap" or args.fetch == "all" or args.all:
             self._loadEvent(eqId)
             self.fetch_shakemap()
-        if args.fetch == "eewalert" or args.fetch == "all" or args.all:
+        if args.fetch == "eewalerts" or args.fetch == "all" or args.all:
             self._loadEvent(eqId)
-            self.fetch_eewalert()
+            self.fetch_eewalerts()
 
         # Process data
         if args.process_data or args.all:
@@ -181,11 +182,11 @@ class EEWAnalyzeApp(object):
         :type eqId: string
         :param eqId: ComCat event id (e.g., nc72923380).
         """
+        from comcat import DetailEvent
 
         if self.showProgress:
             print("Fetching event file...")
 
-        from comcat import DetailEvent
         self.event = DetailEvent()
         self.event.fetch(eqId, _data_filename(self.params, "event", eqId))
         return
@@ -203,12 +204,18 @@ class EEWAnalyzeApp(object):
         shakemap[0].fetch("shape.zip", filename)
         return
         
-    def fetch_dmlog(self):
-        """Fetch DM log from EEW production system.
+    def fetch_eewalerts(self):
+        """Fetch DM alerts from EEW production system.
         """
+        from shakealert import DMLog
+
+        server = self.params.get("shakealert", "server")
         if self.showProgress:
             print("Fetching DM log from %s..." % server)
-        raise NotImplementedError(":TODO: @brad")
+
+        dmlog = DMLog()
+        filename = _data_filename(self.params, "dmlog", self.event.id)
+        dmlog.fetch(self.event, server, filename)
         return
     
     def process_data(self):
@@ -264,7 +271,7 @@ class EEWAnalyzeApp(object):
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
-        parser.add_argument("--fetch", action="store", dest="fetch", default=None, choices=[None, "all", "event", "shakemap", "eewalert"])
+        parser.add_argument("--fetch", action="store", dest="fetch", default=None, choices=[None, "all", "event", "shakemap", "eewalerts"])
         parser.add_argument("--process-data", action="store_true", dest="process_data")
         parser.add_argument("--plot", action="store", dest="plot", default=None, choices=[None, "all", "map", "histograms", "mmierror"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
