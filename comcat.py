@@ -19,12 +19,12 @@ import json
 import urllib2
 from datetime import datetime,timedelta
 import re
-from enum import Enum
+#from enum import Enum
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
 WAIT_SECS = 3
 
-class VersionOption(Enum):
+class VersionOption(object):
     LAST = 1
     FIRST = 2
     ALL = 3

@@ -11,6 +11,7 @@
 import os
 import logging
 
+
 DEFAULTS = """
 [events]
 # Example: nc72923380 = Mw 4.6 Paicines, 2017-11-13
@@ -81,7 +82,7 @@ class EEWAnalyzeApp(object):
         self.params = None
         self.event = None
         self.shakemap = None
-        self.alert = None
+        self.alerts = None
         self.warningTime = None
         self.gmpe = None
         return
@@ -102,9 +103,20 @@ class EEWAnalyzeApp(object):
             self.show_parameters()
 
         if args.fetch or args.process_data or args.plot or args.generate_report or args.all:
+            if args.fetch == "eewalerts" or args.fetch == "all":
+                from shakealert import EEWServer
+                self.server = EEWServer(self.params.get("shakealert", "server"))
+                username = self.params.get("shakealert", "username")
+                password = self.params.get("shakealert", "password")
+                self.server.login(username, password)
+            else:
+                self.server = None
+                                                
             for eqId in self.params.options("events"):
                 self.process_event(eqId, args)
 
+            if self.server:
+                self.server.logout()
         return
 
     def process_event(self, eqId, args):
@@ -122,26 +134,26 @@ class EEWAnalyzeApp(object):
         if args.fetch == "event" or args.fetch == "all" or args.all:
             self.fetch_event(eqId)
         if args.fetch == "shakemap" or args.fetch == "all" or args.all:
-            self._loadEvent(eqId)
+            self._load_event(eqId)
             self.fetch_shakemap()
         if args.fetch == "eewalerts" or args.fetch == "all" or args.all:
-            self._loadEvent(eqId)
+            self._load_event(eqId)
             self.fetch_eewalerts()
 
         # Process data
         if args.process_data or args.all:
-            self._loadData(eqId)
+            self._load_data(eqId)
             self.process_data()
 
         # Plot data
         if args.plot == "map" or args.plot == "all" or args.all:
-            self._loadData(eqId)
+            self._load_data(eqId)
             self.plot_map()
         if args.plot == "histograms" or args.plot == "all" or args.all:
-            self._loadData(eqId)
+            self._load_data(eqId)
             self.plot_histograms()
         if args.plot == "mmierror" or args.plot == "all" or args.all:
-            self._loadData(eqId)
+            self._load_data(eqId)
             self.plot_mmierror()
             
         # Generate report
@@ -205,17 +217,17 @@ class EEWAnalyzeApp(object):
         return
         
     def fetch_eewalerts(self):
-        """Fetch DM alerts from EEW production system.
+        """Fetch DM alerts from EEW system.
         """
         from shakealert import DMLog
 
-        server = self.params.get("shakealert", "server")
+        serverName = self.params.get("shakealert", "server")
         if self.showProgress:
-            print("Fetching DM log from %s..." % server)
+            print("Fetching DM log from %s..." % serverName)
 
         dmlog = DMLog()
         filename = _data_filename(self.params, "dmlog", self.event.id)
-        dmlog.fetch(self.event, server, filename)
+        dmlog.fetch(self.server, self.event, filename)
         return
     
     def process_data(self):
@@ -223,7 +235,7 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Processing data...")
-        self._loadEvent()
+        self._load_event()
         raise NotImplementedError(":TODO: @brad")
         return
     
@@ -233,7 +245,7 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Plotting maps...")
-        self._loadEvent()
+        self._load_event()
         raise NotImplementedError(":TODO: @brad")
         return
     
@@ -242,7 +254,7 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Plotting histograms...")
-        self._loadEvent()
+        self._load_event()
         raise NotImplementedError(":TODO: @brad")
         return
     
@@ -251,7 +263,7 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Plotting MMI error...")
-        self._loadEvent()
+        self._load_event()
         raise NotImplementedError(":TODO: @brad")
         return
     
@@ -280,15 +292,15 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--debug", action="store_true", dest="debug")
         return parser.parse_args()
 
-    def _loadData(self, event):
+    def _load_data(self, event):
         """Load data for analysis.
         """
-        self._loadEvent(event)
-        self._loadShakeMap(event)
-        self._loadAlert(event)
+        self._load_event(event)
+        self._load_shakemap(event)
+        self._load_alerts(event)
         return
     
-    def _loadEvent(self, eqId):
+    def _load_event(self, eqId):
         """Load GeoJSON event file if not already loaded.
 
         :type event: str
@@ -304,25 +316,30 @@ class EEWAnalyzeApp(object):
         return
         
 
-    def _loadShakeMap(self, eqId):
+    def _load_shakemap(self, eqId):
         """Load event ShakeMap if not already loaded.
 
         :type event: str
         :param eqId: ComCat Earthquake id (e.g., nc72923380).
         """
         if not self.shakemap:
-            raise NotImplementedError(":TODO: @brad")
+            pass#raise NotImplementedError(":TODO: @brad")
         return
         
 
-    def _loadAlert(self, eqId):
-        """Load EEW alert if not already loaded.
+    def _load_alerts(self, eqId):
+        """Load EEW alerts if not already loaded.
         
         :type event: str
         :param eqId: ComCat Earthquake id (e.g., nc72923380).
         """
-        if not self.alert:
-            raise NotImplementedError(":TODO: @brad")
+        if not self.alerts:
+            from shakealert import DMLog
+
+            dmlog = DMLog()
+            filename = _data_filename(self.params, "dmlog", self.event.id)
+            dmlog.load(filename)
+            self.alerts = dmlog.alerts(self.event)
         return
         
 
