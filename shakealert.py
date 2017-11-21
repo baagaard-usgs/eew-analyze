@@ -11,6 +11,8 @@ import re
 import numpy
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
+DEMONSTRATION_SERVER = "eew2demo"
+DEMONSTRAION_END = 20160201
 
 class EEWServer(object):
     """EEW ShakeAlert server holding status and logs.
@@ -29,13 +31,31 @@ class EEWServer(object):
         self.baseURL = baseURL
 
         self.connection = None
+        self.connectionDemo = None
         return
 
-    def login(self, username, password):
+    def login(self, username, password, demo=True):
+        """Log in to server and open connection.
+        """
+        self.connection = self._login(username, password, self.name)
+        if demo:
+            self.connectionDemo = self._login(username, password, DEMONSTRATION_SERVER)
+        return
+
+    def logout(self):
+        """Close connection to server.
+        """
+        if self.connection:
+            self.connection.close()
+        if self.connectionDemo:
+            self.connectionDemo.close()
+        return
+        
+    def _login(self, username, password, serverName):
         """Log in to server and open connection.
         """
         URL_TEMPLATE = self.baseURL + "/[SERVER]/dmreview/"
-        urlCookie = URL_TEMPLATE.replace("[SERVER]", self.name)
+        urlCookie = URL_TEMPLATE.replace("[SERVER]", serverName)
         urlLogin = urlCookie + "j_security_check"
 
         payload = {
@@ -59,18 +79,10 @@ class EEWServer(object):
                 response = connection.post(urlLogin, cookies=response.cookies, data=payload, timeout=TIMEOUT_SECS)
                 response.raise_for_status()
             except requests.exceptions.RequestException as msg:
-                raise Exception("Could not connect to server - %s." % self.baseURL)
+                raise Exception("Could not connect to server - %s." % urlCookie)
 
-        self.connection = connection
-        return
+        return connection
 
-    def logout(self):
-        """Close connection to server.
-        """
-        if self.connection:
-            self.connection.close()
-        return
-        
     
 class DMLog(object):
     """DM log fetcher and parser.
@@ -97,29 +109,33 @@ class DMLog(object):
         :param filename: Name of file for locally storing DM log.
         """
         URL_TEMPLATE = server.baseURL + "/[SERVER]/dmreview/dmlogs/dm_[YEARMMDD].txt"
-        DEMONSTRATION_SERVER = "eew2demo"
         
         t = event.time
         tstamp = "%d%02d%02d" % (t.year, t.month, t.day,)
-        serverName = server.name if tstamp >= 20160201 else DEMONSTRATION_SERVER
+        if int(tstamp) >= DEMONSTRAION_END:
+            serverName = server.name
+            connection = server.connection
+        else:
+            serverName = DEMONSTRATION_SERVER
+            connection = server.connectionDemo
         url = URL_TEMPLATE.replace("[SERVER]", serverName).replace("[YEARMMDD]", tstamp)
-
         try:
-            response = server.connection.get(url, timeout=TIMEOUT_SECS)
+            response = connection.get(url, timeout=TIMEOUT_SECS)
             response.raise_for_status()
         except requests.exceptions.RequestException as htpe:
             try:
                 response = connection.get(url, timeout=TIMEOUT_SECS)
                 response.raise_for_status()
             except requests.exceptions.RequestException as htpe:
-                raise Exception("Could not connect to server - %s." % self.baseURL)
+                raise Exception("Could not connect to server - %s." % url)
 
         lines = response.text.decode("utf-8").split("\n")
-        self._fix_timestamp(lines)
+        self._fix_timestamp(lines, event)
         buffer = "\n".join(lines)
         with open(filename, "w") as fh:
             fh.write(buffer)
-        self.data = self._parse(buffer)
+        import StringIO
+        self.data = self._parse(StringIO.StringIO(buffer))
         return
 
     def load(self, filename):
@@ -138,33 +154,59 @@ class DMLog(object):
         :type event: DetailEvent
         :param event: ComCat detailed event.
         """
-        originDiff = numpy.abs(self.data["origin_time"] - numpy.datetime64(event.time))
-        indicesSorted = numpy.argsort(originDiff)
-        latitudeDiff = numpy.abs(self.data["latitude"] - event.latitude)
-        longitudeDiff = numpy.abs(self.data["longitude"] - event.longitude)
-
-        import pdb
-        pdb.set_trace()
+        maskDM = numpy.bitwise_and(self.data["system"] == "dm", self.data["action"] == "Created")
+        maskDM = numpy.bitwise_and(maskDM, self.data["type"] == "new")
+        dataDM = self.data[maskDM]
         
-        return
+        originDiff = numpy.abs(dataDM["origin_time"] - numpy.datetime64(event.time))
+        latitudeDiff = numpy.abs(dataDM["latitude"] - event.latitude)
+        longitudeDiff = numpy.abs(dataDM["longitude"] - event.longitude)
+        indicesSorted = numpy.argsort(originDiff)
+
+        alertIndex = None
+        for index in indicesSorted:
+            if originDiff[index] < numpy.timedelta64(1, "s") and latitudeDiff[index] < 0.3 and longitudeDiff[index] < 0.3:
+                alertIndex = index
+                break
+        if not alertIndex:
+            # Add closest match to log
+            return None
+
+        alertId = dataDM["id"][alertIndex]
+        maskDM = numpy.bitwise_and(self.data["system"] == "dm", self.data["id"] == alertId)
+        maskDM = numpy.bitwise_and(maskDM, self.data["version"] >= 0)
+        maskDM = numpy.bitwise_and(maskDM, self.data["action"] == "Published")
+        alerts = self.data[maskDM]
+        alerts.sort(order="version")
+        return alerts
     
-    def _fix_timestamp(self, lines):
+    def _fix_timestamp(self, lines, event):
         """Fix time stamp in DM log files. Add date to time stamp and
         change ':' between seconds and milliseconds to '.'.
 
         :type lines: List of str
         :param lines: List of lines in file.
         """
-        pattern = "^(?P<timestamp>[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3})\|"
-        tstampRe = re.compile(pattern)
-        linesNew = []
+        t = event.time
+        patternTimeStamp = "^(?P<timestamp>[0-9]{2}:[0-9]{2}:[0-9]{2}:[0-9]{3})\|"
+        patternOriginTime = "(?P<origin_time>[0-9]{2}-[0-9]+-[0-9]+ [0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3})"
+        tstampRe = re.compile(patternTimeStamp)
+        originTRe = re.compile(patternOriginTime)
         for index,line in enumerate(lines):
-            m = tstampRe.match(line)
-            if m:
-                told = m.group("timestamp")
+            matchTimeStamp = tstampRe.match(line)
+            matchOriginTime = originTRe.search(line)
+            lineNew = line
+            if matchTimeStamp:
+                told = matchTimeStamp.group("timestamp")
                 rindex = told.rfind(":")
                 tnew = told[:rindex] + "." + told[rindex+1:]
-                lines[index] = line.replace(told, "%d-%02d-%02d %s" % (t.year, t.month, t.day, tnew))
+                lineNew = lineNew.replace(told, "%d-%02d-%02d %s" % (t.year, t.month, t.day, tnew))
+                lines[index] = lineNew
+            if matchOriginTime:
+                told = matchOriginTime.group("origin_time")
+                tnew = "20"+told
+                lineNew = lineNew.replace(told, tnew)
+                lines[index] = lineNew
         return
                 
     def _parse(self, fh):
@@ -175,7 +217,7 @@ class DMLog(object):
         :returns: Numpy structured array with DM log contents.
         """
         pattern = [
-            "(?P<timestamp>[0-9]{2}-[0-9]+-[0-9]+ [0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3})\|",
+            "(?P<timestamp>[0-9]{4}-[0-9]+-[0-9]+ [0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3})\|",
             "[ ]*(?P<action>[a-zA-Z ]+):",
             "[ ]*(?P<system>[a-zA-Z]+)",
             "[ ]+(?P<id>[0-9]+)",
@@ -190,7 +232,7 @@ class DMLog(object):
             "[ ]+(?P<longitude_uncertainty>[0-9]+\.[0-9]+)",
             "[ ]+(?P<depth>[0-9]+\.[0-9]+)",
             "[ ]+(?P<depth_uncertainty>[0-9]+\.[0-9]+)",
-            "[ ]+(?P<origin_time>[0-9]{2}-[0-9]+-[0-9]+ [0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3})",
+            "[ ]+(?P<origin_time>[0-9]{4}-[0-9]+-[0-9]+ [0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3})",
             ]
         dtype = [
             ("timestamp", "datetime64[ms]",),
@@ -210,7 +252,6 @@ class DMLog(object):
             ("depth_uncertainty", "float32",),
             ("origin_time", "datetime64[ms]",),
             ]
-
         return numpy.fromregex(fh, "".join(pattern), dtype=dtype)
     
 # End of file

@@ -235,7 +235,7 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Processing data...")
-        self._load_event()
+        print self.alerts[:5]
         raise NotImplementedError(":TODO: @brad")
         return
     
