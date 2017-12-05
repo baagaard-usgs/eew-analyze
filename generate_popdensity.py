@@ -110,7 +110,7 @@ class PopulationDensityApp(object):
 
         driverMemory = ogr.GetDriverByName("MEMORY")
         popDensityDataSrc = driverMemory.CreateDataSource("temp")
-        popDensityData = driverMemory.Open("temp", 1)
+        driverMemory.Open("temp", 1)
         popDensityLayer = popDensityDataSrc.CreateLayer("temp", geom_type=ogr.wkbPolygon)
         popDensityLayerDefn = popDensityLayer.GetLayerDefn()
 
@@ -129,8 +129,7 @@ class PopulationDensityApp(object):
             blockId = populationFeature[fieldBlock]
             population = float(populationFeature[fieldPopulation])
             if not blockId in geometryDict:
-                import pdb
-                pdb.set_trace()
+                raise ValueError("Could not find census block '%d' in geometry dictionary." % blockId)
             area = max(float(geometryDict[blockId]), 1.0)
             density = population / area * 1.0e+6
 
@@ -140,23 +139,24 @@ class PopulationDensityApp(object):
             tempFeature.SetField("density", density)
             popDensityLayer.CreateFeature(tempFeature)
             del tempFeature
-        return popDensityLayer
+        return popDensityDataSrc
 
-    def _rasterize(self, popDensityLayer):
+    def _rasterize(self, popDensityDataSrc):
         NODATA_VALUE = -999
 
-        cellSizeDeg = self.params.get("raster", "resolution_deg")
+        cellSizeDeg = self.params.getfloat("raster", "resolution_deg")
 
+        popDensityLayer = popDensityDataSrc.GetLayer()
         xMin, xMax, yMin, yMax = popDensityLayer.GetExtent()
 
         # Create the destination data source
-        numX = int((xMax - xMin) / cellSizeDeg)
-        numY = int((yMax - yMin) / cellSizeDeg)
+        numX = int(1 + (xMax - xMin) / cellSizeDeg)
+        numY = int(1 + (yMax - yMin) / cellSizeDeg)
         rasterDataSrc = gdal.GetDriverByName('GTiff').Create("populationdensity.tiff", numX, numY, 1, gdal.GDT_Byte)
-        rasterDataSrc.SetProjection(popDensityLayer.GetSpatialRef())
+        #rasterDataSrc.SetProjection(popDensityLayer.GetSpatialRef())
         rasterDataSrc.SetGeoTransform((xMin, cellSizeDeg, 0, yMax, 0, -cellSizeDeg))
         band = rasterDataSrc.GetRasterBand(1)
-        band.SetNoDataValue(nodataValue)
+        band.SetNoDataValue(NODATA_VALUE)
 
         # Rasterize
         gdal.RasterizeLayer(rasterDataSrc, [1], popDensityLayer, burn_values=[0], options=["ATTRIBUTE=density"])
