@@ -24,8 +24,19 @@ module = GMPEUserDisplay
 
 [map]
 
-[shakealert]
-server = eew-bk-prod1
+[shakealert.production]
+login_url = None
+log_url = None
+server = None
+username = None
+password = None
+
+[shakealert.demonstration]
+login_url = None
+log_url = None
+server = None
+username = None
+password = None
 
 [files]
 event = event.geojson
@@ -105,18 +116,17 @@ class EEWAnalyzeApp(object):
         if args.fetch or args.process_data or args.plot or args.generate_report or args.all:
             if args.fetch == "eewalerts" or args.fetch == "all":
                 from shakealert import EEWServer
-                self.server = EEWServer(self.params.get("shakealert", "server"))
-                username = self.params.get("shakealert", "username")
-                password = self.params.get("shakealert", "password")
-                self.server.login(username, password)
+
+                self.eewserver = EEWServer(self.params)
+                self.eewserver.login()
             else:
-                self.server = None
+                self.eewserver = None
                                                 
             for eqId in self.params.options("events"):
                 self.process_event(eqId, args)
 
-            if self.server:
-                self.server.logout()
+            if self.eewserver:
+                self.eewserver.logout()
         return
 
     def process_event(self, eqId, args):
@@ -219,13 +229,12 @@ class EEWAnalyzeApp(object):
     def fetch_eewalerts(self):
         """Fetch DM alerts from EEW system.
         """
-        from shakealert import DMLog
-
-        serverName = self.params.get("shakealert", "server")
+        from shakealert import DMLogXML
+        
         if self.showProgress:
-            print("Fetching DM log from %s..." % serverName)
+            print("Fetching DM log...")
 
-        dmlog = DMLog()
+        dmlog = DMLogXML()
         filename = _data_filename(self.params, "dmlog", self.event.id)
         dmlog.fetch(self.server, self.event, filename)
         return
