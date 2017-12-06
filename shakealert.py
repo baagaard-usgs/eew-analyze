@@ -36,7 +36,7 @@ class EEWServer(object):
         """Log in to server and open connection.
         """
         self._loginProd()
-        self._loginDemo()
+        #self._loginDemo()
         return
 
     def logout(self):
@@ -95,11 +95,11 @@ class EEWServer(object):
         try:
             connection = requests.session()
             connection.headers["User-Agent"] = "Mozilla/5.0"
-            response = connection.post(urlCookie, timeout=TIMEOUT_SECS)
+            response = connection.post(url, timeout=TIMEOUT_SECS)
             response.raise_for_status()
         except requests.exceptions.RequestException as htpe:
             try:
-                response = connection.post(urlCookie, timeout=TIMEOUT_SECS)
+                response = connection.post(url, timeout=TIMEOUT_SECS)
                 response.raise_for_status()
             except requests.exceptions.RequestException as msg:
                 raise Exception("Could not connect to server - %s." % url)
