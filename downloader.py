@@ -162,14 +162,20 @@ class DownloaderApp(object):
     def _fetch_shakemaps(self):
         """Fetch geojson event file from USGS ComCat using web services.
         """
+        from comcat import DetailEvent
+
         if self.showProgress:
             print("Fetching ShakeMaps...")
 
-        shakemap = self.event.get_product("shakemap")
-        if len(shakemap) > 1:
-            raise ValueError("Expected to get preferred ShakeMap.")
-        filename = _data_filename(self.params, "shakemap", self.event.id)
-        shakemap[0].fetch("shape.zip", filename)
+        event = DetailEvent()
+        dirTemplate = self.params.get("files", "event_dir")
+        for eqId in self.params.options("events"):
+            dataDir = dirTemplate.replace("[EVENTID]", eqId)
+            event.load(os.path.join(dataDir, eqId+".geojson"))
+            shakemap = event.get_product("shakemap")
+            if len(shakemap) > 1:
+                raise ValueError("Expected to get preferred ShakeMap.")
+            shakemap[0].fetch("grid.xml", dataDir)
         return
 
     def _initdb(self):

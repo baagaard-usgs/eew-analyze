@@ -4,7 +4,7 @@
 # CHANGES
 #
 # General
-#   * Use urllib2 (Python 2) instead of urllib (Python 3)
+#   * Use requests instead of urllib
 #   * Conform to PEP8 style (lowercase and underscores for method names).
 #
 # DetailEvent
@@ -16,20 +16,20 @@
 #   * Rename get_content() to fetch().
 
 import json
+import os
+import requests
 import urllib2
+import gzip
 from datetime import datetime,timedelta
 import re
-#from enum import Enum
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
-WAIT_SECS = 3
 
 class VersionOption(object):
     LAST = 1
     FIRST = 2
     ALL = 3
     PREFERRED = 4
-
     
 
 class DetailEvent(object):
@@ -43,7 +43,7 @@ class DetailEvent(object):
             self.load(filename)
         return
 
-    def fetch(self, event_id, filename):
+    def fetch(self, event_id, dataDir):
         """Fetch detailed event GeoJSON object from ComCat.
         
         Documentation for detailed event information is here:
@@ -58,30 +58,29 @@ class DetailEvent(object):
         URL_TEMPLATE = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/[EVENTID].geojson"
 
         url = URL_TEMPLATE.replace("[EVENTID]", event_id)
-        
-        try:
-            fh = urllib2.urlopen(url, timeout=TIMEOUT_SECS)
-            data = fh.read().decode('utf-8')
-            fh.close()
-            self._jdict = json.loads(data)
-        except urllib2.HTTPError as htpe:
-            time.sleep(WAIT_SECS)
-            try:
-                fh = urllib.request.urlopen(url,timeout=TIMEOUT_SECS)
-                data = fh.read().decode('utf-8')
-                fh.close()
-                self._jdict = json.loads(data)
-            except Exception as msg:
-                raise Exception('Could not connect to ComCat server - %s.' % url).with_traceback(msg2.__traceback__)
+        filename = os.path.join(dataDir, os.path.split(url)[1])
 
-        with open(filename, "w") as fh:
-            fh.write(data)
+        try:
+            connection = requests.session()
+            connection.headers["User-Agent"] = "Mozilla/5.0"
+            response = connection.get(url, timeout=TIMEOUT_SECS)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as htpe:
+            try:
+                response = connection.get(url, timeout=TIMEOUT_SECS)
+                response.raise_for_status()
+            except requests.exceptions.RequestException as htpe:
+                logging.getLogger(__name__).info("Could not download ComCat event %s." % url)
+                return
+
+        with gzip.open(filename+".gz", "w") as fh:
+            fh.write(response.text.decode("utf-8"))
         return
 
     def load(self, filename):
         """Load geojson event file.
         """
-        with open(filename, "r") as fh:
+        with gzip.open(filename+".gz", "r") as fh:
             self._jdict = json.load(fh)
         return
             
@@ -467,13 +466,11 @@ class Product(object):
             return None
 
         
-    def fetch(self,regexp, filename):
+    def fetch(self, regexp, dataDir):
         """Find and download the shortest file name matching the input regular expression.
 
         :param regexp:
           Regular expression which should match one of the content files in the Product.
-        :param filename:
-          Filename to which content should be downloaded.
         :returns:
           The URL from which the content was downloaded.
         :raises:
@@ -493,22 +490,23 @@ class Product(object):
         if content_url is None:
             raise AttributeError("Could not find any content matching input %s" % regexp)
 
+        filename = os.path.join(dataDir, os.path.split(url)[1])
         try:
-            fh = urllib2.urlopen(url, timeout=TIMEOUT_SECS)
-            data = fh.read()
-            fh.close()
-        except urllib2.HTTPError as htpe:
-            time.sleep(WAIT_SECS)
+            connection = requests.session()
+            connection.headers["User-Agent"] = "Mozilla/5.0"
+            response = connection.get(url, timeout=TIMEOUT_SECS)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as htpe:
             try:
-                fh = urllib2.urlopen(url, timeout=TIMEOUT_SECS)
-                data = fh.read()
-                fh.close()
-            except Exception as msg:
-                raise Exception("Could not download %s from %s." % (content_name,url))
-            
-        with open(filename, "w") as f:
-            f.write(data)
-        return url
+                response = connection.get(url, timeout=TIMEOUT_SECS)
+                response.raise_for_status()
+            except requests.exceptions.RequestException as htpe:
+                logging.getLogger(__name__).info("Could not download ComCat product %s." % url)
+                return
+
+        with gzip.open(filename+".gz", "w") as fh:
+            fh.write(response.text.decode("utf-8"))
+        return
     
     def has_property(self,key):
         """Determine if this Product contains a given property.
