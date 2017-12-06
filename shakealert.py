@@ -164,9 +164,8 @@ class DMLogXML(object):
                 logging.getLogger(__name__).info("Could not download log %s. Log may not exist." % url)
                 return
                 
-        buffer = response.text.decode("utf-8")
         with gzip.open(filename+".gz", "w") as fh:
-            fh.write(buffer)
+            fh.write(response.text.decode("utf-8"))
         return
 
     def load(self, filename):
