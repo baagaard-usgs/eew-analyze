@@ -124,12 +124,15 @@ class DownloaderApp(object):
             print("Fetching EEW alerts...")
             
         from shakealert import EEWServer, DMLogXML
+        import datetime
 
         self.eewserver = EEWServer(self.params)
         self.eewserver.login()
 
-        dmlog = DMLogXML()
+        dmlog = DMLogXML(config=self.params)
         logsDir = self.params.get("files", "dmlogs_dir")
+        if not os.path.isdir(logsDir):
+            os.makedirs(logsDir)
         date = dateBegin
         dt = datetime.timedelta(days=1)
         while date <= dateEnd:

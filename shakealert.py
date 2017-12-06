@@ -9,12 +9,15 @@
 import requests
 import re
 import numpy
+import datetime
+import os
+import gzip
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
-DEMONSTRATION_BEGIN = 20120127
-DEMONSTRATION_END = 20160604
-PRODUCTION_BEGIN = 20160605
-PRODUCTION_END = 30000101
+DEMONSTRATION_BEGIN = datetime.date(year=2012, month=1, day=27)
+DEMONSTRATION_END = datetime.date(year=2016, month=6, day=4)
+PRODUCTION_BEGIN = datetime.date(year=2016, month=6, day=5)
+PRODUCTION_END = datetime.date(year=3000, month=1, day=1)
 
 class EEWServer(object):
     """EEW ShakeAlert server holding status and logs.
@@ -123,30 +126,32 @@ class DMLogXML(object):
             self.load(filename)
         return
 
-    def fetch(self, server, event, filename):
+    def fetch(self, server, date, logsDir):
         """Fetch DM XML log from ShakeAlert system.
         
         :type server: EEWServer
         :param server: EEW ShakeAlert server.
 
-        :type event: DetailEvent
-        :param event: ComCat detailed event.
+        :type date: datetime.date
+        :param event: Date of log to download.
 
-        :type filename: str
-        :param filename: Name of file for locally storing DM log.
+        :type logsDir: str
+        :param logsDir: Directory in which to store file locally.
         """
-        t = event.time
-        tstamp = "%d%02d%02d" % (t.year, t.month, t.day,)
-        if tstamp >= PRODUCTION_BEGIN and tstamp <= PRODUCTION_END:
+        tstamp = "%d%02d%02d" % (date.year, date.month, date.day,)
+        if date >= PRODUCTION_BEGIN and date <= PRODUCTION_END:
             urlTemplate = self.config.get("shakealert.production", "log_url")
             logServer = self.config.get("shakealert.production", "server")
-        elif tstamp >= DEMONSTRATION_BEGIN and tstamp <= DEMONSTRATION_END:
+            connection = server.connectionProd
+        elif date >= DEMONSTRATION_BEGIN and date <= DEMONSTRATION_END:
             urlTemplate = self.config.get("shakealert.demonstration", "log_url")
             logServer = self.config.get("shakealert.demonstration", "server")
+            connection = server.connectionDemo
         else:
-            raise ValueError("DM XML logs not available for event on %d-%02d-%02d." % (t.year, t.month, t.day,))
+            raise ValueError("DM XML logs not available for event on %d-%02d-%02d." % (date.year, date.month, date.day,))
 
-        url = urlTemplate.replace("[SERVER]", logServer).replace("[YEARMMDD]", tstamp)
+        url = urlTemplate.replace("[SERVER]", logServer).replace("[YYYYMMDD]", tstamp)
+        filename = os.path.join(logsDir, os.path.split(url)[1])
         try:
             response = connection.get(url, timeout=TIMEOUT_SECS)
             response.raise_for_status()
@@ -155,13 +160,12 @@ class DMLogXML(object):
                 response = connection.get(url, timeout=TIMEOUT_SECS)
                 response.raise_for_status()
             except requests.exceptions.RequestException as htpe:
-                raise Exception("Could not connect to server - %s." % url)
-
+                print("Could not get log %s." % url)
+                return
+                
         buffer = response.text.decode("utf-8")
-        with open(filename, "w") as fh:
+        with gzip.open(filename+".gz", "w") as fh:
             fh.write(buffer)
-        import StringIO
-        self.data = self._parse(StringIO.StringIO(buffer))
         return
 
     def load(self, filename):
@@ -170,7 +174,7 @@ class DMLogXML(object):
         :type filename: str
         :param filename: Name of local file with DM log.
         """
-        with open(filename, "r") as fh:
+        with gzip.open(filename+".gz", "r") as fh:
             self.data = self._parse(fh)
         return
 
@@ -259,7 +263,7 @@ class DMLogASCII(object):
                 response = connection.get(url, timeout=TIMEOUT_SECS)
                 response.raise_for_status()
             except requests.exceptions.RequestException as htpe:
-                raise Exception("Could not connect to server - %s." % url)
+                print("Could not get log %s." % url)
 
         lines = response.text.decode("utf-8").split("\n")
         self._fix_timestamp(lines, event)
