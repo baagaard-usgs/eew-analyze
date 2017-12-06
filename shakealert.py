@@ -12,6 +12,7 @@ import numpy
 import datetime
 import os
 import gzip
+import logging
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
 DEMONSTRATION_BEGIN = datetime.date(year=2012, month=1, day=27)
@@ -39,7 +40,7 @@ class EEWServer(object):
         """Log in to server and open connection.
         """
         self._loginProd()
-        #self._loginDemo()
+        self._loginDemo()
         return
 
     def logout(self):
@@ -160,7 +161,7 @@ class DMLogXML(object):
                 response = connection.get(url, timeout=TIMEOUT_SECS)
                 response.raise_for_status()
             except requests.exceptions.RequestException as htpe:
-                print("Could not get log %s." % url)
+                logging.getLogger(__name__).info("Could not download log %s. Log may not exist." % url)
                 return
                 
         buffer = response.text.decode("utf-8")
