@@ -15,7 +15,6 @@ import gzip
 import logging
 import dateutil
 from lxml import etree
-import math
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
 DEMONSTRATION_BEGIN = datetime.date(year=2012, month=1, day=27)
