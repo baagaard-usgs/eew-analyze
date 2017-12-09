@@ -115,6 +115,7 @@ class CreateEqSetApp(object):
         if not os.path.isdir(path):
             os.makedirs(path)
         with open(filename, "w") as fout:
+            fout.write("[events]\n")
             for event in catalog:
                 eqid = event.preferred_origin_id.id.split("/")[4]
                 if "event_descriptions" in event:
