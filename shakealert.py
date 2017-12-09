@@ -13,6 +13,9 @@ import datetime
 import os
 import gzip
 import logging
+import dateutil
+from lxml import etree
+import math
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
 DEMONSTRATION_BEGIN = datetime.date(year=2012, month=1, day=27)
@@ -164,7 +167,10 @@ class DMLogXML(object):
                 logging.getLogger(__name__).info("Could not download log %s. Log may not exist." % url)
                 return
                 
-        with gzip.open(filename+".gz", "w") as fh:
+        suffix = ""
+        if not filename.endswith(".gz"):
+            suffix = ".gz"
+        with gzip.open(filename+suffix, "w") as fh:
             fh.write(response.text.decode("utf-8"))
         return
 
@@ -174,42 +180,13 @@ class DMLogXML(object):
         :type filename: str
         :param filename: Name of local file with DM log.
         """
-        with gzip.open(filename+".gz", "r") as fh:
-            self.data = self._parse(fh)
-        return
-
-    def alerts(self, event):
-        """Extract alerts for event from DM log.
-
-        :type event: DetailEvent
-        :param event: ComCat detailed event.
-        """
-        maskDM = numpy.bitwise_and(self.data["system"] == "dm", self.data["action"] == "Created")
-        maskDM = numpy.bitwise_and(maskDM, self.data["type"] == "new")
-        dataDM = self.data[maskDM]
-        
-        originDiff = numpy.abs(dataDM["origin_time"] - numpy.datetime64(event.time))
-        latitudeDiff = numpy.abs(dataDM["latitude"] - event.latitude)
-        longitudeDiff = numpy.abs(dataDM["longitude"] - event.longitude)
-        indicesSorted = numpy.argsort(originDiff)
-
-        alertIndex = None
-        for index in indicesSorted:
-            if originDiff[index] < numpy.timedelta64(1, "s") and latitudeDiff[index] < 0.3 and longitudeDiff[index] < 0.3:
-                alertIndex = index
-                break
-        if not alertIndex:
-            # Add closest match to log
-            return None
-
-        alertId = dataDM["id"][alertIndex]
-        maskDM = numpy.bitwise_and(self.data["system"] == "dm", self.data["id"] == alertId)
-        maskDM = numpy.bitwise_and(maskDM, self.data["version"] >= 0)
-        maskDM = numpy.bitwise_and(maskDM, self.data["action"] == "Published")
-        alerts = self.data[maskDM]
-        alerts.sort(order="version")
+        suffix = ""
+        if not filename.endswith(".gz"):
+            suffix = ".gz"
+        with gzip.open(filename+suffix, "r") as fh:
+            alerts = self._parse(fh)
         return alerts
-    
+
     def _parse(self, fh):
         """Parse DM XML log file.
         
@@ -224,34 +201,44 @@ class DMLogXML(object):
             "(?P<xml>\<\?xml[\s\S]+?</event_message>)"
         ]
         xmlBlocks = re.findall("".join(pattern), bytes)
-        for tstamp,xmlBlock in xmlBlocks:
-            elMsg = etree.fromstring(xmlBlock)
-            category = elMsg.get("category")
-            instance = elMsg.get("instance")
-            messageType = elMsg.get("message_type")
-            timestamp = dateutil.parser.parse(elMsg.get("timestamp"))
-            version = int(elMsg.get("version"))
+        alerts = []
+        for timestamp,xmlBlock in xmlBlocks:
+            elMsg = etree.fromstring(xmlBlock.replace("UTF-16", "utf-8"))
+            elCoreInfo = self._getChild(elMsg, "core_info")
+            elMag = self._getChild(elCoreInfo, "mag")
 
-            elCoreInfo = getChild(elMsg, "core_info")
-            id_dm = int(elCoreInfo.get("id"))
-
-            elMag = getChild(elCoreInfo, "mag")
-            magnitude = float(elMag.text)
-            magnitude_type = elMag.get("units")
-
-            latitude = float(getChild(elCoreInfo, "lat").text)
-            longitude = float(getChild(elCoreInfo, "lon").text)
-            depthKm = float(getChild(elCoreInfo, "depth").text)
-            originTime = dateutil.parser.parse(getChild(elCoreInfo, "orig_time").text)
-            likelihood = float(getChild(elCoreInfo, "likelihood").text)
-            numStations = int(getChild(elCoreInfo, "num_stations").text)
-
-            # :TODO: Add data to database
-            print id_dm, magnitude, timestamp
-        return
+            # Use time step in message, fallback to time stamp in log.
+            if elMsg.get("timestamp"):
+                timestamp = elMsg.get("timestamp")
+            if elCoreInfo.get("id").lower().startswith("test"):
+                continue
+            try:
+                alerts.append({
+                    "category": elMsg.get("category"),
+                    "instance": elMsg.get("instance") if elMsg.get("instance") else "unknown",
+                    "message_type": elMsg.get("message_type"),
+                    "timestamp": dateutil.parser.parse(timestamp),
+                    "version": int(elMsg.get("version")),
+                    
+                    "event_id": int(elCoreInfo.get("id")),
+                    
+                    "magnitude": float(elMag.text),
+                    "magnitude_type": elMag.get("units"),
+                    
+                    "latitude": self._getChildValue(elCoreInfo, "lat", vtype=float),
+                    "longitude": self._getChildValue(elCoreInfo, "lon", vtype=float),
+                    "depth_km": self._getChildValue(elCoreInfo, "depth", vtype=float),
+                    "origin_time": dateutil.parser.parse(self._getChildValue(elCoreInfo, "orig_time")),
+                    "likelihood": self._getChildValue(elCoreInfo, "likelihood", vtype=float, default=-1),
+                    "num_stations": self._getChildValue(elCoreInfo, "num_stations", vtype=int, default=-1),
+                })
+            except Exception as ex:
+                import pdb
+                pdb.set_trace()
+        return alerts
         
 
-    def _getChild(el, name):
+    def _getChild(self, el, name):
         """Get child element 'name'. Raises IOError if more than one child element with name is found.
 
         :type el: XML element
@@ -262,9 +249,28 @@ class DMLogXML(object):
         """
         elList = el.xpath(name)
         if len(elList) != 1:
-            raise IOError("Expect one '%s' child element in XML element. Found %d '%s' elements in %s." % \
-                          (name, len(elList), el.tag))
+            raise IOError("Expect one '{0}' child element in XML element. Found {1} elements in {3}.".format(name, len(elList), el.tag))
         return elList[0]
+
+    def _getChildValue(self, el, name, vtype=str, default=None):
+        """Get text value of child element 'name'. Returns default value if exactly one child is not found.
+
+        :type el: XML element
+        :param el: XML element
+
+        :type name: str
+        :param name: Name of child element.
+        """
+        elList = el.xpath(name)
+        if len(elList) != 1:
+            return default
+        value =  elList[0].text
+        if vtype == str:
+            return value
+        value = float(value)
+        if vtype == int:
+            value = int(value)
+        return value
 
 
     

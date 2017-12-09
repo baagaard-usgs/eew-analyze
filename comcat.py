@@ -57,6 +57,9 @@ class DetailEvent(object):
         
         URL_TEMPLATE = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/[EVENTID].geojson"
 
+        if not os.path.isdir(dataDir):
+            os.makedirs(dataDir)
+        
         url = URL_TEMPLATE.replace("[EVENTID]", event_id)
         filename = os.path.join(dataDir, os.path.split(url)[1])
 
@@ -73,14 +76,20 @@ class DetailEvent(object):
                 logging.getLogger(__name__).info("Could not download ComCat event %s." % url)
                 return
 
-        with gzip.open(filename+".gz", "w") as fh:
+        suffix = ""
+        if not filename.endswith(".gz"):
+            suffix = ".gz"
+        with gzip.open(filename+suffix, "w") as fh:
             fh.write(response.text.decode("utf-8"))
         return
 
     def load(self, filename):
         """Load geojson event file.
         """
-        with gzip.open(filename+".gz", "r") as fh:
+        suffix = ""
+        if not filename.endswith(".gz"):
+            suffix = ".gz"
+        with gzip.open(filename+suffix, "r") as fh:
             self._jdict = json.load(fh)
         return
             
@@ -504,7 +513,10 @@ class Product(object):
                 logging.getLogger(__name__).info("Could not download ComCat product %s." % url)
                 return
 
-        with gzip.open(filename+".gz", "w") as fh:
+        suffix = ""
+        if not filename.endswith(".gz"):
+            suffix = ".gz"
+        with gzip.open(filename+suffix, "w") as fh:
             fh.write(response.text.decode("utf-8"))
         return
     

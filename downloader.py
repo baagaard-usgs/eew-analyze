@@ -10,7 +10,12 @@
 
 import os
 import logging
+import datetime
+import dateutil.parser
 
+from comcat import DetailEvent
+from shakealert import EEWServer, DMLogXML
+from analysisdb import AnalysisData
 
 DEFAULTS = """
 [events]
@@ -33,6 +38,7 @@ password = None
 [files]
 dmlogs_dir = ./data/dmlogs/
 event_dir = ./data/[EVENTID]/
+analysis_db = ./data/analysisdb.sqlite
 """
 
 # ----------------------------------------------------------------------
@@ -100,7 +106,6 @@ class DownloaderApp(object):
             self.show_parameters()
 
         if args.fetch_eewalerts:
-            import dateutil.parser
             beginStr,endStr = args.fetch_eewalerts.split(",")
             dateBegin = dateutil.parser.parse(beginStr).date()
             dateEnd = dateutil.parser.parse(endStr).date()
@@ -115,17 +120,22 @@ class DownloaderApp(object):
         if args.initdb or args.all:
             self._initdb()
 
+        if args.dbstatus or args.all:
+            self._dbstatus()
+
         if args.updatedb or args.all:
-            self._updatedb()
+            if args.updatedb == "eew_alerts" or args.all:
+                self._updatedb_eewalerts()
+            if args.updatedb == "comcat_events" or args.all:
+                self._updatedb_events()
+            if args.updatedb == "matches" or args.all:
+                self._updatedb_matches()
         return
 
     def _fetch_eewalerts(self, dateBegin, dateEnd):
         if self.showProgress:
             print("Fetching EEW alerts...")
             
-        from shakealert import EEWServer, DMLogXML
-        import datetime
-
         self.eewserver = EEWServer(self.params)
         self.eewserver.login()
 
@@ -147,8 +157,6 @@ class DownloaderApp(object):
         :type eqId: string
         :param eqId: ComCat event id (e.g., nc72923380).
         """
-        from comcat import DetailEvent
-
         if self.showProgress:
             print("Fetching earthquakes from ComCat database...")
 
@@ -162,8 +170,6 @@ class DownloaderApp(object):
     def _fetch_shakemaps(self):
         """Fetch geojson event file from USGS ComCat using web services.
         """
-        from comcat import DetailEvent
-
         if self.showProgress:
             print("Fetching ShakeMaps...")
 
@@ -179,25 +185,59 @@ class DownloaderApp(object):
         return
 
     def _initdb(self):
-        from analysisdb import AnalysisData
-
+        """Create analysis database with ShakeAlert DM alerts and ComCat events.
+        """
         if self.showProgress:
             print("Setting up analysis database...")
             
-        db = AnalysisData()
+        db = AnalysisData(self.params.get("files", "analysis_db"))
         db.init()
+        logging.getLogger(__name__).info(db.summary())
         return
 
-    def _updatedb(self):
-        from analysisdb import AnalysisData
-
+    def _dbstatus(self):
+        """Show summary of analysis database contents.
+        """
+        db = AnalysisData(self.params.get("files", "analysis_db"))
+        print(db.summary())
+        return
+    
+    def _updatedb_events(self):
         if self.showProgress:
-            print("Updating analysis database...")
+            print("Updating ComCat events in analysis database...")
 
-        db = AnalysisData()
-        db.open()
-        db.update()
-        db.close()
+        db = AnalysisData(self.params.get("files", "analysis_db"))
+
+        event = DetailEvent()
+        dirTemplate = self.params.get("files", "event_dir")
+        for eqId in self.params.options("events"):
+            dataDir = dirTemplate.replace("[EVENTID]", eqId)
+            event.load(os.path.join(dataDir, eqId+".geojson"))
+            db.add_event(event)
+        return
+    
+    def _updatedb_eewalerts(self, all=False):
+        """
+        """
+        import glob
+        
+        if self.showProgress:
+            print("Updating ShakeAlert DM alerts in analysis database...")
+
+        db = AnalysisData(self.params.get("files", "analysis_db"))
+
+        logsDir = self.params.get("files", "dmlogs_dir")
+        files = sorted(glob.glob(os.path.join(logsDir, "dmevent*.log.gz")))
+        if not all:
+            # Get most recent entry and use files starting on that day.
+            pass
+
+        # Read DM logs
+        dmlog = DMLogXML(config=self.params)
+        for filename in files:
+            print filename
+            alerts = dmlog.load(filename)
+            db.add_alerts(alerts)
         return
 
     
@@ -239,10 +279,11 @@ class DownloaderApp(object):
         parser.add_argument("--fetch-events", action="store_true", dest="fetch_events")
         parser.add_argument("--fetch-shakemaps", action="store_true", dest="fetch_shakemaps")
         parser.add_argument("--initdb", action="store_true", dest="initdb")
-        parser.add_argument("--updatedb", action="store_true", dest="updatedb")
+        parser.add_argument("--dbstatus", action="store_true", dest="dbstatus")
+        parser.add_argument("--updatedb", action="store", dest="updatedb", choices=["eew_alerts", "comcat_events", "matches"])
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
-        parser.add_argument("--debug", action="store_true", dest="debug")
+        parser.add_argument("--debug", action="store_true", dest="debug", default=True)
         return parser.parse_args()
 
 # ======================================================================
