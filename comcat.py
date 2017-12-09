@@ -20,8 +20,9 @@ import os
 import requests
 import urllib2
 import gzip
-from datetime import datetime,timedelta
 import re
+import logging
+from datetime import datetime,timedelta
 
 TIMEOUT_SECS = 30 # How many seconds to wait for download
 
