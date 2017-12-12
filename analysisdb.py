@@ -139,7 +139,7 @@ class AnalysisData(object):
     def find_matches(self):
         """Find matches in database between alerts and ComCat events.
         """
-        MAX_DISTANCE_DEG = 0.8
+        MAX_DISTANCE_DEG = 0.9
         MAX_TIME_SECS = 15.0
         VS = 3.0e+3
         DEG_TO_DIST = 110.0e+3
@@ -217,6 +217,17 @@ class AnalysisData(object):
         self.cursor.execute("SELECT * FROM dm_alerts WHERE " + " AND ".join(conditions), values)
         alerts = self.cursor.fetchall()
         return alerts
+
+    def comcat_event(self, comcatId):
+        """Get ComCat event information.
+
+        :type comcatId: str
+        :param comcatId: ComCat event id
+        """
+        self.cursor.execute("SELECT * FROM comcat_events WHERE event_id=?", (comcatId,))
+        event = self.cursor.fetchone()
+        return event
+
     
     def summary(self):
         """Returns string with database summary.
