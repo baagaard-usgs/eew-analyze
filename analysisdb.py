@@ -139,17 +139,19 @@ class AnalysisData(object):
     def find_matches(self):
         """Find matches in database between alerts and ComCat events.
         """
-        MAX_DISTANCE_DEG = 0.30
+        MAX_DISTANCE_DEG = 0.8
         MAX_TIME_SECS = 15.0
         VS = 3.0e+3
         DEG_TO_DIST = 110.0e+3
 
+        self.cursor.execute("DELETE FROM matches")
         self.cursor.execute("select * from comcat_events")
         events = self.cursor.fetchall()
         for event in events:
             lat = event["latitude"]
             lon = event["longitude"]
             ot = dateutil.parser.parse(event["origin_time"])
+            dt = datetime.timedelta(seconds=MAX_TIME_SECS)
             conditions = [
                 "category=?",
                 "message_type=?",
@@ -160,9 +162,9 @@ class AnalysisData(object):
             values = (
                 "live",
                 "new",
-                lat-0.5*MAX_DISTANCE_DEG, lat+0.5*MAX_DISTANCE_DEG,
-                lon-0.5*MAX_DISTANCE_DEG, lon+0.5*MAX_DISTANCE_DEG,
-                ot-datetime.timedelta(seconds=0.5*MAX_TIME_SECS), ot+datetime.timedelta(seconds=0.5*MAX_TIME_SECS),
+                lat-MAX_DISTANCE_DEG, lat+MAX_DISTANCE_DEG,
+                lon-MAX_DISTANCE_DEG, lon+MAX_DISTANCE_DEG,
+                ot-dt, ot+dt,
                 )
             self.cursor.execute("SELECT * FROM dm_alerts WHERE " + " AND ".join(conditions), values)
             alerts = self.cursor.fetchall()

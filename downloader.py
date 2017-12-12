@@ -9,6 +9,7 @@
 #
 
 import os
+import sys
 import logging
 import datetime
 import dateutil.parser
@@ -213,10 +214,17 @@ class DownloaderApp(object):
 
         event = DetailEvent()
         dirTemplate = self.params.get("files", "event_dir")
-        for eqId in self.params.options("events"):
+        events = self.params.options("events")
+        numEvents = len(events)
+        for iEvent,eqId in enumerate(events):
+            if self.showProgress:
+                sys.stdout.write("\rProcessing ComCat events...%d%%" % (((iEvent+1)*100)/numEvents))
+                sys.stdout.flush()
+
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.load(os.path.join(dataDir, eqId+".geojson"))
             db.add_event(event)
+        sys.stdout.write("\n")
         return
     
     def _updatedb_eewalerts(self, all=False):
@@ -237,10 +245,14 @@ class DownloaderApp(object):
 
         # Read DM logs
         dmlog = DMLogXML(config=self.params)
-        for filename in files:
-            print filename
+        numFiles = len(files)
+        for iFile,filename in enumerate(files):
+            if self.showProgress:
+                sys.stdout.write("\rProcessing DM logs...%d%%" % (((iFile+1)*100)/numFiles))
+                sys.stdout.flush()
             alerts = dmlog.load(filename)
             db.add_alerts(alerts)
+        sys.stdout.write("\n")
         return
 
     def _updatedb_matches(self):
