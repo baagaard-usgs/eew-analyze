@@ -130,6 +130,9 @@ class DownloaderApp(object):
                 self._updatedb_events()
             if args.updatedb == "matches" or args.all:
                 self._updatedb_matches()
+
+        if args.show_matches or args.all:
+            self._show_matches()
         return
 
     def _fetch_eewalerts(self, dateBegin, dateEnd):
@@ -240,6 +243,21 @@ class DownloaderApp(object):
             db.add_alerts(alerts)
         return
 
+    def _updatedb_matches(self):
+        if self.showProgress:
+            print("Finding EEW alerts matchings ComCat events...")
+
+        db = AnalysisData(self.params.get("files", "analysis_db"))
+        db.find_matches()
+        return 
+    
+    def _show_matches(self):
+        if self.showProgress:
+            print("Showing matches between ComCat and ShakeAlert...")
+
+        db = AnalysisData(self.params.get("files", "analysis_db"))
+        db.show_matches()
+        return 
     
     def initialize(self, config_filenames):
         """Set parameters from config file and DEFAULTS.
@@ -251,10 +269,11 @@ class DownloaderApp(object):
         import io
         config = ConfigParser.SafeConfigParser()
         config.readfp(io.BytesIO(DEFAULTS))
-        for filename in config_filenames.split(","):
-            if self.showProgress:
-                print("Fetching parameters from %s..." % filename)
-            config.read(filename)
+        if config_filenames:
+            for filename in config_filenames.split(","):
+                if self.showProgress:
+                    print("Fetching parameters from %s..." % filename)
+                config.read(filename)
 
         self.params = config
 
@@ -273,7 +292,7 @@ class DownloaderApp(object):
         import argparse
 
         parser = argparse.ArgumentParser()
-        parser.add_argument("--config", action="store", dest="config", required=True)
+        parser.add_argument("--config", action="store", dest="config")
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
         parser.add_argument("--fetch-eewalerts", action="store", dest="fetch_eewalerts", default=None)
         parser.add_argument("--fetch-events", action="store_true", dest="fetch_events")
@@ -281,6 +300,7 @@ class DownloaderApp(object):
         parser.add_argument("--initdb", action="store_true", dest="initdb")
         parser.add_argument("--dbstatus", action="store_true", dest="dbstatus")
         parser.add_argument("--updatedb", action="store", dest="updatedb", choices=["eew_alerts", "comcat_events", "matches"])
+        parser.add_argument("--show-matches", action="store_true", dest="show_matches")
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug", default=True)
