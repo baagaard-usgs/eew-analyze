@@ -7,8 +7,8 @@
 #
 
 import numpy
-import pyproj
-import math
+
+import greatcircle
 
 def shaking_time_vs(event, points, options):
     """Get shaking time based on origin time and shear wave speed.
@@ -22,18 +22,17 @@ def shaking_time_vs(event, points, options):
     :type options: dict
     :param options: Config options for shaking time.
     """
-    vs = float(options["vs"])
+    SEC_TO_MSEC = 1000.0
+    
+    vs = float(options["vs_mps"])
     originTime = numpy.datetime64(event["origin_time"])
     originLon = event["longitude"]
     originLat = event["latitude"]
     originDepth = event["depth_km"]*1.0e+3
-    
-    utmZone = int(math.floor(originLon + 180.0)/6.0) + 1
-    proj = pyproj.Proj(proj="utm", zone=utmZone, ellps="WGS84")
-    originX, originY = proj(originLon, originLat)
-    x, y = proj(points["longitude"], points["latitude"])
-    dist = ((x-originX)**2 + (y-originY)**2 + originDepth**2)**0.5
-    shakingTime = originTime + numpy.array(1000.0*dist/vs, dtype="timedelta64[ms]")
+
+    distHoriz = greatcircle.distance(originLon, originLat, points["longitude"], points["latitude"])
+    dist = (distHoriz**2 + originDepth**2)**0.5
+    shakingTime = originTime + numpy.array(SEC_TO_MSEC*dist/vs, dtype="timedelta64[ms]")
     return shakingTime
 
 
