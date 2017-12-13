@@ -18,6 +18,7 @@ from importlib import import_module
 from comcat import DetailEvent
 from analysisdb import AnalysisData
 from shakemap import ShakeMap
+import gdalraster
 
 DEFAULTS = """
 [events]
@@ -26,7 +27,7 @@ DEFAULTS = """
 
 [shaking_time]
 function = userdisplay.shaking_time_vs
-vs_mps = 3.4e+3 # User display uses 3.55e+3
+vs_mps = 3.4e+3 ; User display uses 3.55e+3
 
 [mmi_predicted]
 function = userdisplay.gmpe
@@ -39,6 +40,7 @@ mmi_threshold = 2.5
 [files]
 event_dir = ./data/[EVENTID]/
 analysis_db = ./data/analysisdb.sqlite
+population_density = ~/data/gis/populationdensity.tiff
 """
 
 # ----------------------------------------------------------------------
@@ -54,6 +56,17 @@ def _config_get_list(list_string):
     l = [f.strip() for f in list_string[1:-1].split(",")]
     return l
 
+
+def _get_dir(params, name):
+    """Get expanded directory name in [files] section.
+
+    :type params: ConfigParser
+    :param params: Configuration options
+
+    :type name: str
+    :param name: Option in [files] section.
+    """
+    return os.path.expanduser(params.get("files", name))
 
 # ----------------------------------------------------------------------
 class EEWAnalyzeApp(object):
@@ -91,7 +104,7 @@ class EEWAnalyzeApp(object):
         if args.process_events or args.all:
             for eqId in self.params.options("events"):
                 self.load_data(eqId)
-                self.process_event(mmiAlert=self.params.get("alerts","mmi_threshold"))
+                self.process_event(self.params.get("alerts","mmi_threshold"))
         return
 
     def initialize(self, config_filenames):
@@ -129,7 +142,7 @@ class EEWAnalyzeApp(object):
             print("Loading data for {}...".format(eqId))
 
         # ShakeMap
-        dataDir = self.params.get("files", "event_dir").replace("[EVENTID]", eqId)
+        dataDir = _get_dir(self.params, "event_dir").replace("[EVENTID]", eqId)
         filename = os.path.join(dataDir, "grid.xml.gz")
         self.shakemap = ShakeMap()
         self.shakemap.load(filename)
@@ -145,8 +158,8 @@ class EEWAnalyzeApp(object):
         self.shakingTime = fn(self.event, self.shakemap.data, dict(self.params.items("shaking_time")))
 
         # Population density
-        self.populationDensity = None
-        # :TODO: @brad
+        filename = _get_dir(self.params, "population_density")
+        self.populationDensity = gdalraster.resample(filename, self.shakemap.grid)
         return
     
     def process_event(self, mmiAlertThreshold):
@@ -156,35 +169,35 @@ class EEWAnalyzeApp(object):
         :param eqId: ComCat Earthquake id (e.g., nc72923380).
         """
         if self.showProgress:
-            print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlert))
+            print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlertThreshold))
 
-        functionPath = self.params.get("mmi_predicted", "function").split(".")
-        fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
+        # functionPath = self.params.get("mmi_predicted", "function").split(".")
+        # fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
-        npts = self.shakemap.data.shape[-1]
-        warningTime = -1.0e+30 * numpy.ones((npts,), dtype=numpy.float32)
-        mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
-        for alert in self.alerts:
-            mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
-            warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
+        # npts = self.shakemap.data.shape[-1]
+        # warningTime = -1.0e+30 * numpy.ones((npts,), dtype=numpy.float32)
+        # mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
+        # for alert in self.alerts:
+        #     mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
+        #     warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
 
-            # Update alert time if greater than previous
-            maskAlert = numpy.bitwise_and(mmiPredCur >= mmiAlertThreshold, warningTime < warningTimeCur)
-            warningTime[maskAlert] = warningTimeCur[maskAlert]
+        #     # Update alert time if greater than previous
+        #     maskAlert = numpy.bitwise_and(mmiPredCur >= mmiAlertThreshold, warningTime < warningTimeCur)
+        #     warningTime[maskAlert] = warningTimeCur[maskAlert]
 
-            # Update predicted MMI if greater than previous
-            maskMMI = mmiPredCur > mmiPred
-            mmiPred[maskMMI] = mmiPredCur[maskMMI]
+        #     # Update predicted MMI if greater than previous
+        #     maskMMI = mmiPredCur > mmiPred
+        #     mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
-        rasters = [
+        values = [
             ("mmi_obs", self.shakemap.data["mmi"],),
-            ("mmi_pred", mmiPred,),
-            ("warning_time", warningTime,),
-            ("population_density", populationDensity,),
+            #("mmi_pred", mmiPred,),
+            #("warning_time", warningTime,),
+            ("population_density", self.populationDensity,),
             ]
-        dataDir = self.params.get("files", "event_dir").replace("[EVENTID]", self.event["event_id"])
+        dataDir = _get_dir(self.params, "event_dir").replace("[EVENTID]", self.event["event_id"])
         filename = os.path.join(dataDir, "analysis_data.tiff")
-        gdalraster.write(filename, rasters, self.shakemap.grid)
+        gdalraster.write(filename, values, self.shakemap.grid)
         return
     
     def generate_report(self):
