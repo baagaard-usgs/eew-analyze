@@ -13,6 +13,8 @@ import logging
 import numpy
 from osgeo import ogr, gdal
 
+gdal.UseExceptions()
+
 DEFAULTS = """
 [census.geometry]
 shapefile = tl_2010_06_tabblock10.shp
@@ -110,7 +112,7 @@ class PopulationDensityApp(object):
 
         driverMemory = ogr.GetDriverByName("MEMORY")
         popDensityDataSrc = driverMemory.CreateDataSource("temp")
-        driverMemory.Open("temp", 1)
+        driverMemory.Open("temp", gdal)
         popDensityLayer = popDensityDataSrc.CreateLayer("temp", populationLayer.GetSpatialRef(), populationLayerDefn.GetGeomType())
         popDensityLayerDefn = popDensityLayer.GetLayerDefn()
 
@@ -152,7 +154,7 @@ class PopulationDensityApp(object):
         # Create the destination data source
         numX = int(1 + (xMax - xMin) / cellSizeDeg)
         numY = int(1 + (yMax - yMin) / cellSizeDeg)
-        rasterDataSrc = gdal.GetDriverByName('GTiff').Create("populationdensity.tiff", numX, numY, 1, gdal.GDT_Float32)
+        rasterDataSrc = gdal.GetDriverByName('GTiff').Create("populationdensity.tiff", numX, numY, gdal.GA_Update, gdal.GDT_Float32)
         rasterDataSrc.SetGeoTransform((xMin, cellSizeDeg, 0, yMax, 0, -cellSizeDeg))
         rasterDataSrc.SetProjection(popDensityLayer.GetSpatialRef().ExportToWkt())
         band = rasterDataSrc.GetRasterBand(1)
