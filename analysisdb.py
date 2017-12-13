@@ -188,14 +188,12 @@ class AnalysisData(object):
         self.connection.commit()
         return
 
-    def get_alerts(self, comcatId):
+    def alerts(self, comcatId):
         """Get ShakeAlert alerts for event matching ComCat id.
 
         :type comcatId: str
         :param comcatId: ComCat event id.
         """
-        import pdb
-        pdb.set_trace()
         self.cursor.execute("SELECT * FROM matches WHERE comcat_id=?", (comcatId,))
         match = self.cursor.fetchone()
 
