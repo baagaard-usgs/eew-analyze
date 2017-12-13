@@ -97,7 +97,7 @@ class CreateEqSetApp(object):
         """
         
         if self.showProgress:
-            print("Fetching events for earthquake set '%s'..." % domain)
+            print("Fetching events for earthquake set '{}'...".format(domain))
 
         from obspy.clients.fdsn import Client
         client = Client("USGS", debug=self.params.getboolean("fdsn.client", "debug"))
@@ -128,7 +128,7 @@ class CreateEqSetApp(object):
                     "date": str(event.preferred_origin().time.date),
                     "description": description,
                 }
-                fout.write("%(eqid)s = M%(mag).1f %(description)s, %(date)s\n" % info)
+                fout.write("{info[eqid]} = M{info[mag]:.1f} {info[description]}, {info[date]}\n".format(info=info))
 
         return
 
@@ -145,7 +145,7 @@ class CreateEqSetApp(object):
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:
-                    print("Fetching parameters from %s..." % filename)
+                    print("Fetching parameters from {}...".format(filename))
                 config.read(filename)
 
         self.params = config

@@ -218,7 +218,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...%d%%" % (((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%%".format(((iEvent+1)*100)/numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -248,7 +248,7 @@ class DownloaderApp(object):
         numFiles = len(files)
         for iFile,filename in enumerate(files):
             if self.showProgress:
-                sys.stdout.write("\rProcessing DM logs...%d%%" % (((iFile+1)*100)/numFiles))
+                sys.stdout.write("\rProcessing DM logs...{:d}%%".format(((iFile+1)*100)/numFiles))
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
             db.add_alerts(alerts)
@@ -284,7 +284,7 @@ class DownloaderApp(object):
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:
-                    print("Fetching parameters from %s..." % filename)
+                    print("Fetching parameters from {}...".format(filename))
                 config.read(filename)
 
         self.params = config
