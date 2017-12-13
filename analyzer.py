@@ -26,13 +26,13 @@ DEFAULTS = """
 
 [shaking_time]
 function = userdisplay.shaking_time_vs
-vs = 3.0e+3
+vs_mps = 3.4e+3 # User display uses 3.55e+3
 
 [mmi_predicted]
 function = userdisplay.gmpe
 
 [alerts]
-mmi = 2.5
+mmi_threshold = 2.5
 
 [map]
 
@@ -65,10 +65,12 @@ class EEWAnalyzeApp(object):
         """Constructor.
         """
         self.params = None
+        
+        self.event = None
         self.shakemap = None
         self.alerts = None
-        self.warningTime = None
-        self.alertRegion = None
+        self.shakingTime = None
+        self.populationDensity = None
         return
 
     def main(self):
@@ -89,7 +91,7 @@ class EEWAnalyzeApp(object):
         if args.process_events or args.all:
             for eqId in self.params.options("events"):
                 self.load_data(eqId)
-                self.process_event(mmiAlert=self.params.get("alerts","mmi"))
+                self.process_event(mmiAlert=self.params.get("alerts","mmi_threshold"))
         return
 
     def initialize(self, config_filenames):
@@ -104,7 +106,7 @@ class EEWAnalyzeApp(object):
         config.readfp(io.BytesIO(DEFAULTS))
         for filename in config_filenames.split(","):
             if self.showProgress:
-                print("Fetching parameters from %s..." % filename)
+                print("Fetching parameters from {}...".format(filename))
             config.read(filename)
 
         self.params = config
@@ -141,9 +143,13 @@ class EEWAnalyzeApp(object):
         functionPath = self.params.get("shaking_time", "function").split(".")
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
         self.shakingTime = fn(self.event, self.shakemap.data, dict(self.params.items("shaking_time")))
+
+        # Population density
+        self.populationDensity = None
+        # :TODO: @brad
         return
     
-    def process_event(self, mmiAlert):
+    def process_event(self, mmiAlertThreshold):
         """For given event, fetch data, process data, generate plots, and generate report.
         
         :type event: str
@@ -152,7 +158,33 @@ class EEWAnalyzeApp(object):
         if self.showProgress:
             print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlert))
 
-        raise NotImplementedError(":TODO: @brad")
+        functionPath = self.params.get("mmi_predicted", "function").split(".")
+        fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
+            
+        npts = self.shakemap.data.shape[-1]
+        warningTime = -1.0e+30 * numpy.ones((npts,), dtype=numpy.float32)
+        mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
+        for alert in self.alerts:
+            mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
+            warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
+
+            # Update alert time if greater than previous
+            maskAlert = numpy.bitwise_and(mmiPredCur >= mmiAlertThreshold, warningTime < warningTimeCur)
+            warningTime[maskAlert] = warningTimeCur[maskAlert]
+
+            # Update predicted MMI if greater than previous
+            maskMMI = mmiPredCur > mmiPred
+            mmiPred[maskMMI] = mmiPredCur[maskMMI]
+
+        rasters = [
+            ("mmi_obs", self.shakemap.data["mmi"],),
+            ("mmi_pred", mmiPred,),
+            ("warning_time", warningTime,),
+            ("population_density", populationDensity,),
+            ]
+        dataDir = self.params.get("files", "event_dir").replace("[EVENTID]", self.event["event_id"])
+        filename = os.path.join(dataDir, "analysis_data.tiff")
+        gdalraster.write(filename, rasters, self.shakemap.grid)
         return
     
     def generate_report(self):
