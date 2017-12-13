@@ -13,10 +13,11 @@ import sys
 import logging
 import datetime
 import dateutil.parser
-from import lib import import_module
+from importlib import import_module
 
 from comcat import DetailEvent
 from analysisdb import AnalysisData
+from shakemap import ShakeMap
 
 DEFAULTS = """
 [events]
@@ -24,13 +25,14 @@ DEFAULTS = """
 # nc72923380 = Mw 4.6 Paicines, 2017-11-13
 
 [shaking_time]
-module = userdisplay.ShakingTimeSWave
+function = userdisplay.shaking_time_vs
+vs = 3.0e+3
 
 [mmi_predicted]
-module = userdisplay.UserDisplayGMPE
+function = userdisplay.gmpe
 
 [alerts]
-mmi = 3.0
+mmi = 2.5
 
 [map]
 
@@ -112,10 +114,35 @@ class EEWAnalyzeApp(object):
     def show_parameters(self):
         """Write parameters to stdout.
         """
-        import sys
         self.params.write(sys.stdout)
         return
 
+    def load_data(self, eqId):
+        """Load ShakeMap and ShakeAlert data for event.
+
+        :type event: str
+        :param eqId: ComCat Earthquake id (e.g., nc72923380).
+        """
+        if self.showProgress:
+            print("Loading data for {}...".format(eqId))
+
+        # ShakeMap
+        dataDir = self.params.get("files", "event_dir").replace("[EVENTID]", eqId)
+        filename = os.path.join(dataDir, "grid.xml.gz")
+        self.shakemap = ShakeMap()
+        self.shakemap.load(filename)
+
+        # Analsis DB data (event and alerts)
+        db = AnalysisData(self.params.get("files", "analysis_db"))
+        self.event = db.comcat_event(eqId)
+        self.alerts = db.alerts(eqId)
+
+        # Shaking time
+        functionPath = self.params.get("shaking_time", "function").split(".")
+        fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
+        self.shakingTime = fn(self.event, self.shakemap.data, dict(self.params.items("shaking_time")))
+        return
+    
     def process_event(self, mmiAlert):
         """For given event, fetch data, process data, generate plots, and generate report.
         
@@ -142,7 +169,7 @@ class EEWAnalyzeApp(object):
         import argparse
 
         parser = argparse.ArgumentParser()
-        parser.add_argument("--config", action="store", dest="config")
+        parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
         parser.add_argument("--process-events", action="store_true", dest="process_events")
         parser.add_argument("--plot-map", action="store", dest="plot", default=None, choices=[None, "all", "map-mmi", "map-alert"])
@@ -152,33 +179,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--debug", action="store_true", dest="debug")
         return parser.parse_args()
 
-    def load_data(self, eqId):
-        """Load ShakeMap and ShakeAlert data for event.
-
-        :type event: str
-        :param eqId: ComCat Earthquake id (e.g., nc72923380).
-        """
-        if self.showProgress:
-            print("Loading data for {}...".format(eqId))
-
-        # ShakeMap
-        dataDir = self.params.get("files", "event_dir").replace("[EVENTID]", eqId)
-        filename = os.path.join(dataDir, "grid.xml.gz")
-        self.shakemap = ShakeMap()
-        self.shapemap.load(filename)
-
-        # Analsis DB data (event and alerts)
-        db = analysisdb.AnalysisData(self.params.get("files", "analysis_db"))
-        self.event = db.comcat_event(eqId)
-        self.alerts = db.alerts(eqId)
-
-        # Shaking time
-        timer = import_module(self.params.get("shaking_time", "module"))
-        self.shakingTime = timer.shaking_time(self.event)
-        
-        return
-    
- ======================================================================
+# ======================================================================
 if __name__ == "__main__":
     EEWAnalyzeApp().main()
 
