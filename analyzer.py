@@ -35,7 +35,7 @@ function = shakemap.gmpe
 gmpe = BSSA2014
 
 [alerts]
-mmi_threshold = 2.5
+mmi_threshold = 1.5
 
 [map]
 
