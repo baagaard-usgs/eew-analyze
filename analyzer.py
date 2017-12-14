@@ -11,6 +11,7 @@
 import os
 import sys
 import logging
+import numpy
 import datetime
 import dateutil.parser
 from importlib import import_module
@@ -27,11 +28,11 @@ DEFAULTS = """
 
 [shaking_time]
 function = userdisplay.shaking_time_vs
-vs_mps = 3.4e+3 ; User display uses 3.55e+3
+vs_kmps = 3.4 ; User display uses 3.55
 
 [mmi_predicted]
-function = userdisplay.gmpe
-vs30_mps = 300
+function = shakemap.gmpe
+gmpe = BSSA2014
 
 [alerts]
 mmi_threshold = 2.5
@@ -105,7 +106,7 @@ class EEWAnalyzeApp(object):
         if args.process_events or args.all:
             for eqId in self.params.options("events"):
                 self.load_data(eqId)
-                self.process_event(self.params.get("alerts","mmi_threshold"))
+                self.process_event(self.params.getfloat("alerts","mmi_threshold"))
         return
 
     def initialize(self, config_filenames):
@@ -172,30 +173,33 @@ class EEWAnalyzeApp(object):
         if self.showProgress:
             print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlertThreshold))
 
-        # functionPath = self.params.get("mmi_predicted", "function").split(".")
-        # fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
+        functionPath = self.params.get("mmi_predicted", "function").split(".")
+        fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
-        # npts = self.shakemap.data.shape[-1]
-        # warningTime = -1.0e+30 * numpy.ones((npts,), dtype=numpy.float32)
-        # mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
-        # for alert in self.alerts:
-        #     mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
-        #     warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
+        npts = self.shakemap.data.shape[-1]
+        warningTime = -1.0e+10 * numpy.ones((npts,), dtype="timedelta64[s]")
+        mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
+        for alert in self.alerts:
+            mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
+            warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
 
-        #     # Update alert time if greater than previous
-        #     maskAlert = numpy.bitwise_and(mmiPredCur >= mmiAlertThreshold, warningTime < warningTimeCur)
-        #     warningTime[maskAlert] = warningTimeCur[maskAlert]
+            # Update alert time if greater than previous
+            maskAlert = numpy.bitwise_and(mmiPredCur >= mmiAlertThreshold, warningTime < warningTimeCur)
+            warningTime[maskAlert] = warningTimeCur[maskAlert]
 
-        #     # Update predicted MMI if greater than previous
-        #     maskMMI = mmiPredCur > mmiPred
-        #     mmiPred[maskMMI] = mmiPredCur[maskMMI]
+            # Update predicted MMI if greater than previous
+            #maskMMI = mmiPredCur > mmiPred
+            # Update predicted MMI if greater than previous AND positive warning time
+            maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur > 0.0)
+            mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
         values = [
             ("mmi_obs", self.shakemap.data["mmi"],),
-            #("mmi_pred", mmiPred,),
-            #("warning_time", warningTime,),
+            ("mmi_pred", mmiPred,),
+            ("warning_time", warningTime,),
             ("population_density", self.populationDensity,),
             ]
+
         dataDir = _get_dir(self.params, "event_dir").replace("[EVENTID]", self.event["event_id"])
         filename = os.path.join(dataDir, "analysis_data.tiff")
         gdalraster.write(filename, values, self.shakemap.grid)
