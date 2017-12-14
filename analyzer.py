@@ -31,6 +31,7 @@ vs_mps = 3.4e+3 ; User display uses 3.55e+3
 
 [mmi_predicted]
 function = userdisplay.gmpe
+vs30_mps = 300
 
 [alerts]
 mmi_threshold = 2.5
