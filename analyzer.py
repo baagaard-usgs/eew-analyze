@@ -178,6 +178,7 @@ class EEWAnalyzeApp(object):
             
         npts = self.shakemap.data.shape[-1]
         warningTime = -1.0e+10 * numpy.ones((npts,), dtype="timedelta64[s]")
+        warningTimeZero = numpy.zeros((1,), dtype="timedelta64[s]")
         mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
         for alert in self.alerts:
             mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
@@ -190,7 +191,7 @@ class EEWAnalyzeApp(object):
             # Update predicted MMI if greater than previous
             #maskMMI = mmiPredCur > mmiPred
             # Update predicted MMI if greater than previous AND positive warning time
-            maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur > 0.0)
+            maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur >= warningTimeZero)
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
         values = [
