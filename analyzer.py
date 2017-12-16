@@ -181,6 +181,11 @@ class EEWAnalyzeApp(object):
         warningTimeZero = numpy.zeros((1,), dtype="timedelta64[s]")
         mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
         for alert in self.alerts:
+            if numpy.datetime64(alert["timestamp"]) > numpy.max(self.shakingTime):
+                # No points in grid with shaking time after current alert time
+                # :TODO: Add loggging debug
+                break
+            
             mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
             warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
 
