@@ -6,8 +6,11 @@
 # ======================================================================
 #
 
-from osgeo import gdal, osr
+import os
 import numpy
+from lxml import etree
+
+from osgeo import gdal, osr
 
 gdal.UseExceptions()
 
@@ -89,6 +92,57 @@ def write(filename, values, gridSpecs):
         band.WriteArray(value.reshape((numLat,numLon,)))
         band.FlushCache()
     dest.FlushCache()
+
+    write_bands_virtual(filename, dest)
     return
+
+def write_bands_virtual(filename, raster):
+
+    dataset = etree.Element("VRTDataset")
+    dataset.set("rasterXSize", "{:d}".format(raster.RasterXSize))
+    dataset.set("rasterYSize", "{:d}".format(raster.RasterYSize))
+
+    spatialref = etree.SubElement(dataset, "SRS")
+    spatialref.text = raster.GetProjection()
+    
+    geotrans = etree.SubElement(dataset, "GeoTransform")
+    geotrans.text = ", ".join(map(str, raster.GetGeoTransform()))
+
+    band = etree.SubElement(dataset, "VRTRasterBand")
+    band.set("dataType", "Float32")
+    band.set("band", "1")
+
+    colorinterp = etree.SubElement(band, "ColorInterp")
+    colorinterp.text = "Gray"
+
+    src = etree.SubElement(band, "SimpleSource")
+
+    srcFilename = etree.SubElement(src, "SourceFilename")
+    srcFilename.set("relativeToVRT", "1")
+    srcFilename.text = os.path.split(filename)[1]
+
+    srcBand = etree.SubElement(src, "SourceBand")
+
+    srcRect = etree.SubElement(src, "SrcRect")
+    srcRect.set("xOff", "0")
+    srcRect.set("yOff", "0")
+    srcRect.set("xSize", "{:d}".format(raster.RasterXSize))
+    srcRect.set("ySize", "{:d}".format(raster.RasterYSize))
+    
+    dstRect = etree.SubElement(src, "DstRect")
+    dstRect.set("xOff", "0")
+    dstRect.set("yOff", "0")
+    dstRect.set("xSize", "{:d}".format(raster.RasterXSize))
+    dstRect.set("ySize", "{:d}".format(raster.RasterYSize))
+
+    
+    for iband in range(raster.RasterCount):
+        srcBand.text = "{:d}".format(1+iband)
+        description = raster.GetRasterBand(1+iband).GetDescription()
+
+        tree = etree.ElementTree(dataset)
+        fileroot = filename[:filename.rfind(".")]
+        vfilename = "{0}-{1}.vrt".format(fileroot, description)
+        tree.write(vfilename)
 
 # End of file
