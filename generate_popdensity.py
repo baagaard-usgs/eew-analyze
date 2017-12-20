@@ -112,7 +112,7 @@ class PopulationDensityApp(object):
 
         driverMemory = ogr.GetDriverByName("MEMORY")
         popDensityDataSrc = driverMemory.CreateDataSource("temp")
-        driverMemory.Open("temp", gdal)
+        driverMemory.Open("temp", gdal.GA_Update)
         popDensityLayer = popDensityDataSrc.CreateLayer("temp", populationLayer.GetSpatialRef(), populationLayerDefn.GetGeomType())
         popDensityLayerDefn = popDensityLayer.GetLayerDefn()
 
