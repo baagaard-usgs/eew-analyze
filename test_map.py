@@ -11,11 +11,11 @@ standalone = True
 
 if standalone:
     app = qgis.core.QgsApplication([], True)
-    qgis.core.QgsApplication.setPrefixPath("/Applications/QGIS.app/Contents/MacOS", True)
+    #qgis.core.QgsApplication.setPrefixPath("/Applications/QGIS.app/Contents/MacOS", True)
     app.initQgis()
 
 values = ["warning_time", "mmi_obs", "mmi_pred", "population_density",]
-renderValues = ["mmi_obs", "population_density", "basemap"]
+renderValues = ["mmi_pred", "population_density", "basemap"]
 
 layers = {}
 for value in values:
@@ -37,12 +37,13 @@ layers["population_density"].setDrawingStyle("SingleBandGray")
 layers["population_density"].loadNamedStyle("pop_style.qml")
 
 layers["basemap"] = qgis.core.QgsRasterLayer("esri_streetmap.xml")
+if not layers["basemap"].isValid():
+    print("Could not load ESRI streetmap raster.")
 layers["basemap"].setDrawingStyle('MultiBandSingleBandGray')
-layers["basemap"].renderer().setGrayBand(1)
+layers["basemap"].renderer().setGrayBand(2)
 
 layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
-#layerRegistry.addMapLayers([layers[value] for value in values])
-layerRegistry.addMapLayer(layers["basemap"])
+layerRegistry.addMapLayers([layers[value] for value in values+["basemap"]])
 
 def contours_from_raster(filename, contourStart=1.5, contourInterval=0.5):
     src = gdal.Open(filename, gdal.GA_ReadOnly)
@@ -67,27 +68,22 @@ def contours_from_raster(filename, contourStart=1.5, contourInterval=0.5):
     return contourLayer
 
 # contour mmi_obs
-mmiObsContours = contours_from_raster("./data//nc72923380/analysis_data-mmi_obs.vrt", 1.5, 0.5)
-
-import pdb
-pdb.set_trace()
-
-#    gdal.ContourGenerate(ds.GetRasterBand(1), 10, 0, [], 0, 0, ogr_lyr, 0, 1)
+#mmiObsContours = contours_from_raster("./data//nc72923380/analysis_data-mmi_obs.vrt", 1.5, 0.5)
 
 
 
-#canvas = qgis.gui.QgsMapCanvas()
-#canvas.setCanvasColor(PyQt4.QtCore.Qt.white)
-#canvas.enableAntiAliasing(True)
-#canvas.setExtent(layers[renderValues[0]].extent())
-#canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layers[value]) for value in renderValues])
-#
-#if standalone:
-#    canvas.window().resize(1920, 1080)
-#    
-#renderer = canvas.mapRenderer()
-#renderer.setProjectionsEnabled(True)
-#renderer.setDestinationCrs(qgis.core.QgsCoordinateReferenceSystem("EPSG:3311"))
+canvas = qgis.gui.QgsMapCanvas()
+canvas.setCanvasColor(PyQt4.QtCore.Qt.white)
+canvas.enableAntiAliasing(True)
+canvas.setExtent(layers[renderValues[0]].extent())
+canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layers[value]) for value in renderValues])
+
+if standalone:
+    canvas.window().resize(1920, 1080)
+    
+renderer = canvas.mapRenderer()
+renderer.setDestinationCrs(qgis.core.QgsCoordinateReferenceSystem("EPSG:3311"))
+renderer.setProjectionsEnabled(True)
 #canvas.show()
 
 image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(1920, 1080), PyQt4.QtGui.QImage.Format_ARGB32_Premultiplied)
@@ -97,17 +93,6 @@ painter = PyQt4.QtGui.QPainter()
 painter.begin(image)
 painter.setRenderHint(PyQt4.QtGui.QPainter.Antialiasing)
 
-renderer = qgis.core.QgsMapRenderer()
-
-#renderer.setLayerSet([layers[value].id() for value in renderValues])
-renderer.setLayerSet([layers["basemap"].id()])
-renderer.setProjectionsEnabled(True)
-renderer.setDestinationCrs(qgis.core.QgsCoordinateReferenceSystem("EPSG:3311"))
-
-# set extent
-rect = qgis.core.QgsRectangle(renderer.fullExtent())
-rect.scale(1.1)
-renderer.setExtent(rect)
 
 # set output size
 renderer.setOutputSize(image.size(), image.logicalDpiX())
