@@ -6,16 +6,14 @@ import PyQt4.QtGui
 from osgeo import gdal, osr
 gdal.UseExceptions()
 
+useCanvas = False
 
-standalone = True
-
-if standalone:
-    app = qgis.core.QgsApplication([], True)
-    #qgis.core.QgsApplication.setPrefixPath("/Applications/QGIS.app/Contents/MacOS", True)
-    app.initQgis()
+app = qgis.core.QgsApplication([], True)
+#qgis.core.QgsApplication.setPrefixPath("/Applications/QGIS.app/Contents/MacOS", True)
+app.initQgis()
 
 values = ["warning_time", "mmi_obs", "mmi_pred", "population_density",]
-renderValues = ["mmi_pred", "population_density", "basemap"]
+renderValues = ["mmi_pred", "basemap"]
 
 layers = {}
 for value in values:
@@ -70,33 +68,42 @@ def contours_from_raster(filename, contourStart=1.5, contourInterval=0.5):
 # contour mmi_obs
 #mmiObsContours = contours_from_raster("./data//nc72923380/analysis_data-mmi_obs.vrt", 1.5, 0.5)
 
+wsize = (1024, 1024)
 
+if useCanvas:
+    canvas = qgis.gui.QgsMapCanvas()
+    canvas.setCanvasColor(PyQt4.QtCore.Qt.white)
+    canvas.enableAntiAliasing(True)
+    canvas.setExtent(layers[renderValues[0]].extent())
+    canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layers[value]) for value in renderValues])
+    canvas.window().resize(wsize[0], wsize[1])
+    renderer = canvas.mapRenderer()
+else: # If not using canvas renderer
+    renderer = qgis.core.QgsMapRenderer()
+    renderer.setExtent(layers[renderValues[0]].extent())
+    renderer.setLayerSet([layers[value].id() for value in renderValues])
 
-canvas = qgis.gui.QgsMapCanvas()
-canvas.setCanvasColor(PyQt4.QtCore.Qt.white)
-canvas.enableAntiAliasing(True)
-canvas.setExtent(layers[renderValues[0]].extent())
-canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layers[value]) for value in renderValues])
-
-if standalone:
-    canvas.window().resize(1920, 1080)
-    
-renderer = canvas.mapRenderer()
 renderer.setDestinationCrs(qgis.core.QgsCoordinateReferenceSystem("EPSG:3311"))
 renderer.setProjectionsEnabled(True)
-#canvas.show()
 
-image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(1920, 1080), PyQt4.QtGui.QImage.Format_ARGB32_Premultiplied)
+if useCanvas:
+    canvas.show()
+    import pdb
+    pdb.set_trace()
+    
+image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(wsize[0], wsize[1]), PyQt4.QtGui.QImage.Format_ARGB32_Premultiplied)
 image.fill(PyQt4.QtCore.Qt.white)
 
 painter = PyQt4.QtGui.QPainter()
 painter.begin(image)
 painter.setRenderHint(PyQt4.QtGui.QPainter.Antialiasing)
 
-
-# set output size
 renderer.setOutputSize(image.size(), image.logicalDpiX())
-
 renderer.render(painter)
+
 painter.end()
+
 image.save("test.png","png")
+
+
+app.exitQgis()
