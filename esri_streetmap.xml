@@ -15,6 +15,6 @@
   <BlockSizeX>256</BlockSizeX>
   <BlockSizeY>256</BlockSizeY>
   <Cache>
-    <Path>/home/brad/data_scratch/images/tiles/gdalwmscache</Path>	
+    <Path>gdalwmscache</Path>	
   </Cache>
 </GDAL_WMS>
