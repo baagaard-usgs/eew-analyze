@@ -15,7 +15,7 @@ from osgeo import gdal, osr
 gdal.UseExceptions()
 
 def resample(filename, gridSpecs):
-    """Resample/crop raster to match specified grid.
+    """Resample and crop raster to match specified grid.
 
     The grid specs come from ShakeMap which uses a vertex-based
     grid. We are writing a cell-base grid, so the ShakeMap vertices
@@ -52,7 +52,7 @@ def resample(filename, gridSpecs):
 
 
 def write(filename, values, gridSpecs):
-    """Write Get shaking time based on origin time and shear wave speed.
+    """Write values to GeoTiff raster file with grid specs from dictionary.
 
     The grid specs come from ShakeMap which uses a vertex-based
     grid. We are writing a cell-base grid, so the ShakeMap vertices
@@ -92,57 +92,38 @@ def write(filename, values, gridSpecs):
         band.WriteArray(value.reshape((numLat,numLon,)))
         band.FlushCache()
     dest.FlushCache()
-
-    write_bands_virtual(filename, dest)
     return
 
-def write_bands_virtual(filename, raster):
 
-    dataset = etree.Element("VRTDataset")
-    dataset.set("rasterXSize", "{:d}".format(raster.RasterXSize))
-    dataset.set("rasterYSize", "{:d}".format(raster.RasterYSize))
+def clone(filename, name, values, src):
+    """Write values to GeoTiff raster file with grid specs from src raster.
 
-    spatialref = etree.SubElement(dataset, "SRS")
-    spatialref.text = raster.GetProjection()
+    :type filename: str
+    :param filename:
+        Filename for GeoTiff raster.
+
+    :type values: Numpy array
+    :param values:
+        Array of values.
+
+    :type src: GDAL rastter
+    :param src: 
+        GDAL raster with from which values are derived used to specific grid information.
+
+    """
+    numLon = ":TODO:"
+    numLat = ":TODO:"
+    nbands = 1
     
-    geotrans = etree.SubElement(dataset, "GeoTransform")
-    geotrans.text = ", ".join(map(str, raster.GetGeoTransform()))
+    dest = gdal.GetDriverByName("GTiff").Create(filename, numLon, numLat, nbands, gdal.GDT_Float32)
+    dest.SetGeoTransform(src.GetGeoTransform())
+    dest.SetProjection(src.GetProjection())
 
-    band = etree.SubElement(dataset, "VRTRasterBand")
-    band.set("dataType", "Float32")
-    band.set("band", "1")
-
-    colorinterp = etree.SubElement(band, "ColorInterp")
-    colorinterp.text = "Gray"
-
-    src = etree.SubElement(band, "SimpleSource")
-
-    srcFilename = etree.SubElement(src, "SourceFilename")
-    srcFilename.set("relativeToVRT", "1")
-    srcFilename.text = os.path.split(filename)[1]
-
-    srcBand = etree.SubElement(src, "SourceBand")
-
-    srcRect = etree.SubElement(src, "SrcRect")
-    srcRect.set("xOff", "0")
-    srcRect.set("yOff", "0")
-    srcRect.set("xSize", "{:d}".format(raster.RasterXSize))
-    srcRect.set("ySize", "{:d}".format(raster.RasterYSize))
-    
-    dstRect = etree.SubElement(src, "DstRect")
-    dstRect.set("xOff", "0")
-    dstRect.set("yOff", "0")
-    dstRect.set("xSize", "{:d}".format(raster.RasterXSize))
-    dstRect.set("ySize", "{:d}".format(raster.RasterYSize))
-
-    
-    for iband in range(raster.RasterCount):
-        srcBand.text = "{:d}".format(1+iband)
-        description = raster.GetRasterBand(1+iband).GetDescription()
-
-        tree = etree.ElementTree(dataset)
-        fileroot = filename[:filename.rfind(".")]
-        vfilename = "{0}-{1}.vrt".format(fileroot, description)
-        tree.write(vfilename)
+    band = dest.GetRasterBand(1)
+    band.SetDescription(name)
+    band.WriteArray(values)
+    band.FlushCache()
+    dest.FlushCache()
+    return
 
 # End of file
