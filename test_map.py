@@ -8,7 +8,7 @@ gdal.UseExceptions()
 
 useCanvas = False
 
-app = qgis.core.QgsApplication([], True)
+app = qgis.core.QgsApplication([], False)
 #qgis.core.QgsApplication.setPrefixPath("/Applications/QGIS.app/Contents/MacOS", True)
 app.initQgis()
 
@@ -59,7 +59,7 @@ def contours_from_raster(filename, contourStart=1.5, contourInterval=0.5):
     contourLayer.CreateField(ogr.FieldDefn("mmi_obs", ogr.OFTReal))
     gdal.ContourGenerate(src.GetRasterBand(1), contourInterval, contourStart, 0, [], 0, 0, contourLayer, 0, 1)
     del contourDataSrc
-
+    
     # Create QgsVectorLayer (memory) and transfer geometry
     
     

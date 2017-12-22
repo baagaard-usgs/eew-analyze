@@ -19,6 +19,7 @@ from importlib import import_module
 from comcat import DetailEvent
 from analysisdb import AnalysisData
 from shakemap import ShakeMap
+from maps import MapPanels
 import gdalraster
 
 DEFAULTS = """
@@ -37,11 +38,22 @@ gmpe = BSSA2014
 [alerts]
 mmi_threshold = 1.5
 
-[map]
+[qgis]
+prefix_path = None
+
+[maps]
+projection = EPSG:3857
+width_pixels = 1024
+height_pixels = 1024
+bg_color = white
+basemap = esri_streetmap.xml
 
 [files]
 event_dir = ./data/[EVENTID]/
+plots_dir = ./data/plots/
+
 analysis_db = ./data/analysisdb.sqlite
+analysis_event = ./data/[EVENTID]/analysis_data.tiff
 population_density = ~/data/gis/populationdensity.tiff
 """
 
@@ -106,7 +118,12 @@ class EEWAnalyzeApp(object):
         if args.process_events or args.all:
             for eqId in self.params.options("events"):
                 self.load_data(eqId)
-                self.process_event(self.params.getfloat("alerts","mmi_threshold"))
+                self.process_event()
+
+        if args.plot_maps or args.all:
+            for eqId in self.params.options("events"):
+                maps = args.plot_maps if args.plot_maps else "all"
+                self.plot_maps(eqId, maps)
         return
 
     def initialize(self, config_filenames):
@@ -164,15 +181,20 @@ class EEWAnalyzeApp(object):
         self.populationDensity = gdalraster.resample(filename, self.shakemap.grid)
         return
     
-    def process_event(self, mmiAlertThreshold):
+    def process_event(self, mmiAlertThreshold=None):
         """For given event, fetch data, process data, generate plots, and generate report.
         
-        :type event: str
-        :param eqId: ComCat Earthquake id (e.g., nc72923380).
+        :type mmiAlertThreshold: float
+        :param mmiAlertThreshold:
+            MMI threshold for sending alert. Regions with predicted
+            MMI above this threshold would receive an alert.
         """
+        if mmiAlertThreshold is None:
+            mmiAlertThreshold = self.params.getfloat("alerts","mmi_threshold")
         if self.showProgress:
             print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlertThreshold))
 
+            
         functionPath = self.params.get("mmi_predicted", "function").split(".")
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
@@ -210,6 +232,17 @@ class EEWAnalyzeApp(object):
         filename = os.path.join(dataDir, "analysis_data.tiff")
         gdalraster.write(filename, values, self.shakemap.grid)
         return
+
+    def plot_maps(self, eqId, maps):
+        """Plot maps with ShakeAlert performance information.
+
+        :type event: str
+        :param eqId: ComCat Earthquake id (e.g., nc72923380).
+        """
+        panels = MapPanels(eqId, self.params)
+        if maps == "mmi" or maps =="all":
+            panels.mmi_observed()
+        return
     
     def generate_report(self):
         """Assemble plots, etc into PDF file.
@@ -228,7 +261,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
         parser.add_argument("--process-events", action="store_true", dest="process_events")
-        parser.add_argument("--plot-map", action="store", dest="plot", default=None, choices=[None, "all", "map-mmi", "map-alert"])
+        parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)

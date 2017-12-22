@@ -30,7 +30,7 @@ class EEWServer(object):
         """Constructor with configuraton.
 
         :type config: ConfigParser
-        :param config: Configuration for ShakeAlert.
+        :param config: Configuration for application.
 
         """
         self.config = config
