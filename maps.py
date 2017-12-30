@@ -10,6 +10,7 @@ import os
 import numpy
 
 import qgis.core
+import qgis.gui
 import PyQt4.QtCore
 import PyQt4.QtGui
 from osgeo import gdal, osr
@@ -46,7 +47,7 @@ class MapPanels(object):
         self._exitQgis()
         return
         
-    
+
     def mmi_observed(self):
         """Create map with observed MMI with contours.
         """
@@ -59,25 +60,58 @@ class MapPanels(object):
         mmi.loadNamedStyle("mmi.qml")
 
         mmiContours = self.layers["mmi_obs_contour"]
-        symbolLayer = mmiContours.rendererV2().symbol().symbolLayer(0)
-        symbolLayer.setColor(PyQt4.QtGui.QColor("#000000"))
-        symbolLayer.setWidth(2.0)
-
+        self._set_contour_style(mmiContours)
+        self._add_labels(mmiContours)
+            
         #epicenter = self.layers["epicenter_obs"]
         # :TODO: set style
         
-        layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
-        layerRegistry.addMapLayers([mmiContours, mmi, basemap])
-        self._render(layerRegistry, mmi.extent(), "mmi_obs", "png")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png")
         return
 
     def mmi_predicted(self):
+        """Create map with observed MMI with contours.
+        """
+        basemap = self.layers["basemap"]
+        basemap.pipe().hueSaturationFilter().setGrayscaleMode(int(qgis.core.QgsImageOperation.GrayscaleLightness))
+        basemap.pipe().brightnessFilter().setBrightness(50)
+        basemap.pipe().brightnessFilter().setContrast(-20)
+        
+        mmi = self.layers["mmi_pred"]
+        mmi.loadNamedStyle("mmi.qml")
+
+        mmiContours = self.layers["mmi_pred_contour"]
+        self._set_contour_style(mmiContours)
+        self._add_labels(mmiContours)
+            
+        #epicenter = self.layers["epicenter_obs"]
+        # :TODO: set style
+        
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png")
         return
 
     def mmi_residual(self):
         return
 
     def mmi_warning_time(self):
+        """Create map with observed MMI with contours.
+        """
+        basemap = self.layers["basemap"]
+        basemap.pipe().hueSaturationFilter().setGrayscaleMode(int(qgis.core.QgsImageOperation.GrayscaleLightness))
+        basemap.pipe().brightnessFilter().setBrightness(50)
+        basemap.pipe().brightnessFilter().setContrast(-20)
+        
+        mmi = self.layers["mmi_obs"]
+        mmi.loadNamedStyle("mmi.qml")
+
+        warningContours = self.layers["warning_time_contour"]
+        self._set_contour_style(warningContours)
+        self._add_labels(warningContours)
+            
+        #epicenter = self.layers["epicenter_obs"]
+        # :TODO: set style
+        
+        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png")
         return
 
     def alert_categories(self):
@@ -130,7 +164,10 @@ class MapPanels(object):
             self.layers[cvalue] = qgisconverter.ogr_to_qgisvector(ogrLayer, filename)
         del src
 
+        layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
+        layerRegistry.addMapLayers([layer for layer in self.layers.values()])
         return
+    
         # Epicenter
         options = "delimiter={delimiter}&crs=EPSG:4326&xField={x}&yField={}".format(delimiter="|", x="longitude", y="latitude")
         uri = "file://{filename}&{options}".format(filename, options)
@@ -138,11 +175,11 @@ class MapPanels(object):
 
         uri = "file://{filename}&{options}".format(filename, options)
         self.layers["epicenter_pred"] = qgis.core.QgsVectorLayer(uri, "epicenter_pred", "delimitedtext")
-
+        
         return
     
     def _initQgis(self):
-        self.qgis = qgis.core.QgsApplication([], False)
+        self.qgis = qgis.core.QgsApplication([], True)
         qgisPrefixPath = self.config.get("qgis", "prefix_path")
         if qgisPrefixPath != "None":
             # "/Applications/QGIS.app/Contents/MacOS"
@@ -150,37 +187,81 @@ class MapPanels(object):
         self.qgis.initQgis()
         return
 
-    def _render(self, layerRegistry, extent, name, format):
+    def _add_labels(self, layer):
+        labels = qgis.core.QgsPalLayerSettings()
+        labels.readFromLayer(layer)
+        labels.enabled = True
+        labels.fieldName = "mmi_obs"
+        labels.fontSizeInMapUnits = False
+        labels.fontLimitPixelSize = True
+        labels.fontMinPixelSize = 8
+        labels.textFont.setFamily("Arial Narrow")
+        labels.textFont.setPointSize(10)
+        labels.textFont.setWeight(labels.textFont.Normal)
+        labels.textColor = PyQt4.QtGui.QColor("#000000")
+        labels.placement = qgis.core.QgsPalLayerSettings.AboveLine
+        labels.writeToLayer(layer)
+        return
+
+    def _set_contour_style(self, layer):
+        symbolLayer = layer.rendererV2().symbol().symbolLayer(0)
+        symbolLayer.setColor(PyQt4.QtGui.QColor("#000000")) # works
+        symbolLayer.setWidth(4.0)
+        symbolLayer.setWidthUnit(qgis.core.QgsSymbolV2.Pixel)
+        return
+    
+    def _render(self, layers, extent, name, format):
         """Render image to file in given format.
         """
-        renderer = qgis.core.QgsMapRenderer()
-        renderer.setExtent(extent)
-        renderer.setLayerSet([layer.id() for layer in layerRegistry.children()])
+        imageWidth = self.config.getint("maps", "width_pixels")
+        imageHeight = self.config.getint("maps", "height_pixels")
+        canvas = qgis.gui.QgsMapCanvas()
+        canvas.setCanvasColor(PyQt4.QtCore.Qt.white)
+        canvas.enableAntiAliasing(True)
+        canvas.setExtent(extent)
+        canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layer) for layer in layers])
+        canvas.window().resize(imageWidth, imageHeight)
+        renderer = canvas.mapRenderer()
         
         projection = self.config.get("maps", "projection")
         renderer.setDestinationCrs(qgis.core.QgsCoordinateReferenceSystem(projection))
         renderer.setProjectionsEnabled(True)
 
-        
-        imageWidth = self.config.getint("maps", "width_pixels")
-        imageHeight = self.config.getint("maps", "height_pixels")
         bgColor = self.config.get("maps", "bg_color")
-        image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(imageWidth, imageHeight), PyQt4.QtGui.QImage.Format_ARGB32_Premultiplied)
+
+        composer = qgis.core.QgsComposition(renderer)
+        composer.setPlotStyle(qgis.core.QgsComposition.Print)
+        dpmm = 150 / 25.4
+        composer.setPaperSize(imageWidth/dpmm, imageHeight/dpmm)
+        composer.setPrintResolution(dpmm*25.4)
+        
+        x, y = 0,0
+        w, h = composer.paperWidth(), composer.paperHeight()
+        composerMap = qgis.core.QgsComposerMap(composer, x, y, w, h)
+        composer.addItem(composerMap)
+
+        item = qgis.core.QgsComposerScaleBar(composer)
+        item.setStyle('Single box') # optionally modify the style
+        item.setComposerMap(composerMap)
+        item.applyDefaultSize()
+        composer.addItem(item)
+
+        # create output image and initialize it
+        image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(imageWidth, imageHeight), PyQt4.QtGui.QImage.Format_ARGB32)
+        image.setDotsPerMeterX(dpmm * 1000)
+        image.setDotsPerMeterY(dpmm * 1000)
         image.fill(PyQt4.QtGui.QColor(bgColor))
 
-        painter = PyQt4.QtGui.QPainter()
-        painter.begin(image)
-        painter.setRenderHint(PyQt4.QtGui.QPainter.Antialiasing)
-        
-        renderer.setOutputSize(image.size(), image.logicalDpiX())
-        renderer.render(painter)
-
+        # render the composition
+        painter = PyQt4.QtGui.QPainter(image)
+        composer.renderPage(painter, 0)
         painter.end()
 
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = "{eq}-map_{name}.{format}".format(eq=self.eqId, name=name, format=format)
+        print filename
         image.save(os.path.join(plotsDir, filename), format)
         return
 
