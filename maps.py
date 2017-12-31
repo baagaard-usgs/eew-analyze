@@ -155,8 +155,8 @@ class MapPanels(object):
                 clevels = []
             else:
                 cstart = 0
-                cinterval = 0
-                clevels = [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
+                cinterval = 2.0
+                clevels = []
             cvalue = value+"_contour"
             ogrLayer = gdalraster.contours_from_raster(src, value, cstart, cinterval, clevels)
             fileSuffix = "_{}.shp".format(cvalue)
