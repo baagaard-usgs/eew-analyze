@@ -14,6 +14,8 @@ from osgeo import gdal, ogr, osr
 
 gdal.UseExceptions()
 
+NO_DATA_VALUE = -999.0
+
 def resample(filename, gridSpecs):
     """Resample and crop raster to match specified grid.
 
@@ -91,6 +93,7 @@ def write(filename, values, gridSpecs):
     for ivalue,(name,value,) in enumerate(values):
         band = dest.GetRasterBand(1+ivalue)
         band.SetDescription(name)
+        band.SetNoDataValue(NO_DATA_VALUE)
         band.WriteArray(value.reshape((numLat,numLon,)))
         band.FlushCache()
     dest.FlushCache()
@@ -170,7 +173,7 @@ def contours_from_raster(raster, bandName, cstart=0.0, cinterval=10.0, clevels=[
     ogrLayer.CreateField(ogr.FieldDefn("id", ogr.OFTInteger))
     ogrLayer.CreateField(ogr.FieldDefn("mmi_obs", ogr.OFTReal))
 
-    gdal.ContourGenerate(cband, cinterval, cstart, clevels, 0, 0, ogrLayer, 0, 1)
+    gdal.ContourGenerate(cband, cinterval, cstart, clevels, 1, NO_DATA_VALUE, ogrLayer, 0, 1)
 
     return contours
 

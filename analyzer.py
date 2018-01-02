@@ -39,11 +39,12 @@ gmpe = BSSA2014
 mmi_threshold = 1.5
 
 [qgis]
-prefix_path = None
+#prefix_path = None
+prefix_path = /Applications/QGIS.app/Contents/MacOS
 
 [maps]
 projection = EPSG:3857
-width_pixels = 1024
+width_pixels = 1280
 height_pixels = 1024
 bg_color = white
 basemap = esri_streetmap.xml
@@ -199,10 +200,11 @@ class EEWAnalyzeApp(object):
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
         npts = self.shakemap.data.shape[-1]
-        warningTime = -1.0e+10 * numpy.ones((npts,), dtype="timedelta64[s]")
         warningTimeZero = numpy.zeros((1,), dtype="timedelta64[s]")
-        mmiPred = numpy.zeros((npts,), dtype=numpy.float32)
-        for alert in self.alerts:
+        warningTime = gdalraster.NO_DATA_VALUE * numpy.ones((npts,), dtype="timedelta64[s]")
+        mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones((npts,), numpy.float32)
+        
+        for alert in self.alerts[20:21]:
             if numpy.datetime64(alert["timestamp"]) > numpy.max(self.shakingTime):
                 # No points in grid with shaking time after current alert time
                 # :TODO: Add loggging debug
@@ -212,7 +214,7 @@ class EEWAnalyzeApp(object):
             warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
 
             # Update alert time if greater than previous
-            maskAlert = numpy.bitwise_and(mmiPredCur >= mmiAlertThreshold, warningTime < warningTimeCur)
+            maskAlert = numpy.bitwise_and(warningTimeCur > warningTime, mmiPredCur >= mmiAlertThreshold)
             warningTime[maskAlert] = warningTimeCur[maskAlert]
 
             # Update predicted MMI if greater than previous
@@ -221,10 +223,12 @@ class EEWAnalyzeApp(object):
             maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur >= warningTimeZero)
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
+        warningTime = warningTime.astype("timedelta64[us]").astype("float32")/1.0e+6
         values = [
             ("mmi_obs", self.shakemap.data["mmi"],),
             ("mmi_pred", mmiPred,),
             ("warning_time", warningTime,),
+            ("shaking_time", self.shakingTime,),
             ("population_density", self.populationDensity,),
             ]
 
@@ -242,6 +246,8 @@ class EEWAnalyzeApp(object):
         panels = MapPanels(eqId, self.params)
         if maps == "mmi" or maps =="all":
             panels.mmi_observed()
+            panels.mmi_predicted()
+            panels.mmi_warning_time()
         return
     
     def generate_report(self):
