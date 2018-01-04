@@ -37,6 +37,7 @@ gmpe = BSSA2014
 
 [alerts]
 mmi_threshold = 1.5
+magnitude_threshold = 4.45
 
 [qgis]
 #prefix_path = None
@@ -99,6 +100,7 @@ class EEWAnalyzeApp(object):
         self.alerts = None
         self.shakingTime = None
         self.populationDensity = None
+        self.maps = None
         return
 
     def main(self):
@@ -119,7 +121,7 @@ class EEWAnalyzeApp(object):
         if args.process_events or args.all:
             for eqId in self.params.options("events"):
                 self.load_data(eqId)
-                self.process_event()
+                self.process_event(plotAlertMaps=args.plot_alert_maps)
 
         if args.plot_maps or args.all:
             for eqId in self.params.options("events"):
@@ -182,7 +184,7 @@ class EEWAnalyzeApp(object):
         self.populationDensity = gdalraster.resample(filename, self.shakemap.grid)
         return
     
-    def process_event(self, mmiAlertThreshold=None):
+    def process_event(self, mmiAlertThreshold=None, plotAlertMaps=False):
         """For given event, fetch data, process data, generate plots, and generate report.
         
         :type mmiAlertThreshold: float
@@ -196,6 +198,7 @@ class EEWAnalyzeApp(object):
             print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlertThreshold))
 
             
+        dataDir = _get_dir(self.params, "event_dir").replace("[EVENTID]", self.event["event_id"])
         functionPath = self.params.get("mmi_predicted", "function").split(".")
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
@@ -203,37 +206,70 @@ class EEWAnalyzeApp(object):
         warningTimeZero = numpy.zeros((1,), dtype="timedelta64[s]")
         warningTime = gdalraster.NO_DATA_VALUE * numpy.ones((npts,), dtype="timedelta64[s]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones((npts,), numpy.float32)
-        
-        for alert in self.alerts[20:21]:
+
+        self.maps = MapPanels(self.params)
+        self.maps.load_basemap()
+
+        shakingTimeRel = self._timedelta_to_seconds(self.shakingTime - numpy.datetime64(self.event["origin_time"]))
+
+        thresholdReached = False
+        magnitudeThreshold = self.params.getfloat("alerts", "magnitude_threshold")
+        for alert in self.alerts:
             if numpy.datetime64(alert["timestamp"]) > numpy.max(self.shakingTime):
-                # No points in grid with shaking time after current alert time
-                # :TODO: Add loggging debug
-                break
+                # Skip alerts with no positive warning times in
+                # domain. Changes in estimated earthquake location
+                # could result in later alerts having positive warning
+                # times.
+                logging.getLogger(__name__).debug("Skipping alert version {ver} with no positive warning times.".format(ver=alert["version"]))
+                continue
+            if not thresholdReached and alert["magnitude"] < magnitudeThreshold:
+                continue
+            else:
+                if not thresholdReached:
+                    tstamp = numpy.datetime64(alert["timestamp"])
+                    wtime = self._timedelta_to_seconds(tstamp - numpy.datetime64(self.event["origin_time"]))
+                    msg = "Alert threshold reached at {tstamp}, {wtime:.1f}s after origin time.".format(tstamp=tstamp, wtime=wtime)
+                    print msg
+                    logging.getLogger(__name__).info(msg)
+                thresholdReached = True
+                
             
             mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
             warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
-
+            
+            if plotAlertMaps:
+                filename = self.params.get("files", "analysis_event").replace("[EVENTID]", self.event["event_id"])
+                values = [
+                    ("mmi_pred", mmiPredCur,),
+                    ("warning_time", self._timedelta_to_seconds(warningTimeCur),),
+                ]
+                gdalraster.write(filename, values, self.shakemap.grid)
+                self.maps.load_data(self.event["event_id"], alertVersion=alert["version"])
+                self.maps.mmi_predicted(showZeroWarningTime=True)
+                self.maps.mmi_warning_time()
+            
             # Update alert time if greater than previous
             maskAlert = numpy.bitwise_and(warningTimeCur > warningTime, mmiPredCur >= mmiAlertThreshold)
             warningTime[maskAlert] = warningTimeCur[maskAlert]
 
-            # Update predicted MMI if greater than previous
-            #maskMMI = mmiPredCur > mmiPred
             # Update predicted MMI if greater than previous AND positive warning time
             maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur >= warningTimeZero)
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
-        warningTime = warningTime.astype("timedelta64[us]").astype("float32")/1.0e+6
+            # Update predicted MMI if greater than previous AND current warning time is negative
+            maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTime < warningTimeZero)
+            mmiPred[maskMMI] = mmiPredCur[maskMMI]
+
+        # Convert warning time to floating point value in seconds
         values = [
             ("mmi_obs", self.shakemap.data["mmi"],),
             ("mmi_pred", mmiPred,),
-            ("warning_time", warningTime,),
-            ("shaking_time", self.shakingTime,),
+            ("warning_time", self._timedelta_to_seconds(warningTime),),
+            ("shaking_time", shakingTimeRel,),
             ("population_density", self.populationDensity,),
             ]
 
-        dataDir = _get_dir(self.params, "event_dir").replace("[EVENTID]", self.event["event_id"])
-        filename = os.path.join(dataDir, "analysis_data.tiff")
+        filename = self.params.get("files", "analysis_event").replace("[EVENTID]", self.event["event_id"])
         gdalraster.write(filename, values, self.shakemap.grid)
         return
 
@@ -243,11 +279,14 @@ class EEWAnalyzeApp(object):
         :type event: str
         :param eqId: ComCat Earthquake id (e.g., nc72923380).
         """
-        panels = MapPanels(eqId, self.params)
+        if not self.maps:
+            self.maps = MapPanels(self.params)
+        self.maps.load_basemap()
+        self.maps.load_data(eqId)
         if maps == "mmi" or maps =="all":
-            panels.mmi_observed()
-            panels.mmi_predicted()
-            panels.mmi_warning_time()
+            self.maps.mmi_observed()
+            self.maps.mmi_predicted()
+            self.maps.mmi_warning_time()
         return
     
     def generate_report(self):
@@ -267,13 +306,17 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
         parser.add_argument("--process-events", action="store_true", dest="process_events")
+        parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
-        parser.add_argument("--debug", action="store_true", dest="debug")
+        parser.add_argument("--debug", action="store_true", dest="debug", default=True)
         return parser.parse_args()
 
+    def _timedelta_to_seconds(self, value):
+        return value.astype("timedelta64[us]").astype("float32")/1.0e+6
+    
 # ======================================================================
 if __name__ == "__main__":
     EEWAnalyzeApp().main()
