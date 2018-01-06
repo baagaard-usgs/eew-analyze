@@ -36,8 +36,10 @@ function = shakemap.gmpe
 gmpe = BSSA2014
 
 [alerts]
-mmi_threshold = 1.5
-magnitude_threshold = 4.45
+mmi_threshold = 0
+magnitude_threshold = 2.95
+#mmi_threshold = 1.5
+#magnitude_threshold = 4.45
 
 [qgis]
 #prefix_path = None
@@ -257,16 +259,38 @@ class EEWAnalyzeApp(object):
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
             # Update predicted MMI if greater than previous AND current warning time is negative
-            maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTime < warningTimeZero)
-            mmiPred[maskMMI] = mmiPredCur[maskMMI]
+            #maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTime < warningTimeZero)
+            #mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
-        # Convert warning time to floating point value in seconds
+        # Compute TN (0), FN (1), FP (2), and TP (3) regions
+        alertCategories = numpy.zeros(mmiPred.shape, numpy.int32)
+        mmiDamage = 4.5
+        mmiObs = self.shakemap.data["mmi"]
+
+        maskTN = numpy.bitwise_and(mmiObs < mmiDamage, mmiPred < mmiAlertThreshold)
+            
+        maskFP = numpy.bitwise_and(mmiObs < mmiDamage, mmiPred >= mmiAlertThreshold)
+        maskTN = numpy.bitwise_or(maskTN, maskFP)
+        maskFP = numpy.bitwise_and(maskFP, warningTime >= warningTimeZero)
+        
+        maskFN = numpy.bitwise_and(mmiObs >= mmiDamage, mmiPred < mmiAlertThreshold)
+        
+        maskTP = numpy.bitwise_and(mmiObs >= mmiDamage, mmiPred >= mmiAlertThreshold)
+        maskFN = numpy.bitwise_or(maskFN, maskTP)
+        maskTP = numpy.bitwise_and(maskTP, warningTime >= warningTimeZero)
+
+        alertCategories[maskTN] = 0
+        alertCategories[maskFN] = 1
+        alertCategories[maskFP] = 2
+        alertCategories[maskTP] = 3
+            
         values = [
             ("mmi_obs", self.shakemap.data["mmi"],),
             ("mmi_pred", mmiPred,),
             ("warning_time", self._timedelta_to_seconds(warningTime),),
             ("shaking_time", shakingTimeRel,),
             ("population_density", self.populationDensity,),
+            ("alert_categories", alertCategories,),
             ]
 
         filename = self.params.get("files", "analysis_event").replace("[EVENTID]", self.event["event_id"])
