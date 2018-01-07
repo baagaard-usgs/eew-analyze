@@ -50,9 +50,7 @@ class MapPanels(object):
         basemap = qgis.core.QgsRasterLayer(filename)
         if not basemap.isValid():
             raise IOError("Could not load basemap from '{}'.".format(filename))
-        basemap.pipe().hueSaturationFilter().setGrayscaleMode(int(qgis.core.QgsImageOperation.GrayscaleLightness))
-        basemap.pipe().brightnessFilter().setBrightness(50)
-        basemap.pipe().brightnessFilter().setContrast(-20)
+        basemap.loadNamedStyle("basemap.qml")
         self.baseLayers["basemap"] = basemap
 
         layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
@@ -101,10 +99,10 @@ class MapPanels(object):
             self.dataLayers[cvalue] = qgisconverter.ogr_to_qgisvector(ogrLayer, filenameLayer)
 
         if self.dataLayers.has_key("mmi_obs") and self.dataLayers.has_key("mmi_pred"):
-            # MMI residual (predicted - observed)
+            # MMI residual (observed - predicted)
             mmiObs = numpy.array(src.GetRasterBand(1).ReadAsArray())
             mmiPred = numpy.array(src.GetRasterBand(2).ReadAsArray())
-            mmiResidual = mmiPred - mmiObs
+            mmiResidual = mmiObs - mmiPred
             filenameResidual = filename.replace(".tiff", "-mmi_residual.tiff")
             gdalLayer = gdalraster.clone_new_data("mmi_residual", mmiResidual, src)
             self.dataLayers["mmi_residual"] = qgisconverter.gdal_to_qgisraster(gdalLayer, filenameResidual)
@@ -167,6 +165,15 @@ class MapPanels(object):
         return
 
     def mmi_residual(self):
+        basemap = self.baseLayers["basemap"]
+        
+        mmiResidual = self.dataLayers["mmi_residual"]
+        mmiResidual.loadNamedStyle("mmi_residual.qml")
+
+        #epicenter = self.dataLayers["epicenter_obs"]
+        # :TODO: set style
+        
+        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png")
         return
 
     def mmi_warning_time(self):

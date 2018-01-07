@@ -311,6 +311,7 @@ class EEWAnalyzeApp(object):
             self.maps.mmi_observed()
             self.maps.mmi_predicted()
             self.maps.mmi_warning_time()
+            self.maps.mmi_residual()
         return
     
     def generate_report(self):
