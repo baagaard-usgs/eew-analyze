@@ -115,7 +115,6 @@ class CreateEqSetApp(object):
 
 
         blacklist = self.params.options("blacklist")
-        print blacklist
         filename = self.params.get("files", "filename_template").replace("[DOMAIN]", domain)
         path = os.path.split(filename)[0]
         if not os.path.isdir(path):
