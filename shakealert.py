@@ -63,7 +63,7 @@ class EEWServer(object):
         username = self.config.get("shakealert.demonstration", "username")
         password = self.config.get("shakealert.demonstration", "password")
         urlCookie = urlTemplate.replace("[SERVER]", name)
-        urlLogin = urlCookie + "j_security_check"
+        urlLogin = urlCookie + "/j_security_check"
 
         payload = {
             "j_username": username,
