@@ -247,17 +247,43 @@ class MapPanels(object):
         dpmm = 150 / 25.4
         composer.setPaperSize(imageWidth/dpmm, imageHeight/dpmm)
         composer.setPrintResolution(dpmm*25.4)
-        
+
+        # Map
         x, y = 0,0
         w, h = composer.paperWidth(), composer.paperHeight()
-        composerMap = qgis.core.QgsComposerMap(composer, x, y, w, h)
-        composer.addItem(composerMap)
+        map = qgis.core.QgsComposerMap(composer, x, y, w, h)
+        #grid = map.grid()
+        #grid.setUnits(grid.MapUnit)
+        #grid.setIntervalX(0.5)
+        #grid.setIntervalY(0.5)
+        #grid.setFrameStyle(grid.Zebra)
+        #grid.setStyle(grid.FrameAnnotationsOnly)
+        #grid.setAnnotationFormat(grid.Decimal)
+        #grid.setAnnotationPrecision(2)
+        #grid.setFrameSideFlag(grid.FrameLeft)
+        composer.addItem(map)
 
+        # Scale bar
         item = qgis.core.QgsComposerScaleBar(composer)
-        item.setStyle('Single box') # optionally modify the style
-        item.setComposerMap(composerMap)
+        item.setStyle('Single Box') # optionally modify the style
+        item.setComposerMap(map)
         item.applyDefaultSize()
+        item.setNumSegmentsLeft(0)
+        item.setNumSegments(2)
         composer.addItem(item)
+
+        # Title/label
+        #title = qgis.core.QgsComposerLabel(composer)
+        #title.setText("Hello world")
+        #title.adjustSizeToText()
+        #composer.addItem(title)
+        
+        # Legend
+        #legend = qgis.core.QgsComposerLegend(composer)
+        #legend.model().setLayerSet(renderer.layerSet())
+        #legend.setBoxSpace(0)
+        #legend.setTitle(Qstring(""))
+        #composer.addItem(legend)
 
         # create output image and initialize it
         image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(imageWidth, imageHeight), PyQt4.QtGui.QImage.Format_ARGB32)
