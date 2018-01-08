@@ -32,6 +32,9 @@ orderby = magnitude
 [fdsn.client]
 debug = False
 
+[blacklist]
+ci11129826 = deleted event
+
 [files]
 filename_template = ./eqsets/[DOMAIN].cfg
 """
@@ -110,6 +113,9 @@ class CreateEqSetApp(object):
         kwargs.update(dict(self.params.items("fdsn.event")))
         catalog = client.get_events(**kwargs)
 
+
+        blacklist = self.params.options("blacklist")
+        print blacklist
         filename = self.params.get("files", "filename_template").replace("[DOMAIN]", domain)
         path = os.path.split(filename)[0]
         if not os.path.isdir(path):
@@ -128,7 +134,10 @@ class CreateEqSetApp(object):
                     "date": str(event.preferred_origin().time.date),
                     "description": description,
                 }
+                if eqid in blacklist:
+                    fout.write("#") # Blacklisted events will be commented out.
                 fout.write("{info[eqid]} = M{info[mag]:.1f} {info[description]}, {info[date]}\n".format(info=info))
+                    
 
         return
 
