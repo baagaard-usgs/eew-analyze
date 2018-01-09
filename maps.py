@@ -34,6 +34,8 @@ class MapPanels(object):
         self.dataLayers = {}
 
         self._initQgis()
+
+        self.fontFamily = "Arial Narrow"
         return
     
     def __del__(self):
@@ -138,10 +140,10 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png", legendLayers=[mmi], title="ShakeMap MMI")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png", legendLayers=[mmi], legendTitle="MMI", title="Observed Shaking")
         return
 
-    def mmi_predicted(self, showZeroWarningTime=False):
+    def mmi_predicted(self):
         """Create map with observed MMI with contours.
         """
         basemap = self.baseLayers["basemap"]
@@ -153,14 +155,10 @@ class MapPanels(object):
         self._set_contour_style(mmiContours)
         self._add_labels(mmiContours)
 
-        if showZeroWarningTime:
-            # :TODO: Add red contour showing zero warning time
-            pass
-        
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png", legendLayers=[mmi], title="Predicted MMI")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png", legendLayers=[mmi], legendTitle="MMI", title="ShakeAlert Predicted Shaking")
         return
 
     def mmi_residual(self):
@@ -172,7 +170,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual], title="MMI Residual (Obs - Pred)")
+        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual], legendTitle="Residual (Obs - Pred)", title="MMI Residual")
         return
 
     def mmi_warning_time(self):
@@ -187,14 +185,13 @@ class MapPanels(object):
         mmi.loadNamedStyle("mmi.qml")
 
         warningContours = self.dataLayers["warning_time_contour"]
-        #self._set_contour_style(warningContours)
         self._set_warning_time_style(warningContours)
         self._add_labels(warningContours)
             
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], title="Warning Time")
+        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], legendTitle="MMI", title="Warning Time")
         return
 
     def alert_categories(self):
@@ -208,7 +205,7 @@ class MapPanels(object):
         labels.fontSizeInMapUnits = False
         labels.fontLimitPixelSize = True
         labels.fontMinPixelSize = 6
-        labels.textFont.setFamily("Arial Narrow")
+        labels.textFont.setFamily(self.fontFamily)
         labels.textFont.setPointSize(8)
         labels.textFont.setWeight(labels.textFont.Normal)
         labels.textColor = PyQt4.QtGui.QColor("#000000")
@@ -253,7 +250,7 @@ class MapPanels(object):
         return
 
     
-    def _render(self, layers, extent, name, format, legendLayers=None, title=None):
+    def _render(self, layers, extent, name, format, legendLayers=None, legendTitle=None, title=None):
         """Render image to file in given format.
         """
         imageWidth = self.config.getint("maps", "width_pixels")
@@ -264,6 +261,7 @@ class MapPanels(object):
         canvas.setExtent(extent)
         canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layer) for layer in layers])
         canvas.window().resize(imageWidth, imageHeight)
+        canvas.setScaleLocked(True)
         renderer = canvas.mapRenderer()
         
         projection = self.config.get("maps", "projection")
@@ -294,22 +292,26 @@ class MapPanels(object):
         composer.addItem(map)
 
         # Scale bar
-        item = qgis.core.QgsComposerScaleBar(composer)
-        item.setStyle('Single Box') # optionally modify the style
-        item.setComposerMap(map)
-        item.applyDefaultSize()
-        item.setItemPosition(0.0, composer.paperHeight(), item.LowerLeft)
-        item.setNumSegmentsLeft(0)
-        item.setNumSegments(2)
-        composer.addItem(item)
+        scale = qgis.core.QgsComposerScaleBar(composer)
+        scale.setStyle('Single Box') # optionally modify the style
+        scale.setComposerMap(map)
+        scale.applyDefaultSize()
+        scale.setNumSegmentsLeft(0)
+        scale.setNumSegments(2)
+        scale.setFont(PyQt4.QtGui.QFont(self.fontFamily, 8))
+        scale.setHeight(1.5)
+        scale.setLabelBarSpace(1.0)
+        scale.setItemPosition(0.0, composer.paperHeight(), scale.LowerLeft)
+        composer.addItem(scale)
 
         # Title/label
         if title:
             label = qgis.core.QgsComposerLabel(composer)
             label.setText(title)
+            label.setHAlign(PyQt4.QtCore.Qt.AlignCenter)
+            label.setFont(PyQt4.QtGui.QFont(self.fontFamily, 12, PyQt4.QtGui.QFont.Bold))
             label.adjustSizeToText()
-            import pdb
-            pdb.set_trace()
+            label.setItemPosition(0.5*composer.paperWidth(), 0, label.UpperMiddle)
             composer.addItem(label)
 
         # Legend
@@ -321,7 +323,10 @@ class MapPanels(object):
             legend.setBoxSpace(0.5)
             legendSize = legend.paintAndDetermineSize(None)
             legend.setItemPosition(composer.paperWidth()-legendSize.width(), composer.paperHeight()-legendSize.height())
-            legend.setTitle("")
+            legend.setStyleFont(qgis.core.QgsComposerLegendStyle.Title, PyQt4.QtGui.QFont(self.fontFamily, 10))
+            legend.setStyleFont(qgis.core.QgsComposerLegendStyle.SymbolLabel, PyQt4.QtGui.QFont(self.fontFamily, 8))
+            if legendTitle:
+                legend.setTitle(legendTitle)
             legend.setBackgroundColor(PyQt4.QtGui.QColor(255, 255, 255, 128))
             composer.addItem(legend)
 
