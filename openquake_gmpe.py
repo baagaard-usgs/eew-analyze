@@ -68,7 +68,7 @@ class OpenQuakeGMPE(object):
         """
         ruptureContext = self._ruptureContext(event)
         sitesContext = self._sitesContext(points)
-        distContext = self._distanceContext(event, points)
+        distContext = self._distanceContext(event, points, ruptureContext)
 
         fields = OpenQuakeGMPE.FIELDS
         
@@ -135,7 +135,7 @@ class OpenQuakeGMPE(object):
         context.vs30measured = False*numpy.ones(points["vs30"].shape, dtype=numpy.bool)
         return context
 
-    def _distanceContext(self, event, points):
+    def _distanceContext(self, event, points, ruptureContext):
         """Get rupture distance information using great circle path.
 
         Assumptions:
@@ -144,18 +144,79 @@ class OpenQuakeGMPE(object):
 
         :type event: dict
         :param event:
-            Dictionary with event parameters ["longitude", "latitude"]
+            Dictionary with event parameters ["longitude", "latitude", "depth_km"]
 
         :type points: dict of Numpy arrays or Numpy structured array
         :param points:
             Point locations and metadata ["longitude", "latitude"].
         """
         context = openquake.hazardlib.gsim.base.DistancesContext()
-        distEpiKm = 1.0e-3*greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])        
+        distEpiKm = 1.0e-3*greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
+        distRupKm = (distEpiKm**2 + ruptureContext.ztor**2)**0.5 # Assumes vertical fault and point source (ignore strike)
         context.rjb = distEpiKm
-        context.rrup = distEpiKm
+        context.rrup = distRupKm
         context.rx = numpy.zeros(distEpiKm.shape) # Neglect hanging wall effects
         context.ry0 = numpy.zeros(distEpiKm.shape) # Neglect hanging wall effects
         return context
 
+if __name__ == "__main__":
+    # Test
+    event = {
+        "magnitude": 4.38,
+        "depth_km": 12.3,
+        "longitude": -122.0,
+        "latitude": 38.0,
+    }
+    colNames = "longitude, latitude, vs30"
+    colFormats = "float32, float32, float32"
+    longitude = event["longitude"] + numpy.arange(0.0, 3.01, 0.05)
+    latitude = event["latitude"]*numpy.ones(longitude.shape)
+    npts = longitude.shape[-1]
+    points = numpy.zeros(npts, dtype=[("longitude", numpy.float32,), ("latitude", numpy.float32,), ("vs30", numpy.float32,)])
+    points["longitude"] = longitude
+    points["latitude"] = latitude
+    points["vs30"] = 540.0
+
+
+    from basemap.Figure import Figure
+    figure = Figure()
+    figure.open(12.0, 5.5)
+    nrows = 1
+    ncols = 2
+
+    axPGA = figure.axes(nrows, ncols, 1, 1)
+    axPGA.autoscale(tight=True)
+    axPGA.set_xlabel("Joyner-Boore Distance (km)")
+    axPGA.set_ylabel("PGA (g)")
+
+    axPGV = figure.axes(nrows, ncols, 1, 2)
+    axPGV.autoscale(tight=True)
+    axPGV.set_xlabel("Joyner-Boore Distance (km)")
+    axPGV.set_ylabel("PGV (cm/s)")
+
+    gmpes = {
+        "BSSA2014": "c_ltred",
+        "ASK2014": "c_blue",
+        "CB2014": "c_orange",
+        "CY2014": "c_purple",
+    }
+
+    magnitudes = numpy.arange(4.0, 7.01, 1.0)
+    for label, color in gmpes.items():
+        gmpe = OpenQuakeGMPE(label)
+        for magnitude in magnitudes:
+            event["magnitude"] = magnitude
+            data = gmpe.computeMean(event, points)
+            rupContext = gmpe._ruptureContext(event)
+            distContext = gmpe._distanceContext(event, points, rupContext)
+            axPGA.loglog(distContext.rjb, data["pgaG"], color=color)
+            axPGV.loglog(distContext.rjb, data["pgvCmps"], color=color)
+
+    import matplotlib.pyplot as pyplot
+    pyplot.show()
+        
+
+    # Multiple events, fixed distance
+
+    
 # End of file
