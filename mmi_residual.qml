@@ -5,6 +5,7 @@
       <rasterTransparency/>
       <rastershader>
         <colorrampshader colorRampType="DISCRETE" clip="0">
+          <item alpha="255" value="-999" label="No Data" color="#999999"/>
           <item alpha="255" value="-1.5" label="&lt;= -1.5" color="#ca0020"/>
           <item alpha="255" value="-1.25" label="-1.5 - -1.25" color="#d83740"/>
           <item alpha="255" value="-1" label="-1.25 - -1.0" color="#e66e61"/>

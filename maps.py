@@ -107,9 +107,11 @@ class MapPanels(object):
             # MMI residual (observed - predicted)
             mmiObs = numpy.array(src.GetRasterBand(1).ReadAsArray())
             mmiPred = numpy.array(src.GetRasterBand(2).ReadAsArray())
-            mmiResidual = mmiObs - mmiPred
+            noDataValue = src.GetRasterBand(2).GetNoDataValue()
+            mask = mmiPred != noDataValue
+            mmiResidual = mask*(mmiObs - mmiPred) + ~mask*noDataValue
             filenameResidual = filename.replace(".tiff", "-mmi_residual.tiff")
-            gdalLayer = gdalraster.clone_new_data("mmi_residual", mmiResidual, src)
+            gdalLayer = gdalraster.clone_new_data("mmi_residual", mmiResidual, src, noDataValue=None)
             self.dataLayers["mmi_residual"] = qgisconverter.gdal_to_qgisraster(gdalLayer, filenameResidual)
             del gdalLayer
 
@@ -199,7 +201,7 @@ class MapPanels(object):
             tstamp = dateutil.parser.parse(self.alert["timestamp"])
             title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alert, tstamp=tstamp, t=t)
         else:
-            title = "Warning Time (s)"
+            title = "Warning Time (s) and Observed Shaking (MMI)"
         
         self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], legendTitle="MMI", title=title)
         return

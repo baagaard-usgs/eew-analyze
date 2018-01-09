@@ -100,7 +100,7 @@ def write(filename, values, gridSpecs):
     return
 
 
-def clone_new_data(name, values, src):
+def clone_new_data(name, values, src, noDataValue=None):
     """Create GDAL raster in memory with values as data with grid specs from src raster.
 
     :type name: str
@@ -124,6 +124,8 @@ def clone_new_data(name, values, src):
 
     band = dest.GetRasterBand(1)
     band.SetDescription(name)
+    if not noDataValue is None:
+        band.SetNoDataValue(noDataValue)
     band.WriteArray(values)
     band.FlushCache()
     dest.FlushCache()

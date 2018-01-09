@@ -41,6 +41,8 @@ def gdal_to_qgisraster(gdalRaster, filename="raster.tiff"):
         gdalBand = gdalRaster.GetRasterBand(1+iband)
         tempBand = temp.GetRasterBand(1+iband)
         tempBand.SetDescription(gdalBand.GetDescription())
+        if not gdalBand.GetNoDataValue() is None:
+            tempBand.SetNoDataValue(gdalBand.GetNoDataValue())
         tempBand.WriteArray(gdalBand.ReadAsArray())
         tempBand.FlushCache()
     temp.FlushCache()
