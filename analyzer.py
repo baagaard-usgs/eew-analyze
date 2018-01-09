@@ -29,7 +29,8 @@ DEFAULTS = """
 
 [shaking_time]
 function = userdisplay.shaking_time_vs
-vs_kmps = 3.4 ; User display uses 3.55
+#vs_kmps = 3.55 ; User display
+vs_kmps = 3.4 ; From NC record section
 
 [mmi_predicted]
 function = shakemap.gmpe
@@ -42,8 +43,8 @@ magnitude_threshold = 2.95
 #magnitude_threshold = 4.45
 
 [qgis]
-#prefix_path = None
-prefix_path = /Applications/QGIS.app/Contents/MacOS
+prefix_path = None
+#prefix_path = /Applications/QGIS.app/Contents/MacOS
 
 [maps]
 projection = EPSG:3857

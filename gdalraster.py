@@ -171,7 +171,7 @@ def contours_from_raster(raster, bandName, cstart=0.0, cinterval=10.0, clevels=[
     
     ogrLayer = contours.CreateLayer(bandName+"_contour", spatialRef, ogr.wkbLineString25D)
     ogrLayer.CreateField(ogr.FieldDefn("id", ogr.OFTInteger))
-    ogrLayer.CreateField(ogr.FieldDefn("mmi_obs", ogr.OFTReal))
+    ogrLayer.CreateField(ogr.FieldDefn("value", ogr.OFTReal))
 
     gdal.ContourGenerate(cband, cinterval, cstart, clevels, 1, NO_DATA_VALUE, ogrLayer, 0, 1)
 

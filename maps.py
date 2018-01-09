@@ -54,7 +54,7 @@ class MapPanels(object):
         self.baseLayers["basemap"] = basemap
 
         layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
-        layerRegistry.addMapLayers([layer for layer in self.baseLayers.values()])
+        layerRegistry.addMapLayers([layer for layer in self.baseLayers.values()], False)
         return
 
     def load_data(self, eqId, alertVersion=None):
@@ -110,8 +110,7 @@ class MapPanels(object):
 
         del src
 
-        layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
-        layerRegistry.addMapLayers([layer for layer in self.dataLayers.values()])
+        layerRegistry.addMapLayers([layer for layer in self.dataLayers.values()], False)
         return # TEMPORARY
     
         # Epicenter
@@ -139,7 +138,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png", legendLayers=[mmi])
         return
 
     def mmi_predicted(self, showZeroWarningTime=False):
@@ -161,7 +160,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png", legendLayers=[mmi])
         return
 
     def mmi_residual(self):
@@ -173,7 +172,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png")
+        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual])
         return
 
     def mmi_warning_time(self):
@@ -188,13 +187,14 @@ class MapPanels(object):
         mmi.loadNamedStyle("mmi.qml")
 
         warningContours = self.dataLayers["warning_time_contour"]
-        self._set_contour_style(warningContours)
+        #self._set_contour_style(warningContours)
+        self._set_warning_time_style(warningContours)
         self._add_labels(warningContours)
             
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png")
+        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi])
         return
 
     def alert_categories(self):
@@ -204,7 +204,7 @@ class MapPanels(object):
         labels = qgis.core.QgsPalLayerSettings()
         labels.readFromLayer(layer)
         labels.enabled = True
-        labels.fieldName = "mmi_obs"
+        labels.fieldName = "value"
         labels.fontSizeInMapUnits = False
         labels.fontLimitPixelSize = True
         labels.fontMinPixelSize = 6
@@ -219,11 +219,41 @@ class MapPanels(object):
     def _set_contour_style(self, layer):
         symbolLayer = layer.rendererV2().symbol().symbolLayer(0)
         symbolLayer.setColor(PyQt4.QtGui.QColor("#000000")) # works
-        symbolLayer.setWidth(2.0)
+        symbolLayer.setWidth(1.5)
         symbolLayer.setWidthUnit(qgis.core.QgsSymbolV2.Pixel)
         return
+
+    def _set_warning_time_style(self, layer):
+        dashed = [2, 2]
+        contour_rules = (
+            ("negative", '"value" < 0.0', "#666666", dashed,),
+            ("positive", '"value" >= 0.0', "#000000", None,),
+        )
+        symbol = qgis.core.QgsSymbolV2.defaultSymbol(layer.geometryType())
+        renderer = qgis.core.QgsRuleBasedRendererV2(symbol)
+
+        root_rule = renderer.rootRule()
+
+        for label, expression, lineColor, lineStyle in contour_rules:
+            rule = root_rule.children()[0].clone()
+            rule.setLabel(label)
+            rule.setFilterExpression(expression)
+            rule.symbol().setColor(PyQt4.QtGui.QColor(lineColor))
+            symbolLayer = rule.symbol().symbolLayer(0)
+            if lineStyle is None:
+                symbolLayer.setPenStyle(PyQt4.QtCore.Qt.SolidLine)
+            else:
+                symbolLayer.setCustomDashPatternUnit(symbol.MM)
+                symbolLayer.setCustomDashVector(lineStyle)
+                symbolLayer.setUseCustomDashPattern(True)
+            root_rule.appendChild(rule)
+
+        root_rule.removeChildAt(0)
+        layer.setRendererV2(renderer)
+        return
+
     
-    def _render(self, layers, extent, name, format):
+    def _render(self, layers, extent, name, format, legendLayers=None):
         """Render image to file in given format.
         """
         imageWidth = self.config.getint("maps", "width_pixels")
@@ -268,6 +298,7 @@ class MapPanels(object):
         item.setStyle('Single Box') # optionally modify the style
         item.setComposerMap(map)
         item.applyDefaultSize()
+        item.setItemPosition(0.0, 0.0, item.UpperLeft)
         item.setNumSegmentsLeft(0)
         item.setNumSegments(2)
         composer.addItem(item)
@@ -277,13 +308,18 @@ class MapPanels(object):
         #title.setText("Hello world")
         #title.adjustSizeToText()
         #composer.addItem(title)
-        
+
         # Legend
-        #legend = qgis.core.QgsComposerLegend(composer)
-        #legend.model().setLayerSet(renderer.layerSet())
-        #legend.setBoxSpace(0)
-        #legend.setTitle(Qstring(""))
-        #composer.addItem(legend)
+        if legendLayers:
+            legend = qgis.core.QgsComposerLegend(composer)
+            legend.modelV2().rootGroup().removeAllChildren()
+            for layer in legendLayers:
+                legend.modelV2().rootGroup().addLayer(layer)
+            legend.setBoxSpace(0.5)
+            legendSize = legend.paintAndDetermineSize(None)
+            legend.setItemPosition(0, composer.paperHeight()-legendSize.height(), legend.UpperLeft)
+            legend.setTitle("")
+            composer.addItem(legend)
 
         # create output image and initialize it
         image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(imageWidth, imageHeight), PyQt4.QtGui.QImage.Format_ARGB32)
