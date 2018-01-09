@@ -43,8 +43,8 @@ magnitude_threshold = 2.95
 #magnitude_threshold = 4.45
 
 [qgis]
-prefix_path = None
-#prefix_path = /Applications/QGIS.app/Contents/MacOS
+#prefix_path = None
+prefix_path = /Applications/QGIS.app/Contents/MacOS
 
 [maps]
 projection = EPSG:3857
@@ -199,7 +199,6 @@ class EEWAnalyzeApp(object):
             mmiAlertThreshold = self.params.getfloat("alerts","mmi_threshold")
         if self.showProgress:
             print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlertThreshold))
-
             
         dataDir = _get_dir(self.params, "event_dir").replace("[EVENTID]", self.event["event_id"])
         functionPath = self.params.get("mmi_predicted", "function").split(".")
@@ -236,7 +235,6 @@ class EEWAnalyzeApp(object):
                     logging.getLogger(__name__).info(msg)
                 thresholdReached = True
                 
-            
             mmiPredCur = fn(alert, self.shakemap.data, dict(self.params.items("mmi_predicted")))
             warningTimeCur = self.shakingTime - numpy.datetime64(alert["timestamp"])
             
@@ -248,7 +246,6 @@ class EEWAnalyzeApp(object):
                 ]
                 gdalraster.write(filename, values, self.shakemap.grid)
                 self.maps.load_data(self.event["event_id"], alertVersion=alert["version"])
-                self.maps.mmi_predicted(showZeroWarningTime=True)
                 self.maps.mmi_warning_time()
             
             # Update alert time if greater than previous
