@@ -43,8 +43,8 @@ magnitude_threshold = 2.95
 #magnitude_threshold = 4.45
 
 [qgis]
-#prefix_path = None
-prefix_path = /Applications/QGIS.app/Contents/MacOS
+prefix_path = None
+#prefix_path = /Applications/QGIS.app/Contents/MacOS
 
 [maps]
 projection = EPSG:3857
@@ -245,8 +245,9 @@ class EEWAnalyzeApp(object):
                     ("warning_time", self._timedelta_to_seconds(warningTimeCur),),
                 ]
                 gdalraster.write(filename, values, self.shakemap.grid)
-                self.maps.load_data(self.event["event_id"], alertVersion=alert["version"])
-                self.maps.mmi_warning_time()
+                self.maps.load_data(self.event["event_id"], alert=alert)
+                tafterOT = self._timedelta_to_seconds(numpy.datetime64(alert["timestamp"])-numpy.datetime64(self.event["origin_time"]))
+                self.maps.mmi_warning_time(tafterOT)
             
             # Update alert time if greater than previous
             maskAlert = numpy.bitwise_and(warningTimeCur > warningTime, mmiPredCur >= mmiAlertThreshold)

@@ -59,7 +59,7 @@ class MapPanels(object):
         layerRegistry.addMapLayers([layer for layer in self.baseLayers.values()], False)
         return
 
-    def load_data(self, eqId, alertVersion=None):
+    def load_data(self, eqId, alert=None):
         """
         :type eqId: str
         :param eqId: ComCat earthquake id.
@@ -69,9 +69,12 @@ class MapPanels(object):
 
         :type filename: str
         :param config: Filename for analysis data in GDAL raster file.
+
+        :type alert: dict
+        :param alert: ShakeAlert alert information from analysis database.
         """
         self.eqId = eqId
-        self.alertVersion = alertVersion
+        self.alert = alert
 
         layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
         layerRegistry.removeMapLayers([layer for layer in self.dataLayers.values()])
@@ -84,7 +87,7 @@ class MapPanels(object):
             self.dataLayers[name] = layer
 
         # Contours from temporary virtual raster bands.
-        values = ("mmi_obs", "mmi_pred", "warning_time",) if self.alertVersion is None else ("mmi_pred", "warning_time",)
+        values = ("mmi_obs", "mmi_pred", "warning_time",) if self.alert is None else ("mmi_pred", "warning_time",)
         for value in values:
             if value in ("mmi_obs", "mmi_pred",):
                 cstart = 1.5
@@ -173,12 +176,12 @@ class MapPanels(object):
         self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual], legendTitle="Residual (Obs - Pred)", title="MMI Residual")
         return
 
-    def mmi_warning_time(self):
+    def mmi_warning_time(self, t=None):
         """Create map with observed MMI with contours.
         """
         basemap = self.baseLayers["basemap"]
 
-        if self.alertVersion is None:
+        if self.alert is None:
             mmi = self.dataLayers["mmi_obs"]
         else:
             mmi = self.dataLayers["mmi_pred"]
@@ -190,8 +193,15 @@ class MapPanels(object):
             
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
+
+        if self.alert:
+            import dateutil.parser
+            tstamp = dateutil.parser.parse(self.alert["timestamp"])
+            title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alert, tstamp=tstamp, t=t)
+        else:
+            title = "Warning Time (s)"
         
-        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], legendTitle="MMI", title="Warning Time")
+        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], legendTitle="MMI", title=title)
         return
 
     def alert_categories(self):
@@ -344,10 +354,10 @@ class MapPanels(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        if self.alertVersion is None:
+        if self.alert is None:
             filename = "{eq}-map_{name}.{format}".format(eq=self.eqId, name=name, format=format)
         else:
-            filename = "{eq}-alert{ver:03d}_map_{name}.{format}".format(eq=self.eqId, ver=self.alertVersion, name=name, format=format)
+            filename = "{eq}-alert{ver:03d}_map_{name}.{format}".format(eq=self.eqId, ver=self.alert["version"], name=name, format=format)
         image.save(os.path.join(plotsDir, filename), format)
         return
 
