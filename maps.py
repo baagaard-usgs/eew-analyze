@@ -253,7 +253,7 @@ class MapPanels(object):
         return
 
     
-    def _render(self, layers, extent, name, format, legendLayers=None):
+    def _render(self, layers, extent, name, format, legendLayers=None, title=None):
         """Render image to file in given format.
         """
         imageWidth = self.config.getint("maps", "width_pixels")
@@ -298,7 +298,7 @@ class MapPanels(object):
         item.setStyle('Single Box') # optionally modify the style
         item.setComposerMap(map)
         item.applyDefaultSize()
-        item.setItemPosition(0.0, 0.0, item.UpperLeft)
+        item.setItemPosition(0.0, composer.paperHeight(), item.LowerLeft)
         item.setNumSegmentsLeft(0)
         item.setNumSegments(2)
         composer.addItem(item)
@@ -317,8 +317,9 @@ class MapPanels(object):
                 legend.modelV2().rootGroup().addLayer(layer)
             legend.setBoxSpace(0.5)
             legendSize = legend.paintAndDetermineSize(None)
-            legend.setItemPosition(0, composer.paperHeight()-legendSize.height(), legend.UpperLeft)
+            legend.setItemPosition(composer.paperWidth()-legendSize.width(), composer.paperHeight()-legendSize.height())
             legend.setTitle("")
+            legend.setBackgroundColor(PyQt4.QtGui.QColor(255, 255, 255, 128))
             composer.addItem(legend)
 
         # create output image and initialize it
