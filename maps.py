@@ -138,7 +138,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png", legendLayers=[mmi])
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png", legendLayers=[mmi], title="ShakeMap MMI")
         return
 
     def mmi_predicted(self, showZeroWarningTime=False):
@@ -160,7 +160,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png", legendLayers=[mmi])
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png", legendLayers=[mmi], title="Predicted MMI")
         return
 
     def mmi_residual(self):
@@ -172,7 +172,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual])
+        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual], title="MMI Residual (Obs - Pred)")
         return
 
     def mmi_warning_time(self):
@@ -194,7 +194,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi])
+        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], title="Warning Time")
         return
 
     def alert_categories(self):
@@ -304,10 +304,13 @@ class MapPanels(object):
         composer.addItem(item)
 
         # Title/label
-        #title = qgis.core.QgsComposerLabel(composer)
-        #title.setText("Hello world")
-        #title.adjustSizeToText()
-        #composer.addItem(title)
+        if title:
+            label = qgis.core.QgsComposerLabel(composer)
+            label.setText(title)
+            label.adjustSizeToText()
+            import pdb
+            pdb.set_trace()
+            composer.addItem(label)
 
         # Legend
         if legendLayers:
