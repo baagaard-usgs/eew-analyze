@@ -91,11 +91,12 @@ def mmi_WordenEtal2012(pga, pgv):
     :param pgv: PGV in cm/s.
     """
     MIN_FLOAT = 1.0e-20
+    G_ACC = 9.80665
     
     mmiPGA = numpy.zeros(pga.shape)
     mmiPGV = numpy.zeros(pgv.shape)
     
-    logY = numpy.log10(MIN_FLOAT + pga)
+    logY = numpy.log10(MIN_FLOAT + pga*G_ACC)
     maskLower = logY <= 1.57
     mmiPGA = maskLower*(1.78 + 1.55*logY) + ~maskLower*(-1.60 + 3.70*logY)
     mmiPGA = numpy.maximum(1.0, mmiPGA)
