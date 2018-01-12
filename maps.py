@@ -145,7 +145,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "png", legendLayers=[mmi], legendTitle="MMI", title="Observed Shaking")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "jpg", legendLayers=[mmi], legendTitle="MMI", title="Observed Shaking")
         return
 
     def mmi_predicted(self):
@@ -163,7 +163,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "png", legendLayers=[mmi], legendTitle="MMI", title="ShakeAlert Predicted Shaking")
+        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "jpg", legendLayers=[mmi], legendTitle="MMI", title="ShakeAlert Predicted Shaking")
         return
 
     def mmi_residual(self):
@@ -175,7 +175,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "png", legendLayers=[mmiResidual], legendTitle="Residual (Obs - Pred)", title="MMI Residual")
+        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "jpg", legendLayers=[mmiResidual], legendTitle="Residual (Obs - Pred)", title="MMI Residual")
         return
 
     def mmi_warning_time(self, t=None):
@@ -203,7 +203,7 @@ class MapPanels(object):
         else:
             title = "Warning Time (s) and Observed Shaking (MMI)"
         
-        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "png", legendLayers=[mmi], legendTitle="MMI", title=title)
+        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "jpg", legendLayers=[mmi], legendTitle="MMI", title=title)
         return
 
     def alert_categories(self):
