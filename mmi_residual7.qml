@@ -5,13 +5,14 @@
       <rasterTransparency/>
       <rastershader>
         <colorrampshader colorRampType="DISCRETE" clip="0">
-          <item alpha="255" value="-1.5" label="&lt;= -1.50" color="#ca0020"/>
-          <item alpha="255" value="-1" label="-1.5 - -1.00" color="#e66e61"/>
-          <item alpha="255" value="-0.5" label="-1.0 - -0.50" color="#f5c1a9"/>
+          <item alpha="255" value="inf" label="> 1.50" color="#ca0020"/>
+          <item alpha="255" value="1.5" label="1.0 - 1.50" color="#e66e61"/>
+          <item alpha="255" value="1" label="0.5 - 1.00" color="#f5c1a9"/>
           <item alpha="255" value="0.5" label="-0.5 - 0.50" color="#f7f7f7"/>
-          <item alpha="255" value="1" label="0.5 - 1.00" color="#b4d6e7"/>
-          <item alpha="255" value="1.5" label="1.0 - 1.50" color="#63a9cf"/>
-          <item alpha="255" value="inf" label="> 1.50" color="#0571b0"/>
+          <item alpha="255" value="-0.5" label="-1.0 - -0.50" color="#b4d6e7"/>
+          <item alpha="255" value="-1" label="-1.5 - -1.00" color="#63a9cf"/>
+          <item alpha="255" value="-1.5" label="&lt;= -1.50" color="#0571b0"/>
+          <item alpha="255" value="-999" label="No Data" color="#999999"/>
         </colorrampshader>
       </rastershader>
     </rasterrenderer>
