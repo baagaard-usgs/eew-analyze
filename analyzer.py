@@ -20,6 +20,7 @@ from comcat import DetailEvent
 from analysisdb import AnalysisData
 from shakemap import ShakeMap
 from maps import MapPanels
+from plotsxy import Figures
 import gdalraster
 
 DEFAULTS = """
@@ -37,10 +38,10 @@ function = shakemap.gmpe
 gmpe = BSSA2014
 
 [alerts]
-mmi_threshold = 0
-magnitude_threshold = 2.95
-#mmi_threshold = 1.5
-#magnitude_threshold = 4.45
+#mmi_threshold = 0
+#magnitude_threshold = 2.95
+mmi_threshold = 1.5
+magnitude_threshold = 4.45
 
 [qgis]
 prefix_path = None
@@ -130,6 +131,12 @@ class EEWAnalyzeApp(object):
             for eqId in self.params.options("events"):
                 maps = args.plot_maps if args.plot_maps else "all"
                 self.plot_maps(eqId, maps)
+
+        if args.plot_figures or args.all:
+            for eqId in self.params.options("events"):
+                self.load_data(eqId)
+                selection = args.plot_figures if args.plot_figures else "all"
+                self.plot_figures(eqId, selection)
         return
 
     def initialize(self, config_filenames):
@@ -313,6 +320,17 @@ class EEWAnalyzeApp(object):
             self.maps.mmi_residual()
         return
     
+    def plot_figures(self, eqId, selection):
+        """Plot figures with ShakeAlert performance information.
+
+        :type event: str
+        :param eqId: ComCat Earthquake id (e.g., nc72923380).
+        """
+        figures = Figures(self.params, self.event)
+        if selection == "alert_error" or selection =="all":
+            figures.alert_error(self.alerts)
+        return
+    
     def generate_report(self):
         """Assemble plots, etc into PDF file.
         """
@@ -332,6 +350,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--process-events", action="store_true", dest="process_events")
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
+        parser.add_argument("--plot-figures", action="store", dest="plot_figures", default=None, choices=[None, "all", "alert_error"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
