@@ -78,7 +78,7 @@ class Figures(object):
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
         ax.set_xlim(0, 30)
-        ax.set_title("Depth Location Error")
+        ax.set_title("Depth Error (Obs-Pred)")
         icol += 1
         
         figure.figure.savefig("test.pdf")
