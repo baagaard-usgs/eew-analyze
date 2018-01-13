@@ -35,13 +35,13 @@ vs_kmps = 3.4 ; From NC record section
 
 [mmi_predicted]
 function = shakemap.gmpe
-gmpe = BSSA2014
+gmpe = ASK2014
 
 [alerts]
-#mmi_threshold = 0
-#magnitude_threshold = 2.95
-mmi_threshold = 1.5
-magnitude_threshold = 4.45
+mmi_threshold = 0
+magnitude_threshold = 2.95
+#mmi_threshold = 1.5
+#magnitude_threshold = 4.45
 
 [qgis]
 prefix_path = None
@@ -123,11 +123,16 @@ class EEWAnalyzeApp(object):
             self.show_parameters()
 
         if args.process_events or args.all:
+            self.maps = MapPanels(self.params)
+            self.maps.load_basemap()
             for eqId in self.params.options("events"):
                 self.load_data(eqId)
                 self.process_event(plotAlertMaps=args.plot_alert_maps)
 
         if args.plot_maps or args.all:
+            if self.maps is None:
+                self.maps = MapPanels(self.params)
+                self.maps.load_basemap()
             for eqId in self.params.options("events"):
                 maps = args.plot_maps if args.plot_maps else "all"
                 self.plot_maps(eqId, maps)
@@ -216,8 +221,6 @@ class EEWAnalyzeApp(object):
         warningTime = gdalraster.NO_DATA_VALUE * numpy.ones((npts,), dtype="timedelta64[s]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones((npts,), numpy.float32)
 
-        self.maps = MapPanels(self.params)
-        self.maps.load_basemap()
 
         shakingTimeRel = self._timedelta_to_seconds(self.shakingTime - numpy.datetime64(self.event["origin_time"]))
 
@@ -309,7 +312,7 @@ class EEWAnalyzeApp(object):
         :type event: str
         :param eqId: ComCat Earthquake id (e.g., nc72923380).
         """
-        if not self.maps:
+        if self.maps is None:
             self.maps = MapPanels(self.params)
         self.maps.load_basemap()
         self.maps.load_data(eqId)
