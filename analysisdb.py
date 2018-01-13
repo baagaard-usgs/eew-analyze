@@ -198,6 +198,8 @@ class AnalysisData(object):
         match = self.cursor.fetchone()
 
         alerts = []
+        if match["dm_id"] is None:
+            return alerts
         # Get subsequent alerts matching id  and instance within 10 min
         timestamp = dateutil.parser.parse(match["dm_timestamp"])
         conditions = [
