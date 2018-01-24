@@ -38,7 +38,65 @@ class ShakeMap(object):
             self._parse(fh)
         return
 
+    def num_lon(self):
+        """Get number of points along longitude direction.
+        """
+        return self.grid["num_longitude"]
+    
+    def num_lat(self):
+        """Get number of points along latitude direction.
+        """
+        return self.grid["num_latitude"]
+    
+    def spatial_ref(self):
+        """Get spatial reference system for ShakeMap.
+        
+        :returns: OSR SpatialReference
+        """
+        from osgeo import osr
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(4326) # WGS84
+        return srs
+
+    def geo_transform(self):
+        """Get GDAL geometric transformation.
+
+        The geometric transformation describes the coordinates of the
+        points associated with the lon/lat grid.
+        
+        We use a grid origin that is offset 1/2 cell in lon/lat from
+        the cell centers given by the longitude/latitude coordinates
+        of the ShakeMap.
+
+        :returns: GDAL GeoTransform for ShakeMap.
+
+        """
+        numLon = self.grid["num_longitude"]
+        numLat = self.grid["num_latitude"]
+        dLon = (self.grid["longitude_max"]-self.grid["longitude_min"]) / (self.grid["num_longitude"]-1)
+        dLat = -(self.grid["latitude_max"]-self.grid["latitude_min"]) / (self.grid["num_latitude"]-1)
+        originLon = self.grid["longitude_min"] - 0.5*dLon
+        originLat = self.grid["latitude_max"] + 0.5*dLat
+        return (originLon, dLon, 0, originLat, 0, dLat,)
+
+    def pixel_area(self, projection):
+        """Get pixel area of points in lon/lat grid.
+
+        We project the points and compute the area assume the grid is
+        a rhomus in the projected coordinate system.
+        
+        :type projection: str
+        :param projection: Name of projection in the form EPSF:XXXX.
+        """
+        from osgeo import osr
+        import greatcircle
+        
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(int(projection.replace("EPSG:","")))
+        return greatcircle.area_km2(self.data["longitude"], self.data["latitude"], self.grid["longitude_spacing"], self.grid["latitude_spacing"], srs)        
+    
     def _parse(self, fh):
+
         """Parse ShakeMap grid XML file.
         
         :type fh: File handle

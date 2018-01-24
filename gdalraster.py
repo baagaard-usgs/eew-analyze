@@ -16,37 +16,31 @@ gdal.UseExceptions()
 
 NO_DATA_VALUE = -999.0
 
-def resample(filename, gridSpecs):
+def resample(filename, destNumX, destNumY, destSRS, destGeoTransform):
     """Resample and crop raster to match specified grid.
-
-    The grid specs come from ShakeMap which uses a vertex-based
-    grid. We are writing a cell-base grid, so the ShakeMap vertices
-    become the cell centers. The grid origin is 1/2 cell in lon/lat
-    from the cell center.
 
     :type filename: str
     :param filename: 
         Filename with raster
 
-    :type gridSpecs: dict
-    :param gridSpecs: 
-        Grid specifications to match.
+    :type destNumX: int
+    :param destNumX: Number of points in destination grid in x direction.
+
+    :type destNumY: int
+    :param destNumY: Number of points in destination grid in y direction.
+
+    :type destSRS: OSR SpatialReference
+    :param destSRS: Spatial reference in destination grid.
+
+    :type destGeoTransform: GDAL GeoTransform
+    :param destGeoTransform: Geometric transformation of destination grid.
     """
     src = gdal.Open(filename, gdal.GA_ReadOnly)
+    nbands = src.RasterCount
 
-    wgs84 = osr.SpatialReference()
-    wgs84.ImportFromEPSG(4326)
-    numLon = gridSpecs["num_longitude"]
-    numLat = gridSpecs["num_latitude"]
-    dLon = (gridSpecs["longitude_max"]-gridSpecs["longitude_min"]) / gridSpecs["num_longitude"]
-    dLat = -(gridSpecs["latitude_max"]-gridSpecs["latitude_min"]) / gridSpecs["num_latitude"]
-    originLon = gridSpecs["longitude_min"] - 0.5*dLon
-    originLat = gridSpecs["latitude_max"] + 0.5*dLat
-    nbands = 1
-
-    dest = gdal.GetDriverByName("MEM").Create("temp", numLon, numLat, nbands, gdal.GDT_Float32)
-    dest.SetGeoTransform((originLon, dLon, 0, originLat, 0, dLat,))
-    dest.SetProjection(wgs84.ExportToWkt())
+    dest = gdal.GetDriverByName("MEM").Create("temp", destNumX, destNumY, nbands, gdal.GDT_Float32)
+    dest.SetGeoTransform(destGeoTransform)
+    dest.SetProjection(destSRS.ExportToWkt())
     gdal.ReprojectImage(src, dest, src.GetProjection(), dest.GetProjection(), gdal.GRA_Bilinear)
     dest.FlushCache()
 
@@ -55,13 +49,8 @@ def resample(filename, gridSpecs):
     return numpy.array(dest.GetRasterBand(1).ReadAsArray()).ravel()
 
 
-def write(filename, values, gridSpecs):
-    """Write values to GeoTiff raster file with grid specs from dictionary.
-
-    The grid specs come from ShakeMap which uses a vertex-based
-    grid. We are writing a cell-base grid, so the ShakeMap vertices
-    become the cell centers. The grid origin is 1/2 cell in lon/lat
-    from the cell center.
+def write(filename, values, numX, numY, spatialRef, geoTransform):
+    """Write values to GeoTiff raster file with given spatial reference and geometric transformation.
 
     :type filename: str
     :param filename:
@@ -71,30 +60,23 @@ def write(filename, values, gridSpecs):
     :param values:
         List of tuples with value name and Numpy array.
 
-    :type gridSpects: dict
-    :param gridSpecs: 
-        Grid specification.
+    :type spatialRef: OSR SpatialReference
+    :param spatialRef: Spatial reference associated with values.
 
+    :type geoTranform: GDAL GeoTransform
+    :param geoTransform: Geometric transformation associated with values.
     """
-    wgs84 = osr.SpatialReference()
-    wgs84.ImportFromEPSG(4326)
-    numLon = gridSpecs["num_longitude"]
-    numLat = gridSpecs["num_latitude"]
-    dLon = (gridSpecs["longitude_max"]-gridSpecs["longitude_min"]) / (gridSpecs["num_longitude"]-1)
-    dLat = -(gridSpecs["latitude_max"]-gridSpecs["latitude_min"]) / (gridSpecs["num_latitude"]-1)
-    originLon = gridSpecs["longitude_min"] - 0.5*dLon
-    originLat = gridSpecs["latitude_max"] + 0.5*dLat
     nbands = len(values)
     
-    dest = gdal.GetDriverByName("GTiff").Create(filename, numLon, numLat, nbands, gdal.GDT_Float32)
-    dest.SetGeoTransform((originLon, dLon, 0, originLat, 0, dLat,))
-    dest.SetProjection(wgs84.ExportToWkt())
+    dest = gdal.GetDriverByName("GTiff").Create(filename, numX, numY, nbands, gdal.GDT_Float32)
+    dest.SetGeoTransform(geoTransform)
+    dest.SetProjection(spatialRef.ExportToWkt())
 
     for ivalue,(name,value,) in enumerate(values):
         band = dest.GetRasterBand(1+ivalue)
         band.SetDescription(name)
         band.SetNoDataValue(NO_DATA_VALUE)
-        band.WriteArray(value.reshape((numLat,numLon,)))
+        band.WriteArray(value.reshape((numY,numX,)))
         band.FlushCache()
     dest.FlushCache()
     return
@@ -108,12 +90,10 @@ def clone_new_data(name, values, src, noDataValue=None):
         Name for raster layer (description).
 
     :type values: Numpy array
-    :param values:
-        Array of values.
+    :param values: Array of values.
 
     :type src: GDAL raster
-    :param src: 
-        GDAL raster with from which values are derived used to specific grid information.
+    :param src: GDAL raster with from which values are derived used to specific grid information.
 
     """
     NBANDS = 1
@@ -179,5 +159,5 @@ def contours_from_raster(raster, bandName, cstart=0.0, cinterval=10.0, clevels=[
 
     return contours
 
-    
+
 # End of file
