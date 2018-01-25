@@ -51,7 +51,7 @@ class PublicAnxiety(object):
 
 class PublicInjury(object):
 
-    def __init__(self, costAction=0.1, mmiLow=.5, mmiHigh=6.5):
+    def __init__(self, costAction=0.1, mmiLow=4.5, mmiHigh=6.5):
         self.action = Constant(costAction)
         self.damage = LinearRamp(mmiLow, mmiHigh, 0.0, 1.0)
         return
