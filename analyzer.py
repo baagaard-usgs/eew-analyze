@@ -44,6 +44,7 @@ gmpe = ASK2014
 [alerts]
 #mmi_threshold = 0
 #magnitude_threshold = 2.95
+
 mmi_threshold = 1.5
 magnitude_threshold = 4.45
 
@@ -243,6 +244,7 @@ class EEWAnalyzeApp(object):
             self.maps.mmi_predicted()
             self.maps.mmi_warning_time()
             self.maps.mmi_residual()
+            self.maps.alert_category()
         return
     
     def plot_figures(self, eqId, selection):

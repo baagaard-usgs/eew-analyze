@@ -206,7 +206,19 @@ class MapPanels(object):
         self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "jpg", legendLayers=[mmi], legendTitle="MMI", title=title)
         return
 
-    def alert_categories(self):
+    def alert_category(self):
+        basemap = self.baseLayers["basemap"]
+        
+        popDensity = self.dataLayers["population_density"]
+        popDensity.loadNamedStyle("pop_density.qml")
+
+        category = self.dataLayers["alert_category"]
+        category.loadNamedStyle("alert_category.qml")
+
+        #epicenter = self.dataLayers["epicenter_obs"]
+        # :TODO: set style
+        
+        self._render([category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category, popDensity], legendTitle="Alert Category", title="ShakeAlert Alert Classification")
         return
 
     def _add_labels(self, layer):

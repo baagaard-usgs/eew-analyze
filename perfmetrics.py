@@ -112,12 +112,12 @@ class CostSavings(object):
         popDamage = numpy.sum(pixelArea*populationDensity*(costDamage > 0.0))
 
         # Alert categories TN(0),FN(1),FP(2),TP(3)
-        alertCategories = numpy.zeros(costDamage.shape)
+        alertCategory = numpy.zeros(costDamage.shape)
         maskTN = numpy.bitwise_and(mmiPred < mmiAlertThreshold, costDamage < costActionObs)
         maskFN = numpy.bitwise_and(mmiPred < mmiAlertThreshold, costDamage >= costActionObs)
         maskFP = numpy.bitwise_and(mmiPred >= mmiAlertThreshold, costDamage < costActionObs)
         maskTP = numpy.bitwise_and(mmiPred >= mmiAlertThreshold, costDamage >= costActionObs)
-        alertCategories = maskTN*0.0 + maskFN*1.0 + maskFP*2.0 + maskTP*3.0
+        alertCategory = maskTN*0.0 + maskFN*1.0 + maskFP*2.0 + maskTP*3.0
         
         values = [
             ("mmi_obs", shakemap.data["mmi"],),
@@ -128,7 +128,7 @@ class CostSavings(object):
             ("cost_no_eew", costNoEEW,),
             ("cost_perfect_eew", costPerfectEEW,),
             ("cost_eew", costEEW,),
-            ("alert_categories", alertCategories,),
+            ("alert_category", alertCategory,),
             ]
         filename = self.config.get("files", "analysis_event").replace("[EVENTID]", event["event_id"])
         gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
