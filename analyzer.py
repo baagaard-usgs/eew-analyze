@@ -54,6 +54,11 @@ cost_action = 0.1
 damage_low_mmi = 2.5
 damata_high_mmi = 5.5
 
+[optimize]
+mmi_threshold_min = 1.5
+mmi_threshold_max = 4.0
+mmi_threshold_step = 0.5
+
 [qgis]
 prefix_path = None
 #prefix_path = /Applications/QGIS.app/Contents/MacOS
@@ -141,6 +146,12 @@ class EEWAnalyzeApp(object):
                 self.load_data(eqId)
                 self.process_event(plotAlertMaps=args.plot_alert_maps)
 
+        if args.optimize_events or args.all:
+            self.maps = None
+            for eqId in self.params.options("events"):
+                self.load_data(eqId)
+                self.optimize_threshold()
+
         if args.plot_maps or args.all:
             if self.maps is None:
                 self.maps = MapPanels(self.params)
@@ -227,8 +238,21 @@ class EEWAnalyzeApp(object):
         costSavings = CostSavings(self.params, self.maps)
         stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, mmiAlertThreshold, plotAlertMaps)
         print stats
-        return
+        return stats
 
+    def optimize_threshold(self):
+        thresholdStart = self.params.getfloat("optimize", "mmi_threshold_min")
+        thresholdStop = self.params.getfloat("optimize", "mmi_threshold_max")
+        thresholdStep = self.params.getfloat("optimize", "mmi_threshold_step")
+        thresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
+        costSavings = CostSavings(self.params, self.maps)
+        for threshold in thresholds:
+            stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, threshold, plotAlertMaps=False)
+            # :TODO: convert to numpy structure array and write to file
+            # https://docs.scipy.org/doc/numpy-1.10.4/reference/generated/numpy.recarray.tofile.html
+            print threshold, stats["area_alert"], stats["area_damage"], stats["population_alert"], stats["population_damage"],  stats["metric_area"], stats["metric_population"]
+        return
+    
     def plot_maps(self, eqId, maps):
         """Plot maps with ShakeAlert performance information.
 
@@ -275,6 +299,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
         parser.add_argument("--process-events", action="store_true", dest="process_events")
+        parser.add_argument("--optimize-events", action="store_true", dest="optimize_events")
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-figures", action="store", dest="plot_figures", default=None, choices=[None, "all", "alert_error"])
