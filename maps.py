@@ -218,7 +218,7 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category, popDensity], legendTitle="Alert Category", title="ShakeAlert Alert Classification")
+        self._render([category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category], legendTitle="Alert Category", title="Alert Classification") # , Alert Threshold: MMI X.X
         return
 
     def _add_labels(self, layer):
