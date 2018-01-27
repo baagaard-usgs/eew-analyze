@@ -70,7 +70,7 @@ class CostSavings(object):
                 filename = self.config.get("files", "analysis_event").replace("[EVENTID]", event["event_id"])
                 values = [
                     ("mmi_pred", mmiPredCur,),
-                    ("warning_time", self._timedelta_to_seconds(warningTimeCur),),
+                    ("warning_time", timedelta_to_seconds(warningTimeCur),),
                 ]
                 gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
                 self.maps.load_data(event["event_id"], alert=alert)
@@ -98,18 +98,19 @@ class CostSavings(object):
         costPerfectEEW = costDamage*(costDamage < costActionObs) + costActionObs*(costDamage >= costActionObs)
         costEEW = fragility.cost_action(mmiPred)*(mmiPred >= mmiAlertThreshold) + costDamage*(mmiPred < mmiAlertThreshold)
         costSavings = costNoEEW - costEEW
+        costSavingsPerfect = costNoEEW - costPerfectEEW
 
         pixelArea = shakemap.pixel_area(self.config.get("shakemap", "projection"))
-        costSavingsArea = numpy.sum(pixelArea * (costNoEEW - costEEW))
-        costSavingsPop = numpy.sum(populationDensity * pixelArea * (costNoEEW - costEEW))
-        costSavingsPerfectArea = numpy.sum(pixelArea * (costNoEEW - costPerfectEEW))
-        costSavingsPerfectPop = numpy.sum(populationDensity * pixelArea * (costNoEEW - costPerfectEEW))
+        costSavingsArea = numpy.sum(pixelArea * costSavings)
+        costSavingsPop = numpy.sum(populationDensity * pixelArea * costSavings)
+        costSavingsPerfectArea = numpy.sum(pixelArea * costSavingsPerfect)
+        costSavingsPerfectPop = numpy.sum(populationDensity * pixelArea * costSavingsPerfect)
         metricArea = costSavingsArea / costSavingsPerfectArea
         metricPop = costSavingsPop / costSavingsPerfectPop
-        areaAlert = numpy.sum(pixelArea*(mmiPred >= mmiAlertThreshold))
-        areaDamage = numpy.sum(pixelArea*(costDamage > 0.0))
-        popAlert = numpy.sum(pixelArea*populationDensity*(mmiPred >= mmiAlertThreshold))
-        popDamage = numpy.sum(pixelArea*populationDensity*(costDamage > 0.0))
+        areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
+        areaDamage = numpy.sum(pixelArea * (costDamage > 0.0))
+        popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
+        popDamage = numpy.sum(pixelArea * populationDensity * (costDamage > 0.0))
 
         # Alert categories TN(0),FN(1),FP(2),TP(3)
         alertCategory = numpy.zeros(costDamage.shape)
