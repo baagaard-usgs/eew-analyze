@@ -207,11 +207,11 @@ class AnalysisData(object):
             logging.getLogger(__name__).debug(str(event))
         return
 
-    def find_match(self, comcatId):
+    def find_match(self, comcatId, server):
         """Find initial alert matching ComCat event.
         """
         MAX_DISTANCE_DEG = 3.0
-        MAX_DISTANCE_KM = 100.0
+        MAX_DISTANCE_KM = 150.0
         MAX_TIME_SECS = 15.0
         VS = 3.0e+3
 
@@ -246,8 +246,12 @@ class AnalysisData(object):
         alertMatch = None
         for alert in alerts:
             # :TODO: Ignore deleted alerts
+            # Ignore alerts from non-target servers
+            if alert["server"]!="unknown" and alert["server"]!="eew2" and alert["server"]!=server:
+                continue
+            # Limit to distance range 
             dist = greatcircle.distance(lon, lat, alert["longitude"], alert["latitude"])
-            if dist > MAX_DISTANCE_KM:
+            if dist*1e-3 > MAX_DISTANCE_KM:
                 continue
             distOT = abs((dateutil.parser.parse(alert["origin_time"])-ot).total_seconds())*VS
             if dist + distOT < minDist:
@@ -275,7 +279,8 @@ class AnalysisData(object):
             ]
         values = (
             "live",
-            "new", "update",
+            "new",
+            "update",
             match["dm_id"],
             timestamp, timestamp+datetime.timedelta(minutes=10.0),
             )
@@ -323,15 +328,15 @@ class AnalysisData(object):
             sout += "  Number of rows: {}\n".format(nrows)
         return sout
 
-    def show_matches(self):
+    def show_matches(self, server):
         """Show matches.
         """
         self.cursor.execute("SELECT * from comcat_events ORDER BY event_id")
         events = self.cursor.fetchall()
         for event in events:
-            alert = self.find_match(event["event_id"])
+            alert = self.find_match(event["event_id"], server)
             if alert:
-                print("COMAT {event[event_id]} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT {alert[event_id]} {alert[longitude]:.3f} {alert[latitude]:.3f} {alert[origin_time]}".format(event=event, alert=alert))
+                print("COMAT {event[event_id]} M{event[magnitude]:.2f} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT {alert[event_id]} {alert[longitude]:.3f} {alert[latitude]:.3f} {alert[origin_time]} {alert[server]}".format(event=event, alert=alert))
             else:
                 print("COMAT {event[event_id]} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT None".format(event=event))
         return

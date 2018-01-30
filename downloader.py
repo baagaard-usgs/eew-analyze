@@ -281,7 +281,7 @@ class DownloaderApp(object):
             print("Showing matches between ComCat and ShakeAlert...")
 
         db = AnalysisData(self.config.get("files", "analysis_db"))
-        db.show_matches()
+        db.show_matches(self.config.get("shakealert.production", "server"))
         return 
     
     def initialize(self, config_filenames):
