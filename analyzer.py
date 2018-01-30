@@ -115,12 +115,13 @@ def analysis_label(params, eqid):
     :type eqid: str
     :param eqid: ComCat earthquake id.
     """
+    server = params.get("shakealert.production", "server")
     gmpe = params.get("mmi_predicted", "gmpe")
     fragility = params.get("fragility_curves", "object").split(".")[-1]
     magThreshold = params.get("alerts", "mag_threshold")
     mmiThreshold = params.get("alerts", "mmi_threshold")
-    label = "{eqid}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}".format(
-        eqid, gmpe, fragility, magThreshold, mmiThreshold)
+    label = "{eqid}-{server}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}".format(
+        eqid, server, gmpe, fragility, magThreshold, mmiThreshold)
     return label
     
 
