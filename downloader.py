@@ -119,7 +119,7 @@ class DownloaderApp(object):
             self._fetch_shakemaps()
 
         if args.db_init or args.all:
-            self._db_init(args.initdb)
+            self._db_init(args.db_init)
 
         if args.db_status or args.all:
             self._db_status()
