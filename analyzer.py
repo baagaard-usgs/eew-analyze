@@ -105,6 +105,25 @@ def get_dir(params, name):
     """
     return os.path.expanduser(params.get("files", name))
 
+
+def analysis_label(params, eqid):
+    """Get label for anlysis used in output filenames.
+    
+    :type params: ConfigParser
+    :param params: Configuration options
+
+    :type eqid: str
+    :param eqid: ComCat earthquake id.
+    """
+    gmpe = params.get("mmi_predicted", "gmpe")
+    fragility = params.get("fragility_curves", "object").split(".")[-1]
+    magThreshold = params.get("alerts", "mag_threshold")
+    mmiThreshold = params.get("alerts", "mmi_threshold")
+    label = "{eqid}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}".format(
+        eqid, gmpe, fragility, magThreshold, mmiThreshold)
+    return label
+    
+
 # ----------------------------------------------------------------------
 class EEWAnalyzeApp(object):
     """
@@ -222,35 +241,61 @@ class EEWAnalyzeApp(object):
         self.populationDensity = gdalraster.resample(filename, self.shakemap.num_lon(), self.shakemap.num_lat(), self.shakemap.spatial_ref(), self.shakemap.geo_transform())
         return
     
-    def process_event(self, mmiAlertThreshold=None, plotAlertMaps=False):
+    def process_event(self, plotAlertMaps=False):
         """For given event, fetch data, process data, generate plots, and generate report.
         
-        :type mmiAlertThreshold: float
-        :param mmiAlertThreshold:
-            MMI threshold for sending alert. Regions with predicted
-            MMI above this threshold would receive an alert.
+        :type plotAlertMaps: bool
+        :param plotAlertMaps: If true, plot map with predicted MMI and warning time contours for each alert.
         """
-        if mmiAlertThreshold is None:
-            mmiAlertThreshold = self.params.getfloat("alerts","mmi_threshold")
+        magAlertThreshold = self.params.getfloat("alerts", "magnitude_threshold")
+        mmiAlertThreshold = self.params.getfloat("alerts","mmi_threshold")
         if self.showProgress:
-            print("Processing event {event[event_id]} with MMI alert={alert} ...".format(event=self.event, alert=mmiAlertThreshold))
+            print("Processing event {event[event_id]} with alert thresholds M{mag} and MMI {mmi} ...".format(self.event, magAlertThreshold, mmiAlertThreshold))
             
         costSavings = CostSavings(self.params, self.maps)
         stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, mmiAlertThreshold, plotAlertMaps)
-        print stats
-        return stats
+        stats.update({
+            "comcat_id": self.event["event_id"],
+            "eew_server": self.params.get("shakealert.production", "server"),
+            "dm_id", self.alerts[0]["event_id"],
+            "dm_timestamp", self.alerts[0]["timestamp"],
+            "gmpe": self.params.get("mmi_predicted", "gmpe"),
+            "fragility": self.params.get("fragility_curves", "object").split(".")[-1],
+            "magnitude_threshold": magAlertThreshold,
+            "mmi_threshold": mmiAlertThreshold,
+            })
+        db = AnalysisData(self.params.get("files", "analysis_db"))            
+        db.add_performance(stats)
+        return
 
     def optimize_threshold(self):
         thresholdStart = self.params.getfloat("optimize", "mmi_threshold_min")
         thresholdStop = self.params.getfloat("optimize", "mmi_threshold_max")
         thresholdStep = self.params.getfloat("optimize", "mmi_threshold_step")
         thresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
+
+        cols = [
+            ("mmi_threshold", "float32",),
+            ("area_damage", "float32",),
+            ("area_alert", "float32",),
+            ("area_metric", "float32",),
+            ("population_damage", "float32",),
+            ("population_alert", "float32",),
+            ("population_metric", "float32",),
+        ]
+        perfStats = numpy.zeros(len(thresholds), dtype=cols)
+        
         costSavings = CostSavings(self.params, self.maps)
-        for threshold in thresholds:
+        for iperf, threshold in enumerate(thresholds):
             stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, threshold, plotAlertMaps=False)
-            # :TODO: convert to numpy structure array and write to file
-            # https://docs.scipy.org/doc/numpy-1.10.4/reference/generated/numpy.recarray.tofile.html
-            print threshold, stats["area_alert"], stats["area_damage"], stats["population_alert"], stats["population_damage"],  stats["metric_area"], stats["metric_population"]
+            
+            perfStats[iperf] = tuple([threshold] + [stats[col] for col[0] in cols[1:]])
+
+        dataDir = get_dir(self.params, "event_dir").replace("[EVENTID]", eqId)
+        gmpe = params.get("mmi_predicted", "gmpe")
+        fragility = params.get("fragility_curves", "object").split(".")[-1]
+        filename = os.path.join(dataDir, "perfmetrics-{gmpe}-{fragility}.txt".format(gmpe, fragility))
+        perfStats.tofile(filename) #, "%3.1f  %7.1e %7.1e %3.1f  %7.1e %7.1e %3.1f")
         return
     
     def plot_maps(self, eqId, maps):

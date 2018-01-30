@@ -97,18 +97,19 @@ class CostSavings(object):
         costNoEEW = costDamage
         costPerfectEEW = costDamage*(costDamage < costActionObs) + costActionObs*(costDamage >= costActionObs)
         costEEW = fragility.cost_action(mmiPred)*(mmiPred >= mmiAlertThreshold) + costDamage*(mmiPred < mmiAlertThreshold)
-        costSavings = costNoEEW - costEEW
-        costSavingsPerfect = costNoEEW - costPerfectEEW
 
         pixelArea = shakemap.pixel_area(self.config.get("shakemap", "projection"))
-        costSavingsArea = numpy.sum(pixelArea * costSavings)
-        costSavingsPop = numpy.sum(populationDensity * pixelArea * costSavings)
-        costSavingsPerfectArea = numpy.sum(pixelArea * costSavingsPerfect)
-        costSavingsPerfectPop = numpy.sum(populationDensity * pixelArea * costSavingsPerfect)
-        metricArea = costSavingsArea / costSavingsPerfectArea
-        metricPop = costSavingsPop / costSavingsPerfectPop
-        areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
+        areaCostNoEEW = numpy.sum(pixelArea * costNoEEW)
+        areaCostPerfectEEW = numpy.sum(pixelARea * costPerfectEEW)
+        areaCostEEW = numpy.sum(pixelArea * costEEW)
+        areaMetric = (areaCostNoEEW - areaCostEEW) / (areaCostNoEEW - areaCostPerfectEEW)
         areaDamage = numpy.sum(pixelArea * (costDamage > 0.0))
+        areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
+        
+        popCostNoEEW = numpy.sum(populationDensity * pixelArea * costNoEEW)
+        popCostPerfectEEW = numpy.sum(populationDensity * pixelARea * costPerfectEEW)
+        popCostEEW = numpy.sum(populationDensity * pixelArea * costEEW)
+        popMetric = (popCostNoEEW - popCostEEW) / (popCostNoEEW - popCostPerfectEEW)
         popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
         popDamage = numpy.sum(pixelArea * populationDensity * (costDamage > 0.0))
 
@@ -135,12 +136,18 @@ class CostSavings(object):
         gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
 
         metrics = {
-            "area_alert": areaAlert,
-            "population_alert": popAlert,
             "area_damage": areaDamage,
+            "area_alert": areaAlert,
+            "area_cost_eew": areaCostEEW,
+            "area_cost_noeew": areaCostNoEEW,
+            "area_cost_perfecteew": areaCostPerfectEEW,
+            "area_metric": areaMetric,
             "population_damage": popDamage,
-            "metric_area": metricArea,
-            "metric_population": metricPop,
+            "population_alert": popAlert,
+            "population_cost_eew": popCostEEW,
+            "population_cost_noeew": popCostNoEEW,
+            "population_cost_perfecteew": popCostPerfectEEW,
+            "population_metric": popMetric,
             }
         return metrics
 
