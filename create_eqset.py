@@ -23,6 +23,11 @@ longitude = -117.396
 latitude = 33.953
 max_radius_deg = 2.5
 
+[eureka]
+longitude = -124.4
+latitude = 40.4
+max_radius_deg = 1.5
+
 [fdsn.event]
 starttime = 2012-01-27
 minmagnitude = 4.0
@@ -38,27 +43,6 @@ ci11129826 = deleted event
 [files]
 filename_template = ./eqsets/[DOMAIN].cfg
 """
-
-# ----------------------------------------------------------------------
-
-
-def _config_get_list(list_string):
-    """Convert list as string to list.
-
-    :type list_string: list
-    :param list_string: List as string.
-    :returns: List of strings.
-    """
-    l = [f.strip() for f in list_string[1:-1].split(",")]
-    return l
-
-
-    if makeDir or not os.path.isdir(eventDir):
-        os.makedirs(eventDir)
-
-    filename = params.get("files", option) if args is None else params.get("files", option) % args
-    return os.path.join(eventDir, filename)
-    
 
 # ----------------------------------------------------------------------
 class CreateEqSetApp(object):
