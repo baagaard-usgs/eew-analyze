@@ -182,14 +182,17 @@ class AnalysisData(object):
             "fragility",
             "magnitude_threshold",
             "mmi_threshold",
-            "cost_eew",
-            "cost_noeew",
-            "cost_perfecteew",
             "area_damage",
             "area_alert",
+            "area_cost_eew",
+            "area_cost_noeew",
+            "area_cost_perfecteew",
             "area_metric",
             "population_damage",
             "population_alert",
+            "population_cost_eew",
+            "population_cost_noeew",
+            "population_cost_perfecteew",
             "population_metric",
             )
 
@@ -200,11 +203,11 @@ class AnalysisData(object):
         if replace:
             cmd += " OR REPLACE"
         try:
-            self.cursor.execute("{} INTO comcat_events({0}) VALUES({1})".format(cmd, insertCols, perfCols), perfValues)
+            self.cursor.execute("{0} INTO performance({1}) VALUES({2})".format(cmd, insertCols, perfCols), perfValues)
             self.connection.commit()
         except sqlite3.IntegrityError as ex:
             logging.getLogger(__name__).debug(str(ex))
-            logging.getLogger(__name__).debug(str(event))
+            logging.getLogger(__name__).debug(str(stats))
         return
 
     def find_match(self, comcatId, server):
@@ -259,13 +262,13 @@ class AnalysisData(object):
                 minDist = dist
         return alertMatch
 
-    def alerts(self, comcatId):
+    def alerts(self, comcatId, server):
         """Get ShakeAlert alerts for event matching ComCat id.
 
         :type comcatId: str
         :param comcatId: ComCat event id.
         """
-        alert = self.find_match(comcatId)
+        alert = self.find_match(comcatId, server)
         if alert is None:
             return []
         
@@ -275,13 +278,15 @@ class AnalysisData(object):
             "category=?",
             "(message_type=? OR message_type=?)",
             "event_id=?",
+            "server=?",
             "timestamp BETWEEN ? AND ?",
             ]
         values = (
             "live",
             "new",
             "update",
-            match["dm_id"],
+            alert["event_id"],
+            alert["server"],
             timestamp, timestamp+datetime.timedelta(minutes=10.0),
             )
         self.cursor.execute("SELECT * FROM eew_alerts WHERE " + " AND ".join(conditions), values)

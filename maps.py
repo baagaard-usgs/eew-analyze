@@ -17,6 +17,7 @@ from osgeo import gdal, osr
 
 import gdalraster
 import qgisconverter
+import analysis_utils
 
 gdal.UseExceptions()
 
@@ -81,7 +82,8 @@ class MapPanels(object):
         self.dataLayers = {}
 
         # Generate temporary virtual raster bands
-        filename = self.config.get("files", "analysis_event").replace("[EVENTID]", self.eqId)
+        cacheDir = self.config.get("files", "analysis_cache_dir")
+        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, eqId) + ".tiff")
         src = gdal.Open(filename, gdal.GA_ReadOnly)
         for name,layer in qgisconverter.extract_raster_bands(src).items():
             self.dataLayers[name] = layer
@@ -368,10 +370,11 @@ class MapPanels(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_label(self.config, self.eqId)
         if self.alert is None:
-            filename = "{eq}-map_{name}.{format}".format(eq=self.eqId, name=name, format=format)
+            filename += "-map_{name}.{format}".format(eq=self.eqId, name=name, format=format)
         else:
-            filename = "{eq}-alert{ver:03d}_map_{name}.{format}".format(eq=self.eqId, ver=self.alert["version"], name=name, format=format)
+            filename += "-alert{ver:03d}_map_{name}.{format}".format(eq=self.eqId, ver=self.alert["version"], name=name, format=format)
         image.save(os.path.join(plotsDir, filename), format)
         return
 

@@ -8,9 +8,7 @@
 
 import numpy
 
-from osgeo import gdal, ogr, osr
-
-gdal.UseExceptions()
+from osgeo import osr
 
 EARTH_MEAN_RADIUS_M = 6371.0e+3
 DEG_TO_RAD = numpy.pi / 180.0

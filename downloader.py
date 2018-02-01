@@ -43,43 +43,6 @@ analysis_db = ./data/analysisdb_NEW.sqlite
 """
 
 # ----------------------------------------------------------------------
-
-
-def _config_get_list(list_string):
-    """Convert list as string to list.
-
-    :type list_string: list
-    :param list_string: List as string.
-    :returns: List of strings.
-    """
-    l = [f.strip() for f in list_string[1:-1].split(",")]
-    return l
-
-
-def _data_filename(params, option, eqId, args=None, makeDir=False):
-    """Construct relative path for file.
-
-    :type params: ConfigParser
-    :param params: Application parameters.
-    :type option: str
-    :param option: Option in application parameters for filename.
-    :type eqId: str
-    :param ComCat event id (e.g., nc72923380).
-    :param params: Application parameters.
-    :type args: tuple
-    :param args: Tuple for arguments for substitution in name of parameter file.
-    :type makeDir: bool
-    :param makeDir: Create directory for file if True.
-    """
-    eventDir = os.path.join("data", eqId)
-    if makeDir or not os.path.isdir(eventDir):
-        os.makedirs(eventDir)
-
-    filename = params.get("files", option) if args is None else params.get("files", option) % args
-    return os.path.join(eventDir, filename)
-    
-
-# ----------------------------------------------------------------------
 class DownloaderApp(object):
     """
     Download data (DM logs, ShakeMaps, ComCat events) needed for analysis of ShakeAlert performance.
