@@ -254,7 +254,7 @@ class EEWAnalyzeApp(object):
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = os.path.join(cacheDir, "threshold_optimization_"+analysis_utils.analysis_label(self.config, self.event["event_id"])+".txt")
         header = ", ".join(perfStats.dtype.names)
-        numpy.savetxt(filename, perfStats, header=header, fmt="%3.1f  %7.1e %7.1e %3.1f  %7.1e %7.1e %3.1f")
+        numpy.savetxt(filename, perfStats, header=header, fmt="%3.1f  %7.1e %7.1e %4.2f  %7.1e %7.1e %4.2f")
         return
     
     def plot_maps(self, eqId, maps):
