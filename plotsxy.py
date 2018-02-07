@@ -85,7 +85,7 @@ class Figures(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, event["event_id"])
+        filename = analysis_utils.analysis_label(self.config, self.event["event_id"])
         filename += "-alert_error.pdf"
         figure.figure.savefig(os.path.join(plotsDir, filename))
         return
