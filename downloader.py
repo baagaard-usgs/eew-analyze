@@ -172,9 +172,6 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Updating ComCat events in analysis database...")
 
-        import pdb
-        pdb.set_trace()
-            
         db = AnalysisData(self.config.get("files", "analysis_db"))
 
         event = DetailEvent()
