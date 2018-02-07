@@ -343,7 +343,7 @@ class AnalysisData(object):
             if alert:
                 print("COMAT {event[event_id]} M{event[magnitude]:.2f} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT {alert[event_id]} {alert[longitude]:.3f} {alert[latitude]:.3f} {alert[origin_time]} {alert[server]}".format(event=event, alert=alert))
             else:
-                print("COMAT {event[event_id]} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT None".format(event=event))
+                print("COMAT {event[event_id]} M{event[magnitude]:.2f} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT None".format(event=event))
         return
 
 # End of file
