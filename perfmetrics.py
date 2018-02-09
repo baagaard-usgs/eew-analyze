@@ -6,21 +6,14 @@
 # ======================================================================
 #
 
+import os
 import logging
-import numpy
 from importlib import import_module
+import numpy
 
-import fragilitycurves
+import analysis_utils
 import gdalraster
 
-def timedelta_to_seconds(value):
-    """Convert timedelta to floating point value in seconds.
-    
-    :type value: numpy.timedelta64
-    :param value: Array of time differences.
-    """
-    return value.astype("timedelta64[us]").astype("float32")/1.0e+6
-    
 class CostSavings(object):
     """Cost savings weighted by area and population.
     """
@@ -40,7 +33,7 @@ class CostSavings(object):
         warningTime = gdalraster.NO_DATA_VALUE * numpy.ones(shape, dtype="timedelta64[s]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones(shape, numpy.float32)
         
-        shakingTimeRel = timedelta_to_seconds(shakingTime - numpy.datetime64(event["origin_time"]))
+        shakingTimeRel = analysis_utils.timedelta_to_seconds(shakingTime - numpy.datetime64(event["origin_time"]))
 
         thresholdReached = False
         magnitudeThreshold = self.config.getfloat("alerts", "magnitude_threshold")
@@ -57,7 +50,7 @@ class CostSavings(object):
             else:
                 if not thresholdReached:
                     tstamp = numpy.datetime64(alert["timestamp"])
-                    wtime = timedelta_to_seconds(tstamp - numpy.datetime64(event["origin_time"]))
+                    wtime = analysis_utils.timedelta_to_seconds(tstamp - numpy.datetime64(event["origin_time"]))
                     msg = "Alert threshold reached at {tstamp}, {wtime:.1f}s after origin time.".format(tstamp=tstamp, wtime=wtime)
                     print msg
                     logging.getLogger(__name__).info(msg)
@@ -70,11 +63,11 @@ class CostSavings(object):
                 filename = self.config.get("files", "analysis_event").replace("[EVENTID]", event["event_id"])
                 values = [
                     ("mmi_pred", mmiPredCur,),
-                    ("warning_time", timedelta_to_seconds(warningTimeCur),),
+                    ("warning_time", analysis_utils.timedelta_to_seconds(warningTimeCur),),
                 ]
                 gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
                 self.maps.load_data(event["event_id"], alert=alert)
-                tafterOT = timedelta_to_seconds(numpy.datetime64(alert["timestamp"])-numpy.datetime64(event["origin_time"]))
+                tafterOT = analysis_utils.timedelta_to_seconds(numpy.datetime64(alert["timestamp"])-numpy.datetime64(event["origin_time"]))
                 self.maps.mmi_warning_time(tafterOT)
             
             # Update alert time if greater than previous
@@ -91,24 +84,29 @@ class CostSavings(object):
         # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
         mmiObs = shakemap.data["mmi"]
         objectPath = self.config.get("fragility_curves", "object").split(".")
-        fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])()
+        costAction = self.config.getfloat("fragility_curves", "cost_action")
+        mmiLow = self.config.getfloat("fragility_curves", "damage_low_mmi")
+        mmiHigh = self.config.getfloat("fragility_curves", "damage_high_mmi")
+        fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(costAction, mmiLow, mmiHigh)
+        
         costDamage = fragility.cost_damage(mmiObs)
         costActionObs = fragility.cost_action(mmiObs)
         costNoEEW = costDamage
         costPerfectEEW = costDamage*(costDamage < costActionObs) + costActionObs*(costDamage >= costActionObs)
         costEEW = fragility.cost_action(mmiPred)*(mmiPred >= mmiAlertThreshold) + costDamage*(mmiPred < mmiAlertThreshold)
-        costSavings = costNoEEW - costEEW
-        costSavingsPerfect = costNoEEW - costPerfectEEW
 
         pixelArea = shakemap.pixel_area(self.config.get("shakemap", "projection"))
-        costSavingsArea = numpy.sum(pixelArea * costSavings)
-        costSavingsPop = numpy.sum(populationDensity * pixelArea * costSavings)
-        costSavingsPerfectArea = numpy.sum(pixelArea * costSavingsPerfect)
-        costSavingsPerfectPop = numpy.sum(populationDensity * pixelArea * costSavingsPerfect)
-        metricArea = costSavingsArea / costSavingsPerfectArea
-        metricPop = costSavingsPop / costSavingsPerfectPop
-        areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
+        areaCostNoEEW = numpy.sum(pixelArea * costNoEEW)
+        areaCostPerfectEEW = numpy.sum(pixelArea * costPerfectEEW)
+        areaCostEEW = numpy.sum(pixelArea * costEEW)
+        areaMetric = (areaCostNoEEW - areaCostEEW) / (areaCostNoEEW - areaCostPerfectEEW)
         areaDamage = numpy.sum(pixelArea * (costDamage > 0.0))
+        areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
+        
+        popCostNoEEW = numpy.sum(populationDensity * pixelArea * costNoEEW)
+        popCostPerfectEEW = numpy.sum(populationDensity * pixelArea * costPerfectEEW)
+        popCostEEW = numpy.sum(populationDensity * pixelArea * costEEW)
+        popMetric = (popCostNoEEW - popCostEEW) / (popCostNoEEW - popCostPerfectEEW)
         popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
         popDamage = numpy.sum(pixelArea * populationDensity * (costDamage > 0.0))
 
@@ -123,7 +121,7 @@ class CostSavings(object):
         values = [
             ("mmi_obs", shakemap.data["mmi"],),
             ("mmi_pred", mmiPred,),
-            ("warning_time", timedelta_to_seconds(warningTime),),
+            ("warning_time", analysis_utils.timedelta_to_seconds(warningTime),),
             ("shaking_time", shakingTimeRel,),
             ("population_density", populationDensity,),
             ("cost_no_eew", costNoEEW,),
@@ -131,16 +129,25 @@ class CostSavings(object):
             ("cost_eew", costEEW,),
             ("alert_category", alertCategory,),
             ]
-        filename = self.config.get("files", "analysis_event").replace("[EVENTID]", event["event_id"])
+        cacheDir = self.config.get("files", "analysis_cache_dir")
+        if not os.path.isdir(cacheDir):
+            os.makedirs(cacheDir)
+        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"]) + ".tiff")
         gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
 
         metrics = {
-            "area_alert": areaAlert,
-            "population_alert": popAlert,
             "area_damage": areaDamage,
+            "area_alert": areaAlert,
+            "area_cost_eew": areaCostEEW,
+            "area_cost_noeew": areaCostNoEEW,
+            "area_cost_perfecteew": areaCostPerfectEEW,
+            "area_metric": areaMetric,
             "population_damage": popDamage,
-            "metric_area": metricArea,
-            "metric_population": metricPop,
+            "population_alert": popAlert,
+            "population_cost_eew": popCostEEW,
+            "population_cost_noeew": popCostNoEEW,
+            "population_cost_perfecteew": popCostPerfectEEW,
+            "population_metric": popMetric,
             }
         return metrics
 

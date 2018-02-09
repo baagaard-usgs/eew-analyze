@@ -11,6 +11,7 @@ import numpy
 
 from basemap.Figure import Figure
 
+import analysis_utils
 import greatcircle
 
 
@@ -80,8 +81,13 @@ class Figures(object):
         ax.set_xlim(0, 30)
         ax.set_title("Depth Error (Obs-Pred)")
         icol += 1
-        
-        figure.figure.savefig("test.pdf")
+
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_label(self.config, self.event["event_id"])
+        filename += "-alert_error.pdf"
+        figure.figure.savefig(os.path.join(plotsDir, filename))
         return
 
 # End of file

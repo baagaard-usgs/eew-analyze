@@ -37,47 +37,10 @@ username = None
 password = None
 
 [files]
-dmlogs_dir = ./data/dmlogs/
+dmlogs_dir = ./data/dmlogs/[SERVER]/
 event_dir = ./data/[EVENTID]/
-analysis_db = ./data/analysisdb.sqlite
+analysis_db = ./data/analysisdb_NEW.sqlite
 """
-
-# ----------------------------------------------------------------------
-
-
-def _config_get_list(list_string):
-    """Convert list as string to list.
-
-    :type list_string: list
-    :param list_string: List as string.
-    :returns: List of strings.
-    """
-    l = [f.strip() for f in list_string[1:-1].split(",")]
-    return l
-
-
-def _data_filename(params, option, eqId, args=None, makeDir=False):
-    """Construct relative path for file.
-
-    :type params: ConfigParser
-    :param params: Application parameters.
-    :type option: str
-    :param option: Option in application parameters for filename.
-    :type eqId: str
-    :param ComCat event id (e.g., nc72923380).
-    :param params: Application parameters.
-    :type args: tuple
-    :param args: Tuple for arguments for substitution in name of parameter file.
-    :type makeDir: bool
-    :param makeDir: Create directory for file if True.
-    """
-    eventDir = os.path.join("data", eqId)
-    if makeDir or not os.path.isdir(eventDir):
-        os.makedirs(eventDir)
-
-    filename = params.get("files", option) if args is None else params.get("files", option) % args
-    return os.path.join(eventDir, filename)
-    
 
 # ----------------------------------------------------------------------
 class DownloaderApp(object):
@@ -88,7 +51,7 @@ class DownloaderApp(object):
     def __init__(self):
         """Constructor.
         """
-        self.params = None
+        self.config = None
         return
 
     def main(self):
@@ -118,19 +81,17 @@ class DownloaderApp(object):
         if args.fetch_shakemaps or args.all:
             self._fetch_shakemaps()
 
-        if args.initdb or args.all:
-            self._initdb()
+        if args.db_init or args.all:
+            self._db_init(args.db_init)
 
-        if args.dbstatus or args.all:
-            self._dbstatus()
+        if args.db_status or args.all:
+            self._db_status()
 
-        if args.updatedb or args.all:
-            if args.updatedb == "eew_alerts" or args.all:
-                self._updatedb_eewalerts()
-            if args.updatedb == "comcat_events" or args.all:
-                self._updatedb_events()
-            if args.updatedb == "matches" or args.all:
-                self._updatedb_matches()
+        if args.db_populate or args.all:
+            if "eew_alerts" in args.db_populate or args.db_populate == "all" or args.all:
+                self._db_populate_eewalerts(all=args.db_populate != "new_eew_alerts", replace=args.db_replace_rows)
+            if args.db_populate == "comcat_events" or args.db_populate == "all" or args.all:
+                self._db_populate_events(replace=args.db_replace_rows)
 
         if args.show_matches or args.all:
             self._show_matches()
@@ -139,12 +100,13 @@ class DownloaderApp(object):
     def _fetch_eewalerts(self, dateBegin, dateEnd):
         if self.showProgress:
             print("Fetching EEW alerts...")
-            
-        self.eewserver = EEWServer(self.params)
-        self.eewserver.login()
 
-        dmlog = DMLogXML(config=self.params)
-        logsDir = self.params.get("files", "dmlogs_dir")
+        self.eewserver = EEWServer(self.config)
+        self.eewserver.login()
+        
+        dmlog = DMLogXML(config=self.config)
+        server = self.config.get("shakealert.production", "server")    
+        logsDir = self.config.get("files", "dmlogs_dir").replace("[SERVER]", server)
         if not os.path.isdir(logsDir):
             os.makedirs(logsDir)
         date = dateBegin
@@ -165,8 +127,8 @@ class DownloaderApp(object):
             print("Fetching earthquakes from ComCat database...")
 
         event = DetailEvent()
-        dirTemplate = self.params.get("files", "event_dir")
-        for eqId in self.params.options("events"):
+        dirTemplate = self.config.get("files", "event_dir")
+        for eqId in self.config.options("events"):
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.fetch(eqId, dataDir)
         return
@@ -178,8 +140,8 @@ class DownloaderApp(object):
             print("Fetching ShakeMaps...")
 
         event = DetailEvent()
-        dirTemplate = self.params.get("files", "event_dir")
-        for eqId in self.params.options("events"):
+        dirTemplate = self.config.get("files", "event_dir")
+        for eqId in self.config.options("events"):
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.load(os.path.join(dataDir, eqId+".geojson"))
             shakemap = event.get_product("shakemap")
@@ -188,33 +150,33 @@ class DownloaderApp(object):
             shakemap[0].fetch("grid.xml", dataDir)
         return
 
-    def _initdb(self):
+    def _db_init(self, tables):
         """Create analysis database with ShakeAlert DM alerts and ComCat events.
         """
         if self.showProgress:
             print("Setting up analysis database...")
             
-        db = AnalysisData(self.params.get("files", "analysis_db"))
-        db.init()
+        db = AnalysisData(self.config.get("files", "analysis_db"))
+        db.init(tables)
         logging.getLogger(__name__).info(db.summary())
         return
 
-    def _dbstatus(self):
+    def _db_status(self):
         """Show summary of analysis database contents.
         """
-        db = AnalysisData(self.params.get("files", "analysis_db"))
+        db = AnalysisData(self.config.get("files", "analysis_db"))
         print(db.summary())
         return
     
-    def _updatedb_events(self):
+    def _db_populate_events(self, replace=False):
         if self.showProgress:
             print("Updating ComCat events in analysis database...")
 
-        db = AnalysisData(self.params.get("files", "analysis_db"))
+        db = AnalysisData(self.config.get("files", "analysis_db"))
 
         event = DetailEvent()
-        dirTemplate = self.params.get("files", "event_dir")
-        events = self.params.options("events")
+        dirTemplate = self.config.get("files", "event_dir")
+        events = self.config.options("events")
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
@@ -223,52 +185,63 @@ class DownloaderApp(object):
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.load(os.path.join(dataDir, eqId+".geojson"))
-            db.add_event(event)
+            db.add_event(event, replace)
         sys.stdout.write("\n")
         return
     
-    def _updatedb_eewalerts(self, all=False):
+    def _db_populate_eewalerts(self, all=False, replace=False):
         """
         """
         import glob
+        import re
         
         if self.showProgress:
             print("Updating ShakeAlert DM alerts in analysis database...")
 
-        db = AnalysisData(self.params.get("files", "analysis_db"))
+        db = AnalysisData(self.config.get("files", "analysis_db"))
 
-        logsDir = self.params.get("files", "dmlogs_dir")
-        files = sorted(glob.glob(os.path.join(logsDir, "dmevent*.log.gz")))
+        server = self.config.get("shakealert.production", "server")    
+        logsDir = self.config.get("files", "dmlogs_dir").replace("[SERVER]", server)
+        files = sorted(glob.glob(os.path.join(logsDir, "dmevent_*.log.gz")))
         if not all:
             # Get most recent entry and use files starting on that day.
-            pass
+            alert = db.most_recent_alert(server)
+            dateMostRecent = dateutil.parser.parse(alert["timestamp"]).date()
+            pattern = [
+                "dmevent_",
+                "([0-9]{4})",
+                "([0-9]{2})",
+                "([0-9]{2})",
+                ".log*",
+                ]
+            remove = []
+            for filename in files:
+                year, month, day = map(int, re.search("".join(pattern), filename).groups())
+                fileDate = datetime.date(year=year, month=month, day=day)
+                if fileDate < dateMostRecent:
+                    remove.append(filename)
+            for filename in remove:
+                files.remove(filename)
 
         # Read DM logs
-        dmlog = DMLogXML(config=self.params)
+        dmlog = DMLogXML(config=self.config)
         numFiles = len(files)
+        logging.getLogger(__name__).info("Processing {:d} DM logs starting with {:s}.".format(numFiles, files[0]))
         for iFile,filename in enumerate(files):
             if self.showProgress:
                 sys.stdout.write("\rProcessing DM logs...{:d}%%".format(((iFile+1)*100)/numFiles))
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
-            db.add_alerts(alerts)
+            db.add_alerts(alerts, replace)
         sys.stdout.write("\n")
         return
 
-    def _updatedb_matches(self):
-        if self.showProgress:
-            print("Finding EEW alerts matchings ComCat events...")
-
-        db = AnalysisData(self.params.get("files", "analysis_db"))
-        db.find_matches()
-        return 
-    
     def _show_matches(self):
         if self.showProgress:
             print("Showing matches between ComCat and ShakeAlert...")
 
-        db = AnalysisData(self.params.get("files", "analysis_db"))
-        db.show_matches()
+        db = AnalysisData(self.config.get("files", "analysis_db"))
+        db.show_matches(self.config.get("shakealert.production", "server"))
         return 
     
     def initialize(self, config_filenames):
@@ -287,7 +260,7 @@ class DownloaderApp(object):
                     print("Fetching parameters from {}...".format(filename))
                 config.read(filename)
 
-        self.params = config
+        self.config = config
 
         return
     
@@ -295,7 +268,7 @@ class DownloaderApp(object):
         """Write parameters to stdout.
         """
         import sys
-        self.params.write(sys.stdout)
+        self.config.write(sys.stdout)
         return
 
     def _parseCommandLine(self):
@@ -306,12 +279,13 @@ class DownloaderApp(object):
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", action="store", dest="config")
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
-        parser.add_argument("--fetch-eewalerts", action="store", dest="fetch_eewalerts", default=None)
+        parser.add_argument("--fetch-eewalerts", action="store", dest="fetch_eewalerts", default=None, metavar="DATE_BEGIN,DATE_END")
         parser.add_argument("--fetch-events", action="store_true", dest="fetch_events")
         parser.add_argument("--fetch-shakemaps", action="store_true", dest="fetch_shakemaps")
-        parser.add_argument("--initdb", action="store_true", dest="initdb")
-        parser.add_argument("--dbstatus", action="store_true", dest="dbstatus")
-        parser.add_argument("--updatedb", action="store", dest="updatedb", choices=["eew_alerts", "comcat_events", "matches"])
+        parser.add_argument("--db-init", action="store", dest="db_init", choices=["eew_alerts", "comcat_events", "performance", "all"])
+        parser.add_argument("--db-status", action="store_true", dest="db_status")
+        parser.add_argument("--db-populate", action="store", dest="db_populate", choices=["all_eew_alerts", "new_eew_alerts", "comcat_events", "all"])
+        parser.add_argument("--db-replace-rows", action="store_true", dest="db_replace_rows")
         parser.add_argument("--show-matches", action="store_true", dest="show_matches")
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)

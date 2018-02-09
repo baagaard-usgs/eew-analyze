@@ -13,11 +13,13 @@ import datetime
 import dateutil.parser
 import pytz
 
+import greatcircle
+
 TABLES = [
-    ("dm_alerts", [
+    ("eew_alerts", [
+        "server TEXT NOT NULL",
         "event_id INTEGER NOT NULL",
         "category TEXT NOT NULL",
-        "instance TEXT NOT NULL",
         "message_type TEXT NOT NULL",
         "timestamp TEXT NOT NULL",
         "version INTEGER NOT NULL",
@@ -28,7 +30,7 @@ TABLES = [
         "depth_km REAL NOT NULL",
         "origin_time TEXT NOT NULL",
         "num_stations INTEGER DEFAULT 0",
-        #"UNIQUE(event_id) ON CONFLICT FAIL",
+        "UNIQUE(server, event_id, version, category) ON CONFLICT FAIL",
     ]),
     ("comcat_events", [
         "event_id TEXT NOT NULL PRIMARY KEY",
@@ -41,11 +43,28 @@ TABLES = [
         "description TEXT",
         "UNIQUE(event_id) ON CONFLICT FAIL",
     ]),
-    ("matches", [
-        "comcat_id TEXT",
-        "dm_id INTEGER",
-        "dm_timestamp TEXT",
-        "UNIQUE(comcat_id) ON CONFLICT FAIL",
+    ("performance", [
+        "comcat_id TEXT NOT NULL",
+        "eew_server TEXT NOT NULL",
+        "dm_id INTEGER NOT NULL",
+        "dm_timestamp TEXT NOT NULL",
+        "gmpe TEXT NOT NULL",
+        "fragility TEXT NOT NULL",
+        "magnitude_threshold REAL NOT NULL",
+        "mmi_threshold REAL NOT NULL",
+        "area_damage REAL NOT NULL",
+        "area_alert REAL NOT NULL",
+        "area_cost_eew REAL NOT NULL",
+        "area_cost_noeew REAL NOT NULL",
+        "area_cost_perfecteew REAL NOT NULL",
+        "area_metric REAL NOT NULL",
+        "population_damage REAL NOT NULL",
+        "population_alert REAL NOT NULL",
+        "population_cost_eew REAL NOT NULL",
+        "population_cost_noeew REAL NOT NULL",
+        "population_cost_perfecteew REAL NOT NULL",
+        "population_metric REAL NOT NULL",
+        "UNIQUE(comcat_id, eew_server, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
     ]),
 ]
 
@@ -66,23 +85,29 @@ class AnalysisData(object):
         self.cursor = self.connection.cursor()
         return
 
-    def init(self):
+    def init(self, key):
         """Create database.
         """
-        for name, columns in TABLES[::-1]:
-            self.cursor.execute("DROP TABLE IF EXISTS {}".format(name))
-        for name,columns in TABLES:
-            self.cursor.execute("CREATE TABLE {name} ({fields})".format(name=name, fields=", ".join(columns)))
+        if key == "all":
+            for name, columns in TABLES[::-1]:
+                self.cursor.execute("DROP TABLE IF EXISTS {}".format(name))
+            for name,columns in TABLES:
+                self.cursor.execute("CREATE TABLE {name} ({fields})".format(name=name, fields=", ".join(columns)))
+        else:
+            for name, columns in TABLES:
+                if name == key:
+                    self.cursor.execute("DROP TABLE IF EXISTS {}".format(name))
+                    self.cursor.execute("CREATE TABLE {name} ({fields})".format(name=name, fields=", ".join(columns)))
         self.connection.commit()
         return
 
-    def add_alerts(self, alerts):
+    def add_alerts(self, alerts, replace=False):
         """Add alert info to database.
         """
         COLUMNS = (
+            "server",
             "event_id",
             "category",
-            "instance",
             "message_type",
             "timestamp",
             "version",
@@ -96,10 +121,13 @@ class AnalysisData(object):
             )
         insertCols = ", ".join(COLUMNS)
         valueCols = ", ".join([":{}".format(col) for col in COLUMNS])
+        cmd = "INSERT"
+        if replace:
+            cmd += " OR REPLACE"
         try:
-            #self.cursor.executemany("INSERT INTO dm_alerts({}) VALUES({})".format(insertCols, valueCols), alerts)
+            #self.cursor.executemany("INSERT INTO eew_alerts({}) VALUES({})".format(insertCols, valueCols), alerts)
             for alert in alerts:
-                self.cursor.execute("INSERT INTO dm_alerts({}) VALUES({})".format(insertCols, valueCols), alert)
+                self.cursor.execute("{} INTO eew_alerts({}) VALUES({})".format(cmd, insertCols, valueCols), alert)
             self.connection.commit()
         except sqlite3.IntegrityError as ex:
             logging.getLogger(__name__).debug(str(ex))
@@ -107,7 +135,7 @@ class AnalysisData(object):
             logging.getLogger(__name__).debug(str(alert))
         return
     
-    def add_event(self, event):
+    def add_event(self, event, replace=False):
         """Add ComCat event to database.
 
         :type event: Detail event
@@ -128,96 +156,155 @@ class AnalysisData(object):
         insertCols = ", ".join(COLUMNS)
         eventValues = (event.id, event.latitude, event.longitude, event.depth, originTime, event.magnitude, event["magType"], event.location)
         valueCols = ",".join("?"*len(eventValues))
+        cmd = "INSERT"
+        if replace:
+            cmd += " OR REPLACE"
         try:
-            self.cursor.execute("INSERT INTO comcat_events({0}) VALUES({1})".format(insertCols, valueCols), eventValues)
+            self.cursor.execute("{0} INTO comcat_events({1}) VALUES({2})".format(cmd, insertCols, valueCols), eventValues)
             self.connection.commit()
         except sqlite3.IntegrityError as ex:
             logging.getLogger(__name__).debug(str(ex))
             logging.getLogger(__name__).debug(str(event))
         return
 
-    def find_matches(self):
-        """Find matches in database between alerts and ComCat events.
-        """
-        MAX_DISTANCE_DEG = 0.9
-        MAX_TIME_SECS = 15.0
-        VS = 3.0e+3
-        DEG_TO_DIST = 110.0e+3
+    def add_performance(self, stats, replace=False):
+        """Add performance stats to database.
 
-        self.cursor.execute("DELETE FROM matches")
-        self.cursor.execute("select * from comcat_events")
-        events = self.cursor.fetchall()
-        for event in events:
-            lat = event["latitude"]
-            lon = event["longitude"]
-            ot = dateutil.parser.parse(event["origin_time"])
-            dt = datetime.timedelta(seconds=MAX_TIME_SECS)
-            conditions = [
-                "category=?",
-                "message_type=?",
-                "latitude BETWEEN ? AND ?",
-                "longitude BETWEEN ? AND ?",
-                "origin_time BETWEEN ? AND ?",
-                ]
-            values = (
-                "live",
-                "new",
-                lat-MAX_DISTANCE_DEG, lat+MAX_DISTANCE_DEG,
-                lon-MAX_DISTANCE_DEG, lon+MAX_DISTANCE_DEG,
-                ot-dt, ot+dt,
-                )
-            self.cursor.execute("SELECT * FROM dm_alerts WHERE " + " AND ".join(conditions), values)
-            alerts = self.cursor.fetchall()
-            if 0 == len(alerts):
-                self.cursor.execute("INSERT INTO matches(comcat_id, dm_id, dm_timestamp) VALUES(?,?,?)", (event["event_id"], None, None))
-                continue
-            
-            # Get closest alert, ignoring deleted alerts
-            minDist = 1.0e+30
-            alertMatch = None
-            vs = 3.0e+3
-            for alert in alerts:
-                # :TODO: Ignore deleted alerts
-                dist = (((alert["latitude"]-lat)*DEG_TO_DIST)**2
-                            + ((alert["longitude"]-lon)*DEG_TO_DIST)**2
-                            + 1.0*((dateutil.parser.parse(alert["origin_time"])-ot).total_seconds()*VS)**2)**0.5
-                if dist < minDist:
-                    alertMatch = alert
-                    minDist = dist
-            self.cursor.execute("INSERT INTO matches(comcat_id, dm_id, dm_timestamp) VALUES(?,?,?)", (event["event_id"], alertMatch["event_id"], alertMatch["timestamp"]))
-        self.connection.commit()
+        :type stats: dict
+        :param stats: Performance stats to add to database.
+        """
+        COLUMNS = (
+            "comcat_id",
+            "eew_server",
+            "dm_id",
+            "dm_timestamp",
+            "gmpe",
+            "fragility",
+            "magnitude_threshold",
+            "mmi_threshold",
+            "area_damage",
+            "area_alert",
+            "area_cost_eew",
+            "area_cost_noeew",
+            "area_cost_perfecteew",
+            "area_metric",
+            "population_damage",
+            "population_alert",
+            "population_cost_eew",
+            "population_cost_noeew",
+            "population_cost_perfecteew",
+            "population_metric",
+            )
+
+        insertCols = ", ".join(COLUMNS)
+        perfValues = [stats[col] for col in COLUMNS]
+        perfCols = ",".join("?"*len(perfValues))
+        cmd = "INSERT"
+        if replace:
+            cmd += " OR REPLACE"
+        try:
+            self.cursor.execute("{0} INTO performance({1}) VALUES({2})".format(cmd, insertCols, perfCols), perfValues)
+            self.connection.commit()
+        except sqlite3.IntegrityError as ex:
+            logging.getLogger(__name__).debug(str(ex))
+            logging.getLogger(__name__).debug(str(stats))
         return
 
-    def alerts(self, comcatId):
+    def find_match(self, comcatId, server):
+        """Find initial alert matching ComCat event.
+        """
+        MAX_DISTANCE_DEG = 3.0
+        MAX_DISTANCE_KM = 150.0
+        MAX_TIME_SECS = 15.0
+        VS = 3.0e+3
+
+        self.cursor.execute("SELECT * FROM comcat_events WHERE event_id=?", (comcatId,))
+        event = self.cursor.fetchone()
+
+        lat = event["latitude"]
+        lon = event["longitude"]
+        ot = dateutil.parser.parse(event["origin_time"])
+        dt = datetime.timedelta(seconds=MAX_TIME_SECS)
+        conditions = [
+            "category=?",
+            "message_type=?",
+            "latitude BETWEEN ? AND ?",
+            "longitude BETWEEN ? AND ?",
+            "origin_time BETWEEN ? AND ?",
+            ]
+        values = (
+            "live",
+            "new",
+            lat-MAX_DISTANCE_DEG, lat+MAX_DISTANCE_DEG,
+            lon-MAX_DISTANCE_DEG, lon+MAX_DISTANCE_DEG,
+            ot-dt, ot+dt,
+            )
+        self.cursor.execute("SELECT * FROM eew_alerts WHERE " + " AND ".join(conditions), values)
+        alerts = self.cursor.fetchall()
+        if 0 == len(alerts):
+            return None
+            
+        # Get closest alert, ignoring deleted alerts
+        minDist = 1.0e+30
+        alertMatch = None
+        for alert in alerts:
+            # :TODO: Ignore deleted alerts
+            # Ignore alerts from non-target servers
+            if alert["server"]!="unknown" and alert["server"]!="eew2" and alert["server"]!=server:
+                continue
+            # Limit to distance range 
+            dist = greatcircle.distance(lon, lat, alert["longitude"], alert["latitude"])
+            if dist*1e-3 > MAX_DISTANCE_KM:
+                continue
+            distOT = abs((dateutil.parser.parse(alert["origin_time"])-ot).total_seconds())*VS
+            if dist + distOT < minDist:
+                alertMatch = alert
+                minDist = dist
+        return alertMatch
+
+    def alerts(self, comcatId, server):
         """Get ShakeAlert alerts for event matching ComCat id.
 
         :type comcatId: str
         :param comcatId: ComCat event id.
         """
-        self.cursor.execute("SELECT * FROM matches WHERE comcat_id=?", (comcatId,))
-        match = self.cursor.fetchone()
-
-        alerts = []
-        if match["dm_id"] is None:
-            return alerts
+        alert = self.find_match(comcatId, server)
+        if alert is None:
+            return []
+        
         # Get subsequent alerts matching id  and instance within 10 min
-        timestamp = dateutil.parser.parse(match["dm_timestamp"])
+        timestamp = dateutil.parser.parse(alert["timestamp"])
         conditions = [
             "category=?",
             "(message_type=? OR message_type=?)",
             "event_id=?",
+            "server=?",
             "timestamp BETWEEN ? AND ?",
             ]
         values = (
             "live",
-            "new", "update",
-            match["dm_id"],
+            "new",
+            "update",
+            alert["event_id"],
+            alert["server"],
             timestamp, timestamp+datetime.timedelta(minutes=10.0),
             )
-        self.cursor.execute("SELECT * FROM dm_alerts WHERE " + " AND ".join(conditions), values)
+        self.cursor.execute("SELECT * FROM eew_alerts WHERE " + " AND ".join(conditions), values)
         alerts = self.cursor.fetchall()
         return alerts
 
+    def most_recent_alert(self, server):
+        """Get most recent alert in database.
+
+        :type server: str
+        :param server: Name of EEW server associated with alerts.
+
+        :returns: Most recent alert for server in database.
+        """
+        self.cursor.execute("SELECT * from eew_alerts ORDER BY date(timestamp) DESC LIMIT 1")
+        alert = self.cursor.fetchone()
+        return alert
+    
     def comcat_event(self, comcatId):
         """Get ComCat event information.
 
@@ -246,20 +333,17 @@ class AnalysisData(object):
             sout += "  Number of rows: {}\n".format(nrows)
         return sout
 
-    def show_matches(self):
+    def show_matches(self, server):
         """Show matches.
         """
-        self.cursor.execute("SELECT * FROM matches ORDER BY comcat_id")
-        matches = self.cursor.fetchall()
-        for match in matches:
-            self.cursor.execute("SELECT * FROM comcat_events WHERE event_id=?", (match["comcat_id"],))
-            event = self.cursor.fetchone()
-            self.cursor.execute("SELECT * FROM dm_alerts WHERE event_id=? AND timestamp=?", (match["dm_id"], match["dm_timestamp"],))
-            alert = self.cursor.fetchone()
+        self.cursor.execute("SELECT * from comcat_events ORDER BY event_id")
+        events = self.cursor.fetchall()
+        for event in events:
+            alert = self.find_match(event["event_id"], server)
             if alert:
-                print("COMAT {event[event_id]} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT {alert[event_id]} {alert[longitude]:.3f} {alert[latitude]:.3f} {alert[origin_time]}".format(event=event, alert=alert))
+                print("COMAT {event[event_id]} M{event[magnitude]:.2f} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT {alert[event_id]} {alert[longitude]:.3f} {alert[latitude]:.3f} {alert[origin_time]} {alert[server]}".format(event=event, alert=alert))
             else:
-                print("COMAT {event[event_id]} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT None".format(event=event))
+                print("COMAT {event[event_id]} M{event[magnitude]:.2f} {event[longitude]:.3f} {event[latitude]:.3f} {event[origin_time]} ALERT None".format(event=event))
         return
 
 # End of file

@@ -214,7 +214,7 @@ class DMLogXML(object):
             try:
                 alerts.append({
                     "category": elMsg.get("category"),
-                    "instance": elMsg.get("instance") if elMsg.get("instance") else "unknown",
+                    "server": elMsg.get("instance").replace("dm@","") if elMsg.get("instance") else "unknown",
                     "message_type": elMsg.get("message_type"),
                     "timestamp": dateutil.parser.parse(timestamp),
                     "version": int(elMsg.get("version")),
