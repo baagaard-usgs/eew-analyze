@@ -84,7 +84,11 @@ class CostSavings(object):
         # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
         mmiObs = shakemap.data["mmi"]
         objectPath = self.config.get("fragility_curves", "object").split(".")
-        fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])()
+        costAction = self.config.getfloat("fragility_curves", "cost_action")
+        mmiLow = self.config.getfloat("fragility_curves", "damage_low_mmi")
+        mmiHigh = self.config.getfloat("fragility_curves", "damage_high_mmi")
+        fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(costAction, mmiLow, mmiHigh)
+        
         costDamage = fragility.cost_damage(mmiObs)
         costActionObs = fragility.cost_action(mmiObs)
         costNoEEW = costDamage

@@ -41,6 +41,7 @@ gmpe = ASK2014
 
 [alerts]
 mmi_threshold = 0.0
+#mmi_threshold = 2.5
 magnitude_threshold = 2.95
 
 #mmi_threshold = 1.5
@@ -50,7 +51,7 @@ magnitude_threshold = 2.95
 object = fragility_curves.PublicAnxiety
 cost_action = 0.1
 damage_low_mmi = 2.5
-damata_high_mmi = 5.5
+damage_high_mmi = 5.5
 
 [optimize]
 mmi_threshold_min = 1.5
