@@ -41,7 +41,7 @@ gmpe = ASK2014
 
 [alerts]
 mmi_threshold = 0.0
-#mmi_threshold = 2.5
+#mmi_threshold = 2.0
 magnitude_threshold = 2.95
 
 #mmi_threshold = 1.5

@@ -107,8 +107,8 @@ class CostSavings(object):
         popCostPerfectEEW = numpy.sum(populationDensity * pixelArea * costPerfectEEW)
         popCostEEW = numpy.sum(populationDensity * pixelArea * costEEW)
         popMetric = (popCostNoEEW - popCostEEW) / (popCostNoEEW - popCostPerfectEEW)
-        popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
         popDamage = numpy.sum(pixelArea * populationDensity * (costDamage > 0.0))
+        popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
 
         # Alert categories TN(0),FN(1),FP(2),TP(3)
         alertCategory = numpy.zeros(costDamage.shape)
