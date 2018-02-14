@@ -30,7 +30,7 @@ function = shakemap.gmpe
 gmpe = ASK2014
 
 [region]
-mmi_threshold = 1.5
+mmi_threshold = 2.0
 resolution_longitude = 0.008333333
 resolution_latitude = 0.008333333
 buffer_km = 25.0
@@ -111,7 +111,7 @@ class ShakeMapRegionApp(object):
             event.load(os.path.join(dataDir, eqId+".geojson"))
 
             distance = self._calc_distance(event, gmpe)
-            gridSpec = self._calc_grid(event, distance + buffer_km)
+            gridSpec = self._calc_grid(event, distance + buffer_km*1000.0)
 
             shakemap.load(os.path.join(dataDir, "grid.xml.gz"))
             if shakemap.num_lon() >= gridSpec["longitude_npoints"] and shakemap.num_lat() >= gridSpec["latitude_npoints"]:
@@ -152,6 +152,13 @@ class ShakeMapRegionApp(object):
         mmi = gmpe(eventDict, points, dict(self.config.items("mmi_predicted")))
         mmiThreshold = self.config.getfloat("region", "mmi_threshold")
         index = numpy.where(mmi < mmiThreshold)[0][0]
+
+        if False: # :DEBUG:
+            dist = greatcircle.distance(event.longitude, event.latitude, points["longitude"], points["latitude"])
+            import matplotlib.pyplot as pyplot
+            pyplot.plot(dist/1.0e+3, mmi, 'r')
+            pyplot.axhline(mmiThreshold, color="black", linestyle="--")
+            pyplot.show()
         
         return greatcircle.distance(event.longitude, event.latitude, points["longitude"][index], points["latitude"][index])
 
