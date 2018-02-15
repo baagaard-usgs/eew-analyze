@@ -154,23 +154,19 @@ def mmi_WordenEtal2012(pga, pgv):
     mmiPGA = numpy.zeros(pga.shape)
     mmiPGV = numpy.zeros(pgv.shape)
     
-    logY = numpy.log10(MIN_FLOAT + pga*G_ACC)
+    logY = numpy.log10(MIN_FLOAT + pga*G_ACC) # acceleration in cm/s**2
     maskLower = logY <= 1.57
     mmiPGA = maskLower*(1.78 + 1.55*logY) + ~maskLower*(-1.60 + 3.70*logY)
-    mmiPGA = numpy.maximum(1.0, mmiPGA)
-    mmiPGA = numpy.minimum(10.0, mmiPGA)
-
     
-    logY = numpy.log10(MIN_FLOAT + pgv)
+    logY = numpy.log10(MIN_FLOAT + pgv) # velocity in cm/s
     maskLower = logY <= 0.53
     mmiPGV = maskLower*(3.78 + 1.47*logY) + ~maskLower*(2.89 + 3.16*logY)
-    mmiPGV = numpy.maximum(1.0, mmiPGV)
-    mmiPGV = numpy.minimum(10.0, mmiPGV)
     
-    maskPGA = mmiPGA > 0.0
-    maskPGV = mmiPGV > 0.0
+    maskPGA = pga > 0.0
+    maskPGV = pgv > 0.0
     mmi = 0.5*(mmiPGA+mmiPGV)*(maskPGA*maskPGV) + mmiPGA*(maskPGA*~maskPGV) + mmiPGV*(~maskPGA*maskPGV)
-
+    mmi = numpy.maximum(1.0, mmi)
+    mmi = numpy.minimum(10.0, mmi)
     return mmi
 
 

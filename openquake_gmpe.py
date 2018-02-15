@@ -162,14 +162,14 @@ class OpenQuakeGMPE(object):
 if __name__ == "__main__":
     # Test
     event = {
-        "magnitude": 4.38,
+        "magnitude": 4.38, # overwritten
         "depth_km": 12.3,
         "longitude": -122.0,
         "latitude": 38.0,
     }
     colNames = "longitude, latitude, vs30"
     colFormats = "float32, float32, float32"
-    longitude = event["longitude"] + numpy.arange(0.0, 3.01, 0.05)
+    longitude = event["longitude"] + numpy.arange(0.0, 4.01, 0.05)
     latitude = event["latitude"]*numpy.ones(longitude.shape)
     npts = longitude.shape[-1]
     points = numpy.zeros(npts, dtype=[("longitude", numpy.float32,), ("latitude", numpy.float32,), ("vs30", numpy.float32,)])
