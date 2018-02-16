@@ -66,7 +66,7 @@ prefix_path = None
 [maps]
 projection = EPSG:3857
 width_pixels = 1280
-height_pixels = 1024
+height_pixels = 1280
 bg_color = white
 basemap = esri_streetmap.xml
 
@@ -271,7 +271,6 @@ class EEWAnalyzeApp(object):
         if maps == "mmi" or maps == "all":
             self.maps.mmi_observed()
             self.maps.mmi_predicted()
-            self.maps.mmi_warning_time()
             self.maps.mmi_residual()
             self.maps.alert_category()
         return
