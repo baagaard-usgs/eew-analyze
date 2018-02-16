@@ -271,6 +271,9 @@ if __name__ == "__main__":
 
     mmiThreshold = 2.0
     pyplot.axhline(mmiThreshold, color="black", linestyle=":")
+    pyplot.xlabel("Distance (km)")
+    pyplot.ylabel("MMI")
+    pyplot.legend(["Worden et al. (2012)", "Wald et al. (1999)"])
     pyplot.show()
 
         
