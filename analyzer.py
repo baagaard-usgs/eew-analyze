@@ -38,6 +38,8 @@ vs_kmps = 3.4 ; From NC record section
 [mmi_predicted]
 function = shakemap.gmpe
 gmpe = ASK2014
+gmice = WordenEtal2012
+#gmice = WaldEtal1999
 
 [alerts]
 mmi_threshold = 0.0
@@ -54,7 +56,7 @@ damage_low_mmi = 2.5
 damage_high_mmi = 5.5
 
 [optimize]
-mmi_threshold_min = 1.5
+mmi_threshold_min = 2.0
 mmi_threshold_max = 4.0
 mmi_threshold_step = 0.5
 
