@@ -170,6 +170,40 @@ def mmi_WordenEtal2012(pga, pgv):
     return mmi
 
 
+def mmi_WaldEtal1999(pga, pgv):
+    """Use Wald et al. (1999) to convert PGA and PGV to MMI.
+    
+    :type pga: Numpy array
+    :param pga: PGA in percent g.
+    
+    :type pgv: Numpy array
+    :param pgv: PGV in cm/s.
+    """
+    MIN_FLOAT = 1.0e-20
+    G_ACC = 9.80665
+    
+    mmiPGA = numpy.zeros(pga.shape)
+    mmiPGV = numpy.zeros(pgv.shape)
+    
+    logY = numpy.log10(MIN_FLOAT + pga*G_ACC) # acceleration in cm/s**2
+    maskLower = logY <= 1.82
+    mmiPGA = maskLower*(1.00 + 2.20*logY) + ~maskLower*(-1.66 + 3.66*logY)
+    
+    logY = numpy.log10(MIN_FLOAT + pgv) # velocity in cm/s
+    maskLower = logY <= 0.76
+    mmiPGV = maskLower*(3.40 + 2.10*logY) + ~maskLower*(2.35 + 3.47*logY)
+    
+    maskPGA = pga > 0.0
+    maskPGV = pgv > 0.0
+    wtPGA = 1.0*(mmiPGA <= 5.0) + (7.0 - mmiPGA)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
+    wtPGV = 1.0*(mmiPGV >= 7.0) + (mmiPGA - 5.0)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
+
+    mmi = (wtPGA*mmiPGA + wtPGV*mmiPGV)*(maskPGA*maskPGV) + mmiPGA*(maskPGA*~maskPGV) + mmiPGV*(~maskPGA*maskPGV)
+    mmi = numpy.maximum(1.0, mmi)
+    mmi = numpy.minimum(10.0, mmi)
+    return mmi
+
+
 def gmpe(alert, points, options):
     """Get predicted MMI for given alert.
 
@@ -192,9 +226,52 @@ def gmpe(alert, points, options):
 
     values["pgaG"] *= ROTD50_TO_PGA_LARGER
     values["pgvCmps"] *= ROTD50_TO_PGV_LARGER
+
+    if options["gmice"] == "WordenEtal2012":
+        gmice = mmi_WordenEtal2012
+    elif options["gmice"] == "WaldEtal1999":
+        gmice = mmi_WaldEtal1999
     
-    return mmi_WordenEtal2012(values["pgaG"]*100.0, values["pgvCmps"])
+    return gmice(values["pgaG"]*100.0, values["pgvCmps"])
 
 
+if __name__ == "__main__":
+    event = {
+        "magnitude": 6.0,
+        "longitude": -120.0,
+        "latitude": 37.00,
+        "depth_km": 8.0,
+    }
+    
+    cols = [
+        ("longitude", "float32",),
+        ("latitude", "float32",),
+        ("vs30", "float32",),
+    ]
+    longitude = event["longitude"] + numpy.arange(0.2, 25.0, 0.005)
+    points = numpy.zeros(longitude.shape[-1], dtype=cols)
+    points["longitude"] = longitude
+    points["latitude"] = event["latitude"]
+    points["vs30"] = 400.0 # m/s
 
+    options = {
+        "gmpe": "CB2014",
+        "gmice": "WordenEtal2012",
+    }
+
+    
+    mmiWorden = gmpe(event, points, options)
+    options["gmice"] = "WaldEtal1999"
+    mmiWald = gmpe(event, points, options)
+
+    import greatcircle
+    dist = greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
+    import matplotlib.pyplot as pyplot
+    pyplot.semilogx(dist/1.0e+3, mmiWorden, 'r-', dist/1.0e+3, mmiWald, 'b--')
+
+    mmiThreshold = 2.0
+    pyplot.axhline(mmiThreshold, color="black", linestyle=":")
+    pyplot.show()
+
+        
 # End of file

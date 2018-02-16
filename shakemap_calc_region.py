@@ -28,6 +28,8 @@ DEFAULTS = """
 [mmi_predicted]
 function = shakemap.gmpe
 gmpe = ASK2014
+gmice = WordenEtal2012
+#gmice = WaldEtal1999
 
 [region]
 mmi_threshold = 2.0
