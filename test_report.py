@@ -79,6 +79,8 @@ def go():
 
     # Figure of magnitude and location error
     x += map_size + spacing
+    filename = os.path.join(plots_dir, filename_prefix+"-alert_error.png")
+    #c.drawImage(filename, x, y, width=map_size, )    
     
     # Stats
     c.saveState()

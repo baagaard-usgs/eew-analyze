@@ -19,6 +19,7 @@ from analysisdb import AnalysisData
 from perfmetrics import CostSavings
 from maps import MapPanels
 from plotsxy import Figures
+from reports import AnalysisSummary
 import analysis_utils
 import gdalraster
 
@@ -68,7 +69,7 @@ prefix_path = None
 [maps]
 projection = EPSG:3857
 width_pixels = 1280
-height_pixels = 1280
+height_pixels = 1024
 bg_color = white
 basemap = esri_streetmap.xml
 
@@ -76,6 +77,7 @@ basemap = esri_streetmap.xml
 event_dir = ./data/[EVENTID]/
 analysis_cache_dir = ./data/cache/
 plots_dir = ./data/plots/
+report = report.pdf
 
 analysis_db = ./data/analysisdb_NEW.sqlite
 population_density = ~/data/gis/populationdensity.tiff
@@ -142,6 +144,9 @@ class EEWAnalyzeApp(object):
                 self.load_data(eqId)
                 selection = args.plot_figures if args.plot_figures else "all"
                 self.plot_figures(eqId, selection)
+
+        if args.generate_report or args.all:
+            self.generate_report()
         return
 
     def initialize(self, config_filenames):
@@ -257,7 +262,7 @@ class EEWAnalyzeApp(object):
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = os.path.join(cacheDir, "threshold_optimization_"+analysis_utils.analysis_label(self.config, self.event["event_id"])+".txt")
         header = ", ".join(perfStats.dtype.names)
-        numpy.savetxt(filename, perfStats, header=header, fmt="%3.1f  %7.1e %7.1e %4.2f  %7.1e %7.1e %4.2f")
+        numpy.savetxt(filename, perfStats, header=header, fmt="%3.1f  %7.1e %7.1e %5.2f  %7.1e %7.1e %5.2f")
         return
     
     def plot_maps(self, eqId, maps):
@@ -293,7 +298,9 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Generating report...")
-        raise NotImplementedError(":TODO: @brad")
+
+        summary = AnalysisSummary(self.config)
+        summary.generate(self.config.options("events"))
         return
         
     def _parse_command_line(self):
