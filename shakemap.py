@@ -196,7 +196,7 @@ def mmi_WaldEtal1999(pga, pgv):
     maskPGA = pga > 0.0
     maskPGV = pgv > 0.0
     wtPGA = 1.0*(mmiPGA <= 5.0) + (7.0 - mmiPGA)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
-    wtPGV = 1.0*(mmiPGV >= 7.0) + (mmiPGA - 5.0)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
+    wtPGV = 1.0*(mmiPGA >= 7.0) + (mmiPGA - 5.0)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
 
     mmi = (wtPGA*mmiPGA + wtPGV*mmiPGV)*(maskPGA*maskPGV) + mmiPGA*(maskPGA*~maskPGV) + mmiPGV*(~maskPGA*maskPGV)
     mmi = numpy.maximum(1.0, mmi)
@@ -237,7 +237,7 @@ def gmpe(alert, points, options):
 
 if __name__ == "__main__":
     event = {
-        "magnitude": 6.0,
+        "magnitude": 7.1,
         "longitude": -120.0,
         "latitude": 37.00,
         "depth_km": 8.0,
