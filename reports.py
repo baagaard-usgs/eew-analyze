@@ -20,7 +20,7 @@ from reportlab.platypus import Table
 from reportlab.lib.utils import ImageReader
 
 from analysisdb import AnalysisData
-from analysis_utils import analysis_label
+from analysis_utils import analysis_label, timedelta_to_seconds
 
 class AnalysisSummary(object):
     """Summary of analysis.
@@ -59,10 +59,21 @@ class AnalysisSummary(object):
         """
         db = AnalysisData(self.config.get("files", "analysis_db"))
         event = db.comcat_event(eqId)
+
+        # Get alerts
+        server = self.config.get("shakealert.production", "server")
+        alerts = db.alerts(eqId, server)
+        
+        # Get performance information
+        #comcat_id, eew_server, gmpe, fragility, magnitude_threshold
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        perfStats = numpy.array(db.performance_stats(eqId, server, gmpe, fragility, magThreshold))
         
         self._render_event_header(event)
         self._render_event_plots(event)
-        self._render_event_stats(event)
+        self._render_event_stats(event, alerts, perfStats)
 
         self.canvas.showPage()
         return
@@ -131,7 +142,7 @@ class AnalysisSummary(object):
 
         return
 
-    def _render_event_stats(self, event):
+    def _render_event_stats(self, event, alerts, perfStats):
         self.canvas.saveState()
         self.canvas.translate(7.25*inch, 3.5*inch)
 
@@ -140,33 +151,22 @@ class AnalysisSummary(object):
         text.setFont("Courier", 8)
         text.textLine("ANSS")
         text.textLine("   {event[magnitude_type]}{event[magnitude]:.1f}".format(event=event))
-        text.textLine("   {ot:%Y-%m-%d %H:%M:%S:%f}".format(ot=ot))
+        text.textLine("   {ot:%Y-%m-%d %H:%M:%S.%f}".format(ot=ot))
 
+        alert0 = alerts[0]
         text.textLine("First alert")
-        text.textLine("   MwX.X")
-        text.textLine("   YYYY-MM-DD HH:MM:SS.MSEC (X.Xs after OT)")
+        text.textLine("   M{:.1f}".format(alert0["magnitude"]))
+        at = dateutil.parser.parse(alert0["timestamp"])
+        dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
+        text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
         self.canvas.drawText(text)
 
-        self._render_event_stats_table(event)
+        self._render_event_stats_table(event, perfStats)
 
         self.canvas.restoreState()
         return
 
-    def _render_event_stats_table(self, event):
-        cache_dir = self.config.get("files", "analysis_cache_dir")
-        label = analysis_label(self.config, event["event_id"])
-        filename = os.path.join(cache_dir, "threshold_optimization_"+label+".txt")
-        cols = [
-            ("mmi_threshold", "float32"),
-            ("area_damage", "float32"),
-            ("area_alert", "float32"),
-            ("area_metric", "float32"),
-            ("population_damage", "float32"),
-            ("population_alert", "float32"),
-            ("population_metric", "float32"),
-        ]
-        results = numpy.loadtxt(filename, dtype=cols)
-        
+    def _render_event_stats_table(self, event, results):
         data = [
             ["MMI\nThreshold", "Alert", "", "Q", ""],
             ["", "Area (km^2)", "Population", "Area", "Population"],

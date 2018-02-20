@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 from importlib import import_module
+from multiprocessing import Pool
 import numpy
 
 from shakemap import ShakeMap # openquake before osgeo
@@ -43,11 +44,10 @@ gmice = WordenEtal2012
 #gmice = WaldEtal1999
 
 [alerts]
-mmi_threshold = 0.0
-#mmi_threshold = 2.0
+#mmi_threshold = 0.0
+mmi_threshold = 2.0
 magnitude_threshold = 2.95
 
-#mmi_threshold = 1.5
 #magnitude_threshold = 4.45
 
 [fragility_curves]
@@ -238,32 +238,36 @@ class EEWAnalyzeApp(object):
         thresholdStep = self.config.getfloat("optimize", "mmi_threshold_step")
         thresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
-        cols = [
-            ("mmi_threshold", "float32",),
-            ("area_damage", "float32",),
-            ("area_alert", "float32",),
-            ("area_metric", "float32",),
-            ("population_damage", "float32",),
-            ("population_alert", "float32",),
-            ("population_metric", "float32",),
-        ]
-        perfStats = numpy.zeros(len(thresholds), dtype=cols)
+        statsExtra = {
+            "comcat_id": self.event["event_id"],
+            "eew_server": self.config.get("shakealert.production", "server"),
+            "dm_id": self.alerts[0]["event_id"],
+            "dm_timestamp": self.alerts[0]["timestamp"],
+            "gmpe": self.config.get("mmi_predicted", "gmpe"),
+            "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
+            "magnitude_threshold": self.config.getfloat("alerts", "magnitude_threshold"),
+            }
+        
+        db = AnalysisData(self.config.get("files", "analysis_db"))            
         
         costSavings = CostSavings(self.config, self.maps)
+        #threadPool = Pool(self.maxthreads)
         for iperf, threshold in enumerate(thresholds):
+            #[threadPool.apply_async(self._optimize_worker, (threshold, statsExtra, db) for threshold in thresholds)]
             stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, threshold, plotAlertMaps=False)
-            
-            perfStats[iperf] = tuple([threshold] + [stats[col[0]] for col in cols[1:]])
+            stats.update(statsExtra)
+            stats["mmi_threshold"] = threshold
+            db.add_performance(stats, replace=True)
 
-        server = self.config.get("shakealert.production", "server")
-        dataDir = analysis_utils.get_dir(self.config, "event_dir").replace("[EVENTID]", self.event["event_id"])
-        gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
-        cacheDir = self.config.get("files", "analysis_cache_dir")
-        filename = os.path.join(cacheDir, "threshold_optimization_"+analysis_utils.analysis_label(self.config, self.event["event_id"])+".txt")
-        header = ", ".join(perfStats.dtype.names)
-        numpy.savetxt(filename, perfStats, header=header, fmt="%3.1f  %7.1e %7.1e %5.2f  %7.1e %7.1e %5.2f")
         return
+
+    def _optimize_worker(self, threshold, statsExtra, db):
+        stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, threshold, plotAlertMaps=False)
+        stats.update(statsExtra)
+        stats["mmi_threshold"] = threshold
+        db.add_performance(stats, replace=True)
+        return
+            
     
     def plot_maps(self, eqId, maps):
         """Plot maps with ShakeAlert performance information.
