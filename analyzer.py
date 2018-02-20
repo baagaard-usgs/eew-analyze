@@ -35,7 +35,8 @@ projection = EPSG:3311
 [shaking_time]
 function = userdisplay.shaking_time_vs
 #vs_kmps = 3.55 ; User display
-vs_kmps = 3.4 ; From NC record section
+#vs_kmps = 3.4 ; From NC record section
+vs_kmps = 3.5 ; From NC record section
 
 [mmi_predicted]
 function = shakemap.gmpe
