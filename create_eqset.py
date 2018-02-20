@@ -30,7 +30,7 @@ max_radius_deg = 1.5
 
 [fdsn.event]
 starttime = 2012-01-27
-minmagnitude = 4.0
+minmagnitude = 3.95
 producttype = shakemap
 orderby = magnitude
 
