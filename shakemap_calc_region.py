@@ -168,6 +168,7 @@ class ShakeMapRegionApp(object):
         distKm = 1.0e-3*greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
 
         figure = pyplot.figure(figsize=(5.0, 4.0), dpi=100)
+        pyplot.style.use(["color-lightbg", "size-paper"])
         ax = figure.add_axes((0.2, 0.15, 0.7, 0.8))
 
         gg = [("WaldEtal1999", "Wald 1999", "--"), ("WordenEtal2012", "Worden 2012", "-")]
@@ -188,12 +189,12 @@ class ShakeMapRegionApp(object):
             for ithreshold, mmiThreshold in enumerate(mmiThresholds):
                 ax.plot(magnitudes, thresholdDistKm[ithreshold,:], color=colors[ithreshold], linestyle=linestyle, linewidth=1.0, label="{} MMI {:.1f}".format(label, mmiThreshold))
         
-        ax.set_xlabel("Earthquake Magnitude (Mw)", fontsize=10),
-        ax.set_ylabel("Hypocentral Distance (km)", fontsize=10)
+        ax.set_xlabel("Earthquake Magnitude (Mw)"),
+        ax.set_ylabel("Hypocentral Distance (km)")
         ax.autoscale(enable=True, axis="both", tight=True)
-        ax.legend(fontsize=8, loc="upper left")
+        ax.legend(loc="upper left")
 
-        pyplot.show()
+        figure.savefig("mmi_threshold_distance.pdf")
         return
     
     def _calc_distance(self, event, gmpe):
