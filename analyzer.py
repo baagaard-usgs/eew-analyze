@@ -40,8 +40,8 @@ vs_kmps = 3.4 ; From NC record section
 [mmi_predicted]
 function = shakemap.gmpe
 gmpe = ASK2014
-gmice = WordenEtal2012
-#gmice = WaldEtal1999
+#gmice = WordenEtal2012
+gmice = WaldEtal1999
 
 [alerts]
 #mmi_threshold = 0.0
