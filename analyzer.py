@@ -186,7 +186,9 @@ class EEWAnalyzeApp(object):
 
         # ShakeMap
         dataDir = analysis_utils.get_dir(self.config, "event_dir").replace("[EVENTID]", eqId)
-        filename = os.path.join(dataDir, "grid.xml.gz")
+        filename = os.path.join(dataDir, "custom_grid.xml.gz")
+        if not os.path.isfile(filename):
+            filename = os.path.join(dataDir, "grid.xml.gz")
         self.shakemap = ShakeMap()
         self.shakemap.load(filename)
 
