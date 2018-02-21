@@ -163,10 +163,13 @@ class AnalysisSummary(object):
 
         # First alert exceeding threshold
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        thresholdAlert = False
         for alert in alerts:
             if alert["magnitude"] > magThreshold:
+                if alert != alerts[0]:
+                    thresholdAlert = True
                 break
-        if alert != alerts[0]:
+        if thresholdAlert:
             text.textLine("First alert exceeding threshold")
             text.textLine("   M{:.1f}".format(alert["magnitude"]))
             at = dateutil.parser.parse(alert["timestamp"])
