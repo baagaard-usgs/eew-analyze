@@ -153,12 +153,25 @@ class AnalysisSummary(object):
         text.textLine("   {event[magnitude_type]}{event[magnitude]:.1f}".format(event=event))
         text.textLine("   {ot:%Y-%m-%d %H:%M:%S.%f}".format(ot=ot))
 
-        alert0 = alerts[0]
+        # First alert
+        alert = alerts[0]
         text.textLine("First alert")
-        text.textLine("   M{:.1f}".format(alert0["magnitude"]))
-        at = dateutil.parser.parse(alert0["timestamp"])
+        text.textLine("   M{:.1f}".format(alert["magnitude"]))
+        at = dateutil.parser.parse(alert["timestamp"])
         dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
         text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
+
+        # First alert exceeding threshold
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        for alert in alerts:
+            if alert["magnitude"] > magThreshold:
+                break
+        if alert != alerts[0]:
+            text.textLine("First alert exceeding threshold")
+            text.textLine("   M{:.1f}".format(alert["magnitude"]))
+            at = dateutil.parser.parse(alert["timestamp"])
+            dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
+            text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
         self.canvas.drawText(text)
 
         self._render_event_stats_table(event, perfStats)
@@ -197,7 +210,7 @@ class AnalysisSummary(object):
         ]
         t = Table(data, style=style)
         t.wrapOn(self.canvas, 3.0*inch, 2.0*inch)
-        t.drawOn(self.canvas, *self._coord(0.0, -2.0, inch)) #0.0, y-2.0, inch))
+        t.drawOn(self.canvas, *self._coord(0.0, -2.5, inch)) #0.0, y-2.0, inch))
         return
 
     def _render_image(self, filename, x, y, width=None, height=None):
