@@ -50,13 +50,15 @@ class Figures(object):
         irow = 1
         icol = 1
 
+        tmax = max(30.0, t[0]+30.0)
+        
         # Magnitude
         ax = figure.axes(nrows, ncols, irow, icol)
         ax.plot(t, alertsMag, marker="o", mfc="c_ltred", mec="c_fg", lw=0, alpha=0.5)
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Magnitude (Mw)")
         ax.set_title("Magnitude")
-        ax.set_xlim(0, 30)
+        ax.set_xlim(0, tmax)
 
         ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_blue")
         ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_blue")
@@ -69,7 +71,7 @@ class Figures(object):
         ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_blue")
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
-        ax.set_xlim(0, 30)
+        ax.set_xlim(0, tmax)
         ax.set_title("Horiz. Location Error")
         icol += 1
         
@@ -79,7 +81,7 @@ class Figures(object):
         ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_blue")
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
-        ax.set_xlim(0, 30)
+        ax.set_xlim(0, tmax)
         ax.set_title("Depth Error (Obs-Pred)")
         icol += 1
 
