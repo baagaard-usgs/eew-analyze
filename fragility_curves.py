@@ -35,7 +35,7 @@ class LinearRamp(object):
         return maskLow*self.yLow + maskRamp*(x-self.xLow)/(self.xHigh-self.xLow) + maskHigh*self.yHigh
 
 
-class PublicAnxiety(object):
+class PublicFearAvoidance(object):
 
     def __init__(self, costAction=0.1, mmiLow=2.5, mmiHigh=5.5):
         self.action = Constant(costAction)

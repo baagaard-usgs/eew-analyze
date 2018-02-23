@@ -52,7 +52,7 @@ magnitude_threshold = 2.95
 #magnitude_threshold = 4.45
 
 [fragility_curves]
-object = fragility_curves.PublicAnxiety
+object = fragility_curves.PublicFearAvoidance
 cost_action = 0.1
 damage_low_mmi = 2.5
 damage_high_mmi = 5.5
