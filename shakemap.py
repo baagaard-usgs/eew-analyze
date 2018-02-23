@@ -204,6 +204,53 @@ def mmi_WaldEtal1999(pga, pgv):
     return mmi
 
 
+def mmi_AllenEtal2012(event, points, options):
+    """Use Allen et al. (2012) IPE to calculate MMI from magnitude and rupture distance.
+
+    :type event: dict
+    :param event: ShakeAlert alert dictionary (from AnalysisData).
+
+    :type points: Numpy structured array
+    :param points: Array with 'longitude' and 'latitude' point locations.
+    """
+    import greatcircle
+
+    SLOPE = 0.062 # Vs30 = 400 m/s
+    ALPHA = -8.54
+
+    distKm = 1.0e-3 * greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
+
+    if options["distance_metric"] == "Rrup":
+        C0 = 3.950
+        C1 = 0.913
+        C2 = -1.107
+        C3 = 0.813
+
+        distKm = numpy.sqrt(distKm**2 + event["depth_km"]**2)
+
+        mmi = C0 + C1*event["magnitude"] + C2*numpy.log(numpy.sqrt(distKm**2 + (1.0+C3*numpy.exp(event["magnitude"]-5))**2))
+    elif options["distance_metric"] == "Rhyp":
+        C0 = 2.085
+        C1 = 1.428
+        C2 = -1.404
+        C4 = 0.078
+        M1 = -0.209
+        M2 = 2.042
+
+        RM = M1 + M2*numpy.exp(event["magnitude"]-5.0)
+
+        mmi = C0 + C1*event["magnitude"] + C2*numpy.log(numpy.sqrt(distKm**2 + RM**2))
+        mask = distKm > 50.0
+        mmi += + mask*(C4*numpy.log(distKm/50.0))
+    else:
+        raiseValueError("Unknown distance metric '{}'.".format(options["distance_metric"]))
+
+    if options["site_amplification"]:
+        mask = mmi >= 4.0
+        mmi += mask*(numpy.exp(ALPHA)*(mmi-4.0))/(numpy.maximum(SLOPE, 10**-3.5))
+    return mmi
+
+
 def gmpe(alert, points, options):
     """Get predicted MMI for given alert.
 
@@ -265,9 +312,9 @@ if __name__ == "__main__":
     mmiWald = gmpe(event, points, options)
 
     import greatcircle
-    dist = greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
+    distKm = 1.0e-3 * greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
     import matplotlib.pyplot as pyplot
-    pyplot.semilogx(dist/1.0e+3, mmiWorden, 'r-', dist/1.0e+3, mmiWald, 'b--')
+    pyplot.semilogx(dist, mmiWorden, 'r-', dist, mmiWald, 'b--')
 
     mmiThreshold = 2.0
     pyplot.axhline(mmiThreshold, color="black", linestyle=":")
