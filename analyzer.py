@@ -39,7 +39,7 @@ function = userdisplay.shaking_time_vs
 vs_kmps = 3.5 ; From NC record section
 
 [mmi_predicted]
-function = shakemap.gmpe
+function = shakemap.mmi_via_gmpe_gmice
 gmpe = ASK2014
 #gmice = WordenEtal2012
 gmice = WaldEtal1999
@@ -49,6 +49,7 @@ gmice = WaldEtal1999
 mmi_threshold = 2.0
 magnitude_threshold = 2.95
 
+magnitude_threshold = 3.95
 #magnitude_threshold = 4.45
 
 [fragility_curves]

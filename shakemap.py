@@ -251,7 +251,7 @@ def mmi_AllenEtal2012(event, points, options):
     return mmi
 
 
-def gmpe(alert, points, options):
+def mmi_via_gmpe_gmice(alert, points, gmpe="ASK2014", gmice="WaldEtal1999"):
     """Get predicted MMI for given alert.
 
     RotD50 to "larger" (max) PGA/PGV from Beyer and Bommer, BSSA (2006) doi: 10.1785/0120050210.
@@ -262,29 +262,30 @@ def gmpe(alert, points, options):
     :type points: Numpy structured array
     :param points: Array with 'longitude' and 'latitude' point locations.
 
+    :
     :type options: dict
     :param options: Config options for GMPE.
     """
     ROTD50_TO_PGA_LARGER = 1.1
     ROTD50_TO_PGV_LARGER = 1.0
     
-    oqGMPE = OpenQuakeGMPE(options["gmpe"])
+    oqGMPE = OpenQuakeGMPE(gmpe)
     values = oqGMPE.computeMean(alert, points)
 
     values["pgaG"] *= ROTD50_TO_PGA_LARGER
     values["pgvCmps"] *= ROTD50_TO_PGV_LARGER
 
-    if options["gmice"] == "WordenEtal2012":
-        gmice = mmi_WordenEtal2012
-    elif options["gmice"] == "WaldEtal1999":
-        gmice = mmi_WaldEtal1999
+    if gmice == "WordenEtal2012":
+        gmiceFn = mmi_WordenEtal2012
+    elif gmice == "WaldEtal1999":
+        gmiceFn = mmi_WaldEtal1999
     
-    return gmice(values["pgaG"]*100.0, values["pgvCmps"])
+    return gmiceFn(values["pgaG"]*100.0, values["pgvCmps"])
 
 
 if __name__ == "__main__":
     event = {
-        "magnitude": 7.1,
+        "magnitude": 4.0,
         "longitude": -120.0,
         "latitude": 37.00,
         "depth_km": 8.0,
@@ -295,26 +296,21 @@ if __name__ == "__main__":
         ("latitude", "float32",),
         ("vs30", "float32",),
     ]
-    longitude = event["longitude"] + numpy.arange(0.2, 25.0, 0.005)
+    longitude = event["longitude"] + numpy.arange(0, 25.0, 0.005)
     points = numpy.zeros(longitude.shape[-1], dtype=cols)
     points["longitude"] = longitude
     points["latitude"] = event["latitude"]
     points["vs30"] = 400.0 # m/s
 
-    options = {
-        "gmpe": "CB2014",
-        "gmice": "WordenEtal2012",
-    }
-
+    gmpe = "ASK2014"
     
-    mmiWorden = gmpe(event, points, options)
-    options["gmice"] = "WaldEtal1999"
-    mmiWald = gmpe(event, points, options)
+    mmiWorden = mmi_via_gmpe_gmice(event, points, gmpe, gmice="WordenEtal2012")
+    mmiWald = mmi_via_gmpe_gmice(event, points, gmpe, gmice="WaldEtal1999")
 
     import greatcircle
     distKm = 1.0e-3 * greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
     import matplotlib.pyplot as pyplot
-    pyplot.semilogx(dist, mmiWorden, 'r-', dist, mmiWald, 'b--')
+    pyplot.plot(distKm, mmiWorden, 'r-', distKm, mmiWald, 'b--')
 
     mmiThreshold = 2.0
     pyplot.axhline(mmiThreshold, color="black", linestyle=":")

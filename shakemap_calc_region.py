@@ -14,7 +14,7 @@ import logging
 from importlib import import_module
 import numpy
 
-from shakemap import ShakeMap, gmpe
+from shakemap import ShakeMap, mmi_via_gmpe_gmice
 from osgeo import osr
 
 import greatcircle
@@ -28,8 +28,8 @@ DEFAULTS = """
 [mmi_predicted]
 function = shakemap.gmpe
 gmpe = ASK2014
-gmice = WordenEtal2012
-#gmice = WaldEtal1999
+#gmice = WordenEtal2012
+gmice = WaldEtal1999
 
 [region]
 mmi_threshold = 2.0
@@ -141,7 +141,7 @@ class ShakeMapRegionApp(object):
         import matplotlib.pyplot as pyplot
 
         colors = ("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
-        magnitudes = numpy.arange(3.5, 8.01, 0.1)
+        magnitudes = numpy.arange(3.0, 8.01, 0.1)
         mmiThresholds = numpy.arange(2.0, 4.01, 0.5)
 
         event = {
@@ -155,15 +155,11 @@ class ShakeMapRegionApp(object):
             ("latitude", "float32",),
             ("vs30", "float32",),
         ]
-        longitude = event["longitude"] + numpy.arange(0.2, 25.0, 0.005)
+        longitude = event["longitude"] + numpy.arange(0.0, 25.0, 0.005)
         points = numpy.zeros(longitude.shape[-1], dtype=cols)
         points["longitude"] = longitude
         points["latitude"] = event["latitude"]
         points["vs30"] = 400.0 # m/s
-        options = {
-            "gmpe": gmpe,
-            "gmice": "WordenEtal2012",
-        }
 
         distKm = 1.0e-3*greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
 
@@ -173,13 +169,11 @@ class ShakeMapRegionApp(object):
 
         gg = [("WaldEtal1999", "Wald 1999", "--"), ("WordenEtal2012", "Worden 2012", "-")]
         for gmice, label, linestyle in gg:
-            options["gmice"] = gmice
-
             thresholdDistKm = numpy.zeros((mmiThresholds.shape[-1], magnitudes.shape[-1]))
             
             for imag, magnitude in enumerate(magnitudes):
                 event["magnitude"] = magnitude
-                mmi = shakemap.gmpe(event, points, options)
+                mmi = mmi_via_gmpe_gmice(event, points, gmpe, gmice)
                 for ithreshold, mmiThreshold in enumerate(mmiThresholds):
                     if numpy.max(mmi) >= mmiThreshold:
                         thresholdDistKm[ithreshold, imag] = distKm[numpy.where(mmi < mmiThreshold)[0][0]]
@@ -187,12 +181,13 @@ class ShakeMapRegionApp(object):
                         thresholdDistKm[ithreshold, imag] = None
 
             for ithreshold, mmiThreshold in enumerate(mmiThresholds):
-                ax.plot(magnitudes, thresholdDistKm[ithreshold,:], color=colors[ithreshold], linestyle=linestyle, linewidth=1.0, label="{} MMI {:.1f}".format(label, mmiThreshold))
+                ax.semilogy(magnitudes, thresholdDistKm[ithreshold,:], color=colors[ithreshold], linestyle=linestyle, linewidth=1.0, label="{} MMI {:.1f}".format(label, mmiThreshold))
         
         ax.set_xlabel("Earthquake Magnitude (Mw)"),
         ax.set_ylabel("Hypocentral Distance (km)")
-        ax.autoscale(enable=True, axis="both", tight=True)
-        ax.legend(loc="upper left")
+        ax.autoscale(enable=True, axis="y")
+        ax.autoscale(enable=True, axis="x", tight=True)
+        ax.legend(loc="lower right")
 
         figure.savefig("mmi_threshold_distance.pdf")
         return
@@ -219,7 +214,9 @@ class ShakeMapRegionApp(object):
         points["latitude"] = event.latitude
         points["vs30"] = 400.0 # m/s
 
-        mmi = gmpe(eventDict, points, dict(self.config.items("mmi_predicted")))
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        gmice = self.config.get("mmi_predicted", "gmice")
+        mmi = mmi_via_gmpe_gmice(eventDict, points, gmpe, gmice)
         mmiThreshold = self.config.getfloat("region", "mmi_threshold")
         index = numpy.where(mmi < mmiThreshold)[0][0]
 
