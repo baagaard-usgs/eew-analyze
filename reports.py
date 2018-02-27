@@ -194,7 +194,8 @@ class AnalysisSummary(object):
             ("area_metric", "{:5.2f}"),
             ("population_metric", "{:5.2f}"),
         )
-        rowPreferred = 2 + numpy.argmax(results["population_metric"])
+        rowQPopMax = 2 + numpy.argmax(results["population_metric"])
+        rowQAreaMax = 2 + numpy.argmax(results["area_metric"])
         for result in results:
             data.append([s.format(result[v]) for v,s in tableCols])
             
@@ -209,7 +210,8 @@ class AnalysisSummary(object):
             ("SPAN", (1,0), (2,0)),
             ("SPAN", (3,0), (4,0)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("BACKGROUND", (0,rowPreferred),(-1,rowPreferred), (0.7, 1.0, 0.7)),
+            ("BACKGROUND", (-1,rowQPopMax),(-1,rowQPopMax), (0.7, 1.0, 0.7)),
+            ("BACKGROUND", (-2,rowQAreaMax),(-2,rowQAreaMax), (0.7, 1.0, 0.7)),
         ]
         t = Table(data, style=style)
         t.wrapOn(self.canvas, 3.0*inch, 2.0*inch)
