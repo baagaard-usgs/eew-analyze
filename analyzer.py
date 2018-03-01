@@ -15,14 +15,14 @@ from importlib import import_module
 import multiprocessing
 import numpy
 
-import shakemap # OpenQuake before osgeo
-import analysisdb
-import perfmetrics
-import maps
-import plotsxy
-import reports
-import analysis_utils
-import gdalraster
+import eewperformance.shakemap as shakemap # OpenQuake before osgeo
+import eewperformance.analysisdb as analysisdb
+import eewperformance.perfmetrics as perfmetrics
+import eewperformance.maps as maps
+import eewperformance.plotsxy as plotsxy
+import eewperformance.reports as reports
+import eewperformance.analysis_utils as analysis_utils
+import eewperformance.gdalraster as gdalraster
 
 DEFAULTS = """
 [events]
@@ -33,13 +33,13 @@ DEFAULTS = """
 projection = EPSG:3311
 
 [shaking_time]
-function = userdisplay.shaking_time_vs
+function = eewperformance.userdisplay.shaking_time_vs
 #vs_kmps = 3.55 ; User display
 #vs_kmps = 3.4 ; From NC record section
 vs_kmps = 3.5 ; From NC record section
 
 [mmi_predicted]
-function = shakemap.mmi_via_gmpe_gmice
+function = eewperformance.shakemap.mmi_via_gmpe_gmice
 gmpe = ASK2014
 gmice = default
 
@@ -51,17 +51,17 @@ mmi_threshold = 2.0
 magnitude_threshold = 4.45
 
 [fragility_curves]
-object = fragility_curves.PublicFearAvoidance
+object = eewperformance.fragility_curves.PublicFearAvoidance
 cost_action = 0.1
 damage_low_mmi = 2.5
 damage_high_mmi = 5.5
 
-#object = fragility_curves.PublicInjury
+#object = eewperformance.fragility_curves.PublicInjury
 #cost_action = 0.1
 #damage_low_mmi = 4.5
 #damage_high_mmi = 7.5
 
-#object = fragility_curves.StepDamage
+#object = eewperformance.fragility_curves.StepDamage
 #cost_action = 0.1
 #damage_mmi = 3.5
 
