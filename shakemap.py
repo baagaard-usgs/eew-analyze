@@ -18,11 +18,12 @@ class ShakeMap(object):
     """ShakeMap reader.
     """
 
-    def __init__(self):
+    def __init__(self, gmice=None):
         """Constructor.
         """
         self.data = None
         self.grid = None
+        self.gmice = gmice
         return
 
     def load(self, filename):
@@ -135,7 +136,8 @@ class ShakeMap(object):
 
         data = numpy.loadtxt(cStringIO.StringIO(elRoot.xpath("ns:grid_data", namespaces=namespaces)[0].text), usecols=colIndices)
         self.data = numpy.core.records.fromarrays(data.transpose(), names=colNames, formats=colFormats)
-        self.data["mmi"] = mmi_WordenEtal2012(self.data["pga"], self.data["pgv"])
+        if self.gmice:
+            self.data["mmi"] = self.gmice(self.data["pga"], self.data["pgv"])
         return
         
 
@@ -170,7 +172,91 @@ def mmi_WordenEtal2012(pga, pgv):
     return mmi
 
 
-def gmpe(alert, points, options):
+def mmi_WaldEtal1999(pga, pgv):
+    """Use Wald et al. (1999) to convert PGA and PGV to MMI.
+    
+    :type pga: Numpy array
+    :param pga: PGA in percent g.
+    
+    :type pgv: Numpy array
+    :param pgv: PGV in cm/s.
+    """
+    MIN_FLOAT = 1.0e-20
+    G_ACC = 9.80665
+    
+    mmiPGA = numpy.zeros(pga.shape)
+    mmiPGV = numpy.zeros(pgv.shape)
+    
+    logY = numpy.log10(MIN_FLOAT + pga*G_ACC) # acceleration in cm/s**2
+    maskLower = logY <= 1.8193
+    mmiPGA = maskLower*(1.00 + 2.1987*logY) + ~maskLower*(-1.6582 + 3.6598*logY)
+    #mmiPGA = numpy.floor(100*mmiPGA)/100.0
+    #mmiPGA = numpy.clip(mmiPGA, 1.0, 10.0)
+    
+    logY = numpy.log10(MIN_FLOAT + pgv) # velocity in cm/s
+    maskLower = logY <= 0.7641
+    mmiPGV = maskLower*(3.3991 + 2.0951*logY) + ~maskLower*(2.3478 + 3.4709*logY)
+    #mmiPGV = numpy.floor(100*mmiPGV)/100.0
+    #mmiPGV = numpy.clip(mmiPGV, 1.0, 10.0)
+    
+    maskPGA = pga > 0.0
+    maskPGV = pgv > 0.0
+    wtPGA = 1.0*(mmiPGA <= 5.0) + (7.0 - mmiPGA)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
+    wtPGV = 1.0*(mmiPGA >= 7.0) + (mmiPGA - 5.0)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
+
+    mmi = (wtPGA*mmiPGA + wtPGV*mmiPGV)*(maskPGA*maskPGV) + mmiPGA*(maskPGA*~maskPGV) + mmiPGV*(~maskPGA*maskPGV)
+    mmi = numpy.clip(mmi, 1.0, 10.0)
+    return mmi
+
+
+def mmi_AllenEtal2012(event, points, options):
+    """Use Allen et al. (2012) IPE to calculate MMI from magnitude and rupture distance.
+
+    :type event: dict
+    :param event: ShakeAlert alert dictionary (from AnalysisData).
+
+    :type points: Numpy structured array
+    :param points: Array with 'longitude' and 'latitude' point locations.
+    """
+    import greatcircle
+
+    SLOPE = 0.062 # Vs30 = 400 m/s
+    ALPHA = -8.54
+
+    distKm = 1.0e-3 * greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
+
+    if options["distance_metric"] == "Rrup":
+        C0 = 3.950
+        C1 = 0.913
+        C2 = -1.107
+        C3 = 0.813
+
+        distKm = numpy.sqrt(distKm**2 + event["depth_km"]**2)
+
+        mmi = C0 + C1*event["magnitude"] + C2*numpy.log(numpy.sqrt(distKm**2 + (1.0+C3*numpy.exp(event["magnitude"]-5))**2))
+    elif options["distance_metric"] == "Rhyp":
+        C0 = 2.085
+        C1 = 1.428
+        C2 = -1.404
+        C4 = 0.078
+        M1 = -0.209
+        M2 = 2.042
+
+        RM = M1 + M2*numpy.exp(event["magnitude"]-5.0)
+
+        mmi = C0 + C1*event["magnitude"] + C2*numpy.log(numpy.sqrt(distKm**2 + RM**2))
+        mask = distKm > 50.0
+        mmi += + mask*(C4*numpy.log(distKm/50.0))
+    else:
+        raiseValueError("Unknown distance metric '{}'.".format(options["distance_metric"]))
+
+    if options["site_amplification"]:
+        mask = mmi >= 4.0
+        mmi += mask*(numpy.exp(ALPHA)*(mmi-4.0))/(numpy.maximum(SLOPE, 10**-3.5))
+    return mmi
+
+
+def mmi_via_gmpe_gmice(alert, points, gmpe="ASK2014", gmice="WaldEtal1999"):
     """Get predicted MMI for given alert.
 
     RotD50 to "larger" (max) PGA/PGV from Beyer and Bommer, BSSA (2006) doi: 10.1785/0120050210.
@@ -181,20 +267,64 @@ def gmpe(alert, points, options):
     :type points: Numpy structured array
     :param points: Array with 'longitude' and 'latitude' point locations.
 
+    :
     :type options: dict
     :param options: Config options for GMPE.
     """
     ROTD50_TO_PGA_LARGER = 1.1
     ROTD50_TO_PGV_LARGER = 1.0
     
-    oqGMPE = OpenQuakeGMPE(options["gmpe"])
+    oqGMPE = OpenQuakeGMPE(gmpe)
     values = oqGMPE.computeMean(alert, points)
 
     values["pgaG"] *= ROTD50_TO_PGA_LARGER
     values["pgvCmps"] *= ROTD50_TO_PGV_LARGER
+
+    if gmice == "WordenEtal2012":
+        gmiceFn = mmi_WordenEtal2012
+    elif gmice == "WaldEtal1999" or gmice == "default":
+        gmiceFn = mmi_WaldEtal1999
+    else:
+        raise ValueError("Unknown GMIC '{}'.".format(gmice))
+        
+    return gmiceFn(values["pgaG"]*100.0, values["pgvCmps"])
+
+
+if __name__ == "__main__":
+    event = {
+        "magnitude": 4.0,
+        "longitude": -120.0,
+        "latitude": 37.00,
+        "depth_km": 8.0,
+    }
     
-    return mmi_WordenEtal2012(values["pgaG"]*100.0, values["pgvCmps"])
+    cols = [
+        ("longitude", "float32",),
+        ("latitude", "float32",),
+        ("vs30", "float32",),
+    ]
+    longitude = event["longitude"] + numpy.arange(0, 25.0, 0.005)
+    points = numpy.zeros(longitude.shape[-1], dtype=cols)
+    points["longitude"] = longitude
+    points["latitude"] = event["latitude"]
+    points["vs30"] = 400.0 # m/s
 
+    gmpe = "ASK2014"
+    
+    mmiWorden = mmi_via_gmpe_gmice(event, points, gmpe, gmice="WordenEtal2012")
+    mmiWald = mmi_via_gmpe_gmice(event, points, gmpe, gmice="WaldEtal1999")
 
+    import greatcircle
+    distKm = 1.0e-3 * greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
+    import matplotlib.pyplot as pyplot
+    pyplot.plot(distKm, mmiWorden, 'r-', distKm, mmiWald, 'b--')
 
+    mmiThreshold = 2.0
+    pyplot.axhline(mmiThreshold, color="black", linestyle=":")
+    pyplot.xlabel("Distance (km)")
+    pyplot.ylabel("MMI")
+    pyplot.legend(["Worden et al. (2012)", "Wald et al. (1999)"])
+    pyplot.show()
+
+        
 # End of file

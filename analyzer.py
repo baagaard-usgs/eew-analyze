@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 from importlib import import_module
+from multiprocessing import Pool
 import numpy
 
 from shakemap import ShakeMap # openquake before osgeo
@@ -19,6 +20,7 @@ from analysisdb import AnalysisData
 from perfmetrics import CostSavings
 from maps import MapPanels
 from plotsxy import Figures
+from reports import AnalysisSummary
 import analysis_utils
 import gdalraster
 
@@ -33,28 +35,41 @@ projection = EPSG:3311
 [shaking_time]
 function = userdisplay.shaking_time_vs
 #vs_kmps = 3.55 ; User display
-vs_kmps = 3.4 ; From NC record section
+#vs_kmps = 3.4 ; From NC record section
+vs_kmps = 3.5 ; From NC record section
 
 [mmi_predicted]
-function = shakemap.gmpe
+function = shakemap.mmi_via_gmpe_gmice
 gmpe = ASK2014
+#gmice = WordenEtal2012
+#gmice = WaldEtal1999
+gmice = default
 
 [alerts]
-mmi_threshold = 0.0
-#mmi_threshold = 2.0
+#mmi_threshold = 0.0
+mmi_threshold = 2.0
 magnitude_threshold = 2.95
 
-#mmi_threshold = 1.5
+#magnitude_threshold = 3.95
 #magnitude_threshold = 4.45
 
 [fragility_curves]
-object = fragility_curves.PublicAnxiety
+object = fragility_curves.PublicFearAvoidance
 cost_action = 0.1
 damage_low_mmi = 2.5
 damage_high_mmi = 5.5
 
+#object = fragility_curves.PublicInjury
+#cost_action = 0.1
+#damage_low_mmi = 4.5
+#damage_high_mmi = 7.5
+
+#object = fragility_curves.StepDamage
+#cost_action = 0.1
+#damage_mmi = 3.5
+
 [optimize]
-mmi_threshold_min = 1.5
+mmi_threshold_min = 2.0
 mmi_threshold_max = 4.0
 mmi_threshold_step = 0.5
 
@@ -74,6 +89,7 @@ basemap = esri_streetmap.xml
 event_dir = ./data/[EVENTID]/
 analysis_cache_dir = ./data/cache/
 plots_dir = ./data/plots/
+report = report.pdf
 
 analysis_db = ./data/analysisdb_NEW.sqlite
 population_density = ~/data/gis/populationdensity.tiff
@@ -140,6 +156,9 @@ class EEWAnalyzeApp(object):
                 self.load_data(eqId)
                 selection = args.plot_figures if args.plot_figures else "all"
                 self.plot_figures(eqId, selection)
+
+        if args.generate_report or args.all:
+            self.generate_report()
         return
 
     def initialize(self, config_filenames):
@@ -178,8 +197,21 @@ class EEWAnalyzeApp(object):
 
         # ShakeMap
         dataDir = analysis_utils.get_dir(self.config, "event_dir").replace("[EVENTID]", eqId)
-        filename = os.path.join(dataDir, "grid.xml.gz")
-        self.shakemap = ShakeMap()
+        filename = os.path.join(dataDir, "custom_grid.xml.gz")
+        if not os.path.isfile(filename):
+            filename = os.path.join(dataDir, "grid.xml.gz")
+        gmice = self.config.get("mmi_predicted", "gmice")
+        if gmice == "WaldEtal1999":
+            from shakemap import mmi_WaldEtal1999
+            gmice = mmi_WaldEtal1999
+        elif gmice == "WordenEtal2012":
+            from shakemap import mmi_WordenEtal2012
+            gmice = mmi_WordenEtal2012
+        elif gmice == "default":
+            gmice = None
+        else:
+            raise ValueError("Unknown GMICE '{}'.".format(gmice))
+        self.shakemap = ShakeMap(gmice)
         self.shakemap.load(filename)
 
         # Analsis DB data (event and alerts)
@@ -231,32 +263,36 @@ class EEWAnalyzeApp(object):
         thresholdStep = self.config.getfloat("optimize", "mmi_threshold_step")
         thresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
-        cols = [
-            ("mmi_threshold", "float32",),
-            ("area_damage", "float32",),
-            ("area_alert", "float32",),
-            ("area_metric", "float32",),
-            ("population_damage", "float32",),
-            ("population_alert", "float32",),
-            ("population_metric", "float32",),
-        ]
-        perfStats = numpy.zeros(len(thresholds), dtype=cols)
+        statsExtra = {
+            "comcat_id": self.event["event_id"],
+            "eew_server": self.config.get("shakealert.production", "server"),
+            "dm_id": self.alerts[0]["event_id"],
+            "dm_timestamp": self.alerts[0]["timestamp"],
+            "gmpe": self.config.get("mmi_predicted", "gmpe"),
+            "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
+            "magnitude_threshold": self.config.getfloat("alerts", "magnitude_threshold"),
+            }
+        
+        db = AnalysisData(self.config.get("files", "analysis_db"))            
         
         costSavings = CostSavings(self.config, self.maps)
+        #threadPool = Pool(self.maxthreads)
         for iperf, threshold in enumerate(thresholds):
+            #[threadPool.apply_async(self._optimize_worker, (threshold, statsExtra, db) for threshold in thresholds)]
             stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, threshold, plotAlertMaps=False)
-            
-            perfStats[iperf] = tuple([threshold] + [stats[col[0]] for col in cols[1:]])
+            stats.update(statsExtra)
+            stats["mmi_threshold"] = threshold
+            db.add_performance(stats, replace=True)
 
-        server = self.config.get("shakealert.production", "server")
-        dataDir = analysis_utils.get_dir(self.config, "event_dir").replace("[EVENTID]", self.event["event_id"])
-        gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
-        cacheDir = self.config.get("files", "analysis_cache_dir")
-        filename = os.path.join(cacheDir, "threshold_optimization_"+analysis_utils.analysis_label(self.config, self.event["event_id"])+".txt")
-        header = ", ".join(perfStats.dtype.names)
-        numpy.savetxt(filename, perfStats, header=header, fmt="%3.1f  %7.1e %7.1e %4.2f  %7.1e %7.1e %4.2f")
         return
+
+    def _optimize_worker(self, threshold, statsExtra, db):
+        stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, threshold, plotAlertMaps=False)
+        stats.update(statsExtra)
+        stats["mmi_threshold"] = threshold
+        db.add_performance(stats, replace=True)
+        return
+            
     
     def plot_maps(self, eqId, maps):
         """Plot maps with ShakeAlert performance information.
@@ -271,7 +307,6 @@ class EEWAnalyzeApp(object):
         if maps == "mmi" or maps == "all":
             self.maps.mmi_observed()
             self.maps.mmi_predicted()
-            self.maps.mmi_warning_time()
             self.maps.mmi_residual()
             self.maps.alert_category()
         return
@@ -292,7 +327,9 @@ class EEWAnalyzeApp(object):
         """
         if self.showProgress:
             print("Generating report...")
-        raise NotImplementedError(":TODO: @brad")
+
+        summary = AnalysisSummary(self.config)
+        summary.generate(self.config.options("events"))
         return
         
     def _parse_command_line(self):

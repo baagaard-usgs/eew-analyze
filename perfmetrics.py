@@ -56,7 +56,9 @@ class CostSavings(object):
                     logging.getLogger(__name__).info(msg)
                 thresholdReached = True
 
-            mmiPredCur = fn(alert, shakemap.data, dict(self.config.items("mmi_predicted")))
+            gmpe = self.config.get("mmi_predicted", "gmpe")
+            gmice = self.config.get("mmi_predicted", "gmice")
+            mmiPredCur = fn(alert, shakemap.data, gmpe, gmice)
             warningTimeCur = shakingTime - numpy.datetime64(alert["timestamp"])
             
             if plotAlertMaps:
@@ -84,10 +86,10 @@ class CostSavings(object):
         # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
         mmiObs = shakemap.data["mmi"]
         objectPath = self.config.get("fragility_curves", "object").split(".")
-        costAction = self.config.getfloat("fragility_curves", "cost_action")
-        mmiLow = self.config.getfloat("fragility_curves", "damage_low_mmi")
-        mmiHigh = self.config.getfloat("fragility_curves", "damage_high_mmi")
-        fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(costAction, mmiLow, mmiHigh)
+        fragilityOptions = dict(self.config.items("fragility_curves"))
+        fragilityOptions.pop("object")
+        fragilityOptions = {k: float(v) for k,v in fragilityOptions.iteritems()}
+        fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(**fragilityOptions)
         
         costDamage = fragility.cost_damage(mmiObs)
         costActionObs = fragility.cost_action(mmiObs)

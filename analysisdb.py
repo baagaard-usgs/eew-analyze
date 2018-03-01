@@ -13,6 +13,8 @@ import datetime
 import dateutil.parser
 import pytz
 
+import numpy
+
 import greatcircle
 
 TABLES = [
@@ -293,6 +295,55 @@ class AnalysisData(object):
         alerts = self.cursor.fetchall()
         return alerts
 
+    def performance_stats(self, comcatId, server, gmpe, fragility, magnitude_threshold):
+        """
+        """
+        conditions = [
+            "comcat_id=?",
+            "eew_server=?",
+            "gmpe=?",
+            "fragility=?",
+            "magnitude_threshold=?",
+            ]
+        values = (
+            comcatId,
+            server,
+            gmpe,
+            fragility,
+            magnitude_threshold,
+            )
+        self.cursor.execute("SELECT * FROM performance WHERE " + " AND ".join(conditions) + " ORDER BY mmi_threshold", values)
+        # :TODO: :KLUDGE: to get structured array
+        # Can we use PRAGMA TABLE_INFO to get column name and type (to map to numpy.dtype)
+        dtype = [
+            ("comcat_id", "|S32"),
+            ("eew_server", "|S32"),
+            ("dm_id", "int32"),
+            ("dm_timestamp", "|S32"),
+            ("gmpe", "|S32"),
+            ("fragility", "|S32"),
+            ("magnitude_threshold", "float32"),
+            ("mmi_threshold", "float32"),
+            ("area_damage", "float32"),
+            ("area_alert", "float32"),
+            ("area_cost_eew", "float32"),
+            ("area_cost_noeew", "float32"),
+            ("area_cost_perfecteew", "float32"),
+            ("area_metric", "float32"),
+            ("population_damage", "float32"),
+            ("population_alert", "float32"),
+            ("population_cost_eew", "float32"),
+            ("population_cost_noeew", "float32"),
+            ("population_cost_perfecteew", "float32"),
+            ("population_metric", "float32"),
+            ]
+        results = self.cursor.fetchall()
+        nrows = len(results)
+        stats = numpy.zeros(nrows, dtype=dtype)
+        for iresult, result in enumerate(results):
+            stats[iresult] = tuple([result[key] for key in result.keys()])
+        return stats
+    
     def most_recent_alert(self, server):
         """Get most recent alert in database.
 

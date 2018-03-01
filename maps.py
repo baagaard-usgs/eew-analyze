@@ -180,15 +180,12 @@ class MapPanels(object):
         self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "jpg", legendLayers=[mmiResidual], legendTitle="Residual (Obs - Pred)", title="MMI Residual")
         return
 
-    def mmi_warning_time(self, t=None):
-        """Create map with observed MMI with contours.
+    def mmi_warning_time(self, t):
+        """Create map with predicted MMI with warning time contours.
         """
         basemap = self.baseLayers["basemap"]
 
-        if self.alert is None:
-            mmi = self.dataLayers["mmi_obs"]
-        else:
-            mmi = self.dataLayers["mmi_pred"]
+        mmi = self.dataLayers["mmi_pred"]
         mmi.loadNamedStyle("mmi.qml")
 
         warningContours = self.dataLayers["warning_time_contour"]
@@ -198,13 +195,9 @@ class MapPanels(object):
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
 
-        if self.alert:
-            import dateutil.parser
-            tstamp = dateutil.parser.parse(self.alert["timestamp"])
-            title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alert, tstamp=tstamp, t=t)
-        else:
-            title = "Warning Time (s) and Observed Shaking (MMI)"
-        
+        import dateutil.parser
+        tstamp = dateutil.parser.parse(self.alert["timestamp"])
+        title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alert, tstamp=tstamp, t=t)
         self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "jpg", legendLayers=[mmi], legendTitle="MMI", title=title)
         return
 
@@ -217,10 +210,14 @@ class MapPanels(object):
         category = self.dataLayers["alert_category"]
         category.loadNamedStyle("alert_category.qml")
 
+        warningContours = self.dataLayers["warning_time_contour"]
+        self._set_warning_time_style(warningContours)
+        self._add_labels(warningContours)
+            
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
-        self._render([category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category], legendTitle="Alert Category", title="Alert Classification") # , Alert Threshold: MMI X.X
+        self._render([warningContours, category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category], legendTitle="Alert Category", title="Alert Classification and Warning Time (s)") # , Alert Threshold: MMI X.X
         return
 
     def _add_labels(self, layer):
