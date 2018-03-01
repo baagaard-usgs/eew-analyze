@@ -14,9 +14,9 @@ import logging
 import datetime
 import dateutil.parser
 
-from comcat import DetailEvent
-from shakealert import EEWServer, DMLogXML
-from analysisdb import AnalysisData
+import comcat
+import shakealert
+import analysisdb
 
 DEFAULTS = """
 [events]
@@ -81,6 +81,9 @@ class DownloaderApp(object):
         if args.fetch_shakemaps or args.all:
             self._fetch_shakemaps()
 
+
+        self.db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
+
         if args.db_init or args.all:
             self._db_init(args.db_init)
 
@@ -101,10 +104,10 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Fetching EEW alerts...")
 
-        self.eewserver = EEWServer(self.config)
+        self.eewserver = shakealert.EEWServer(self.config)
         self.eewserver.login()
         
-        dmlog = DMLogXML(config=self.config)
+        dmlog = shakealert.DMLogXML(config=self.config)
         server = self.config.get("shakealert.production", "server")    
         logsDir = self.config.get("files", "dmlogs_dir").replace("[SERVER]", server)
         if not os.path.isdir(logsDir):
@@ -126,7 +129,7 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Fetching earthquakes from ComCat database...")
 
-        event = DetailEvent()
+        event = comcat.DetailEvent()
         dirTemplate = self.config.get("files", "event_dir")
         for eqId in self.config.options("events"):
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -139,7 +142,7 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Fetching ShakeMaps...")
 
-        event = DetailEvent()
+        event = comcat.DetailEvent()
         dirTemplate = self.config.get("files", "event_dir")
         for eqId in self.config.options("events"):
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -156,15 +159,13 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Setting up analysis database...")
             
-        db = AnalysisData(self.config.get("files", "analysis_db"))
-        db.init(tables)
+        self.db.init(tables)
         logging.getLogger(__name__).info(db.summary())
         return
 
     def _db_status(self):
         """Show summary of analysis database contents.
         """
-        db = AnalysisData(self.config.get("files", "analysis_db"))
         print(db.summary())
         return
     
@@ -172,9 +173,7 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Updating ComCat events in analysis database...")
 
-        db = AnalysisData(self.config.get("files", "analysis_db"))
-
-        event = DetailEvent()
+        event = comcat.DetailEvent()
         dirTemplate = self.config.get("files", "event_dir")
         events = self.config.options("events")
         numEvents = len(events)
@@ -185,7 +184,7 @@ class DownloaderApp(object):
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.load(os.path.join(dataDir, eqId+".geojson"))
-            db.add_event(event, replace)
+            self.db.add_event(event, replace)
         sys.stdout.write("\n")
         return
     
@@ -198,14 +197,12 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Updating ShakeAlert DM alerts in analysis database...")
 
-        db = AnalysisData(self.config.get("files", "analysis_db"))
-
         server = self.config.get("shakealert.production", "server")    
         logsDir = self.config.get("files", "dmlogs_dir").replace("[SERVER]", server)
         files = sorted(glob.glob(os.path.join(logsDir, "dmevent_*.log.gz")))
         if not all:
             # Get most recent entry and use files starting on that day.
-            alert = db.most_recent_alert(server)
+            alert = self.db.most_recent_alert(server)
             dateMostRecent = dateutil.parser.parse(alert["timestamp"]).date()
             pattern = [
                 "dmevent_",
@@ -224,7 +221,7 @@ class DownloaderApp(object):
                 files.remove(filename)
 
         # Read DM logs
-        dmlog = DMLogXML(config=self.config)
+        dmlog = shakealert.DMLogXML(config=self.config)
         numFiles = len(files)
         logging.getLogger(__name__).info("Processing {:d} DM logs starting with {:s}.".format(numFiles, files[0]))
         for iFile,filename in enumerate(files):
@@ -232,7 +229,7 @@ class DownloaderApp(object):
                 sys.stdout.write("\rProcessing DM logs...{:d}%%".format(((iFile+1)*100)/numFiles))
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
-            db.add_alerts(alerts, replace)
+            self.db.add_alerts(alerts, replace)
         sys.stdout.write("\n")
         return
 
@@ -240,8 +237,8 @@ class DownloaderApp(object):
         if self.showProgress:
             print("Showing matches between ComCat and ShakeAlert...")
 
-        db = AnalysisData(self.config.get("files", "analysis_db"))
-        db.show_matches(self.config.get("shakealert.production", "server"))
+        self.db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
+        self.db.show_matches(self.config.get("shakealert.production", "server"))
         return 
     
     def initialize(self, config_filenames):
@@ -261,7 +258,6 @@ class DownloaderApp(object):
                 config.read(filename)
 
         self.config = config
-
         return
     
     def show_parameters(self):
