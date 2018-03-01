@@ -23,7 +23,7 @@ class CostSavings(object):
         self.maps = maps
         return
 
-    def compute(self, event, shakemap, alerts, shakingTime, populationDensity, mmiAlertThreshold, plotAlertMaps=False):
+    def compute(self, event, shakemap, alerts, shakingTime, populationDensity, magAlertThreshold, mmiAlertThreshold, plotAlertMaps=False):
 
         functionPath = self.config.get("mmi_predicted", "function").split(".")
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
@@ -36,7 +36,6 @@ class CostSavings(object):
         shakingTimeRel = analysis_utils.timedelta_to_seconds(shakingTime - numpy.datetime64(event["origin_time"]))
 
         thresholdReached = False
-        magnitudeThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         for alert in alerts:
             if numpy.datetime64(alert["timestamp"]) > numpy.max(shakingTime):
                 # Skip alerts with no positive warning times in
@@ -45,16 +44,15 @@ class CostSavings(object):
                 # times.
                 logging.getLogger(__name__).debug("Skipping alert version {ver} with no positive warning times.".format(ver=alert["version"]))
                 continue
-            if not thresholdReached and alert["magnitude"] < magnitudeThreshold:
+            if not thresholdReached and alert["magnitude"] < magAlertThreshold:
                 continue
             else:
                 if not thresholdReached:
                     tstamp = numpy.datetime64(alert["timestamp"])
                     wtime = analysis_utils.timedelta_to_seconds(tstamp - numpy.datetime64(event["origin_time"]))
                     msg = "Alert threshold reached at {tstamp}, {wtime:.1f}s after origin time.".format(tstamp=tstamp, wtime=wtime)
-                    print msg
                     logging.getLogger(__name__).info(msg)
-                thresholdReached = True
+                    thresholdReached = True
 
             gmpe = self.config.get("mmi_predicted", "gmpe")
             gmice = self.config.get("mmi_predicted", "gmice")
@@ -62,7 +60,10 @@ class CostSavings(object):
             warningTimeCur = shakingTime - numpy.datetime64(alert["timestamp"])
             
             if plotAlertMaps:
-                filename = self.config.get("files", "analysis_event").replace("[EVENTID]", event["event_id"])
+                plotsDir = self.config.get("files", "plots_dir")
+                if not os.path.isdir(plotsDir):
+                    os.makedirs(plotsDir)
+                filename = analysis_utils.analysis_label(self.config, self.eqId, magAlertThreshold, mmiAlertThreshold)+"_alert_snapshot.tiff"
                 values = [
                     ("mmi_pred", mmiPredCur,),
                     ("warning_time", analysis_utils.timedelta_to_seconds(warningTimeCur),),
@@ -134,7 +135,7 @@ class CostSavings(object):
         cacheDir = self.config.get("files", "analysis_cache_dir")
         if not os.path.isdir(cacheDir):
             os.makedirs(cacheDir)
-        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"]) + ".tiff")
+        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff")
         gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
 
         metrics = {
