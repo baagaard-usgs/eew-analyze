@@ -498,7 +498,8 @@ class Product(object):
                 content_name = fname
                 content_url = url
         if content_url is None:
-            raise AttributeError("Could not find any content matching input %s" % regexp)
+            logging.getLogger(__name__).info("Could not find any content matching input %s" % regexp)
+            return
 
         filename = os.path.join(dataDir, os.path.split(url)[1])
         try:
