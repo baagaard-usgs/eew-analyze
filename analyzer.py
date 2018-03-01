@@ -15,14 +15,14 @@ from importlib import import_module
 import multiprocessing
 import numpy
 
-import eewperformance.shakemap as shakemap # OpenQuake before osgeo
-import eewperformance.analysisdb as analysisdb
-import eewperformance.perfmetrics as perfmetrics
-import eewperformance.maps as maps
-import eewperformance.plotsxy as plotsxy
-import eewperformance.reports as reports
-import eewperformance.analysis_utils as analysis_utils
-import eewperformance.gdalraster as gdalraster
+from eewperformance import shakemap # OpenQuake before osgeo
+from eewperformance import analysisdb
+from eewperformance import perfmetrics
+from eewperformance import maps
+from eewperformance import plotsxy
+from eewperformance import reports
+from eewperformance import analysis_utils
+from eewperformance import gdalraster
 
 DEFAULTS = """
 [events]

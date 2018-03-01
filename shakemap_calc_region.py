@@ -14,11 +14,11 @@ import logging
 from importlib import import_module
 import numpy
 
-from shakemap import ShakeMap, mmi_via_gmpe_gmice
+from eewperformance import shakemap
 from osgeo import osr
 
-import greatcircle
-from comcat import DetailEvent
+from eewperformance import greatcircle
+from comcat import comcat
 
 DEFAULTS = """
 [events]
@@ -93,8 +93,8 @@ class ShakeMapRegionApp(object):
     def calc_regions(self, filename, showMap=False):
         """Compute target rectangular region for customized ShakeMap.
         """
-        event = DetailEvent()
-        shakemap = ShakeMap()
+        event = comcat.DetailEvent()
+        shakemap = shakemap.ShakeMap()
         eventDir = self.config.get("files", "event_dir")
 
         functionPath = self.config.get("mmi_predicted", "function").split(".")
@@ -136,8 +136,6 @@ class ShakeMapRegionApp(object):
         """Plot threshold distance versus earthquake magnitude using GMPE and Wald et al. (1999)
         and Worden et al. (2012) GMICE.
         """
-        import greatcircle
-        import shakemap
         import matplotlib.pyplot as pyplot
 
         colors = ("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
@@ -173,7 +171,7 @@ class ShakeMapRegionApp(object):
             
             for imag, magnitude in enumerate(magnitudes):
                 event["magnitude"] = magnitude
-                mmi = mmi_via_gmpe_gmice(event, points, gmpe, gmice)
+                mmi = shakemap.mmi_via_gmpe_gmice(event, points, gmpe, gmice)
                 for ithreshold, mmiThreshold in enumerate(mmiThresholds):
                     if numpy.max(mmi) >= mmiThreshold:
                         thresholdDistKm[ithreshold, imag] = distKm[numpy.where(mmi < mmiThreshold)[0][0]]

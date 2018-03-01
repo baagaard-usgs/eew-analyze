@@ -14,9 +14,9 @@ import logging
 import datetime
 import dateutil.parser
 
-import eewperformance.comcat as comcat
-import eewperformance.shakealert as shakealert
-import eewperformance.analysisdb as analysisdb
+from eewperformance import comcat
+from eewperformance import shakealert
+from eewperformance import analysisdb
 
 DEFAULTS = """
 [events]
