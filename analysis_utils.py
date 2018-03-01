@@ -40,7 +40,7 @@ def timedelta_to_seconds(value):
     return value.astype("timedelta64[us]").astype("float32")/1.0e+6
 
 
-def analysis_label(params, eqid):
+def analysis_label(params, eqid, magThreshold=None, mmiThreshold=None):
     """Get label for anlysis used in output filenames.
     
     :type params: ConfigParser
@@ -52,8 +52,10 @@ def analysis_label(params, eqid):
     server = params.get("shakealert.production", "server")
     gmpe = params.get("mmi_predicted", "gmpe")
     fragility = params.get("fragility_curves", "object").split(".")[-1]
-    magThreshold = params.getfloat("alerts", "magnitude_threshold")
-    mmiThreshold = params.getfloat("alerts", "mmi_threshold")
+    if magThreshold is None:
+        magThreshold = params.getfloat("alerts", "magnitude_threshold")
+    if mmiThreshold is None:
+        mmiThreshold = params.getfloat("alerts", "mmi_threshold")
     label = "{eqid}-{server}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}".format(
         eqid=eqid, server=server, gmpe=gmpe, fragility=fragility, magThreshold=magThreshold, mmiThreshold=mmiThreshold)
     return label
