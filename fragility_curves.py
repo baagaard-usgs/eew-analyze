@@ -123,6 +123,38 @@ class PublicFearAvoidance(CostActionDamage):
         return
 
 
+class PublicFearAvoidance20(CostActionDamage):
+    """Rough estimate of cost of action and damage for public
+    fear avoidance (public perception of utility of EEW).
+
+    Cost of action is uniform with respect to MMI, while cost of
+    damage is a linear ramp.
+    """
+
+    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
+        CostActionDamage.__init__(self)
+
+        self.action = Constant(cost_action)
+        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
+        return
+
+
+class PublicFearAvoidance50(CostActionDamage):
+    """Rough estimate of cost of action and damage for public
+    fear avoidance (public perception of utility of EEW).
+
+    Cost of action is uniform with respect to MMI, while cost of
+    damage is a linear ramp.
+    """
+
+    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
+        CostActionDamage.__init__(self)
+
+        self.action = Constant(cost_action)
+        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
+        return
+
+
 class PublicInjury(CostActionDamage):
     """Rough estimate of cost of action and damage for public
     injuries.
@@ -131,7 +163,7 @@ class PublicInjury(CostActionDamage):
     damage is a linear ramp.
     """
 
-    def __init__(self, cost_action=0.1, damage_low_mmi=4.5, damage_high_mmi=6.5):
+    def __init__(self, cost_action=0.1, damage_low_mmi=4.5, damage_high_mmi=7.5):
         """Constructor.
 
         :type cost_action: float
