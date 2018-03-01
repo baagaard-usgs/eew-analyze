@@ -42,14 +42,15 @@ vs_kmps = 3.5 ; From NC record section
 function = shakemap.mmi_via_gmpe_gmice
 gmpe = ASK2014
 #gmice = WordenEtal2012
-gmice = WaldEtal1999
+#gmice = WaldEtal1999
+gmice = default
 
 [alerts]
 #mmi_threshold = 0.0
 mmi_threshold = 2.0
 magnitude_threshold = 2.95
 
-magnitude_threshold = 3.95
+#magnitude_threshold = 3.95
 #magnitude_threshold = 4.45
 
 [fragility_curves]
@@ -57,6 +58,15 @@ object = fragility_curves.PublicFearAvoidance
 cost_action = 0.1
 damage_low_mmi = 2.5
 damage_high_mmi = 5.5
+
+#object = fragility_curves.PublicInjury
+#cost_action = 0.1
+#damage_low_mmi = 4.5
+#damage_high_mmi = 7.5
+
+#object = fragility_curves.StepDamage
+#cost_action = 0.1
+#damage_mmi = 3.5
 
 [optimize]
 mmi_threshold_min = 2.0
@@ -190,7 +200,18 @@ class EEWAnalyzeApp(object):
         filename = os.path.join(dataDir, "custom_grid.xml.gz")
         if not os.path.isfile(filename):
             filename = os.path.join(dataDir, "grid.xml.gz")
-        self.shakemap = ShakeMap()
+        gmice = self.config.get("mmi_predicted", "gmice")
+        if gmice == "WaldEtal1999":
+            from shakemap import mmi_WaldEtal1999
+            gmice = mmi_WaldEtal1999
+        elif gmice == "WordenEtal2012":
+            from shakemap import mmi_WordenEtal2012
+            gmice = mmi_WordenEtal2012
+        elif gmice == "default":
+            gmice = None
+        else:
+            raise ValueError("Unknown GMICE '{}'.".format(gmice))
+        self.shakemap = ShakeMap(gmice)
         self.shakemap.load(filename)
 
         # Analsis DB data (event and alerts)

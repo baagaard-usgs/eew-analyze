@@ -18,11 +18,12 @@ class ShakeMap(object):
     """ShakeMap reader.
     """
 
-    def __init__(self):
+    def __init__(self, gmice=None):
         """Constructor.
         """
         self.data = None
         self.grid = None
+        self.gmice = gmice
         return
 
     def load(self, filename):
@@ -135,7 +136,8 @@ class ShakeMap(object):
 
         data = numpy.loadtxt(cStringIO.StringIO(elRoot.xpath("ns:grid_data", namespaces=namespaces)[0].text), usecols=colIndices)
         self.data = numpy.core.records.fromarrays(data.transpose(), names=colNames, formats=colFormats)
-        self.data["mmi"] = mmi_WordenEtal2012(self.data["pga"], self.data["pgv"])
+        if self.gmice:
+            self.data["mmi"] = self.gmice(self.data["pga"], self.data["pgv"])
         return
         
 
@@ -186,12 +188,16 @@ def mmi_WaldEtal1999(pga, pgv):
     mmiPGV = numpy.zeros(pgv.shape)
     
     logY = numpy.log10(MIN_FLOAT + pga*G_ACC) # acceleration in cm/s**2
-    maskLower = logY <= 1.82
-    mmiPGA = maskLower*(1.00 + 2.20*logY) + ~maskLower*(-1.66 + 3.66*logY)
+    maskLower = logY <= 1.8193
+    mmiPGA = maskLower*(1.00 + 2.1987*logY) + ~maskLower*(-1.6582 + 3.6598*logY)
+    #mmiPGA = numpy.floor(100*mmiPGA)/100.0
+    #mmiPGA = numpy.clip(mmiPGA, 1.0, 10.0)
     
     logY = numpy.log10(MIN_FLOAT + pgv) # velocity in cm/s
-    maskLower = logY <= 0.76
-    mmiPGV = maskLower*(3.40 + 2.10*logY) + ~maskLower*(2.35 + 3.47*logY)
+    maskLower = logY <= 0.7641
+    mmiPGV = maskLower*(3.3991 + 2.0951*logY) + ~maskLower*(2.3478 + 3.4709*logY)
+    #mmiPGV = numpy.floor(100*mmiPGV)/100.0
+    #mmiPGV = numpy.clip(mmiPGV, 1.0, 10.0)
     
     maskPGA = pga > 0.0
     maskPGV = pgv > 0.0
@@ -199,8 +205,7 @@ def mmi_WaldEtal1999(pga, pgv):
     wtPGV = 1.0*(mmiPGA >= 7.0) + (mmiPGA - 5.0)/(7.0 - 5.0)*numpy.bitwise_and(mmiPGA > 5.0, mmiPGA < 7.0)
 
     mmi = (wtPGA*mmiPGA + wtPGV*mmiPGV)*(maskPGA*maskPGV) + mmiPGA*(maskPGA*~maskPGV) + mmiPGV*(~maskPGA*maskPGV)
-    mmi = numpy.maximum(1.0, mmi)
-    mmi = numpy.minimum(10.0, mmi)
+    mmi = numpy.clip(mmi, 1.0, 10.0)
     return mmi
 
 
@@ -277,9 +282,11 @@ def mmi_via_gmpe_gmice(alert, points, gmpe="ASK2014", gmice="WaldEtal1999"):
 
     if gmice == "WordenEtal2012":
         gmiceFn = mmi_WordenEtal2012
-    elif gmice == "WaldEtal1999":
+    elif gmice == "WaldEtal1999" or gmice == "default":
         gmiceFn = mmi_WaldEtal1999
-    
+    else:
+        raise ValueError("Unknown GMIC '{}'.".format(gmice))
+        
     return gmiceFn(values["pgaG"]*100.0, values["pgvCmps"])
 
 
