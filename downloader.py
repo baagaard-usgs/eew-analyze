@@ -13,6 +13,7 @@ import sys
 import logging
 import datetime
 import dateutil.parser
+import gzip
 
 from eewperformance import comcat
 from eewperformance import shakealert
@@ -39,7 +40,7 @@ password = None
 [files]
 dmlogs_dir = ./data/dmlogs/[SERVER]/
 event_dir = ./data/[EVENTID]/
-analysis_db = ./data/analysisdb_NEW.sqlite
+analysis_db = ./data/analysisdb.sqlite
 """
 
 # ----------------------------------------------------------------------
@@ -81,7 +82,6 @@ class DownloaderApp(object):
         if args.fetch_shakemaps or args.all:
             self._fetch_shakemaps()
 
-
         self.db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
 
         if args.db_init or args.all:
@@ -95,6 +95,8 @@ class DownloaderApp(object):
                 self._db_populate_eewalerts(all=args.db_populate != "new_eew_alerts", replace=args.db_replace_rows)
             if args.db_populate == "comcat_events" or args.db_populate == "all" or args.all:
                 self._db_populate_events(replace=args.db_replace_rows)
+            if args.db_populate == "comcat_shakemaps" or args.db_populate == "all" or args.all:
+                self._db_populate_shakemaps(replace=args.db_replace_rows)
 
         if args.show_matches or args.all:
             self._show_matches()
@@ -223,9 +225,77 @@ class DownloaderApp(object):
         #     shakemap_versions
         #         shakemap_revision
         with gzip.open(os.path.join(dataDir, "info.xml.gz"), "r") as fxml:
-            import pdb
-            pdb.set_trace()
-            
+
+            bytes = fxml.read()
+            elRoot = etree.fromstring(bytes) # info
+
+            # Values
+            mmiBias = float(elRoot.xpath("tag[@name='mi_bias']")[0].get("value"))
+            pgmBias = tuple(map(float, elRoot.xpath("tag[@name='bias']")[0].get("value").split()))
+            (pgaBias, pgvBias, psa03Bias, psa10Bias, psa30Bias) = pgmBias
+
+            mmiMax = float(elRoot.xpath("tag[@name='mi_max']")[0].get("value"))
+            pgvMax = float(elRoot.xpath("tag[@name='pgv_max']")[0].get("value"))
+            pgaMax = float(elRoot.xpath("tag[@name='pga_max']")[0].get("value"))
+            psa03Max = float(elRoot.xpath("tag[@name='psa03_max']")[0].get("value"))
+            psa10Max = float(elRoot.xpath("tag[@name='psa10_max']")[0].get("value"))
+            psa30Max = float(elRoot.xpath("tag[@name='psa30_max']")[0].get("value"))
+    
+            gmpeStr = elRoot.xpath("tag[@name='GMPE']")[0].get("value")
+            pgm2miStr = elRoot.xpath("tag[@name='pgm2mi']")[0].get("value")
+            shakemapVer = elRoot.xpath("tag[@name='ShakeMap revision']")[0].get("value")
+
+            data = {
+                "output": {
+                    "ground_motions": {
+                        "intensity": {
+                            "bias": mmiBias,
+                            "max": mmiMax,
+                            "units": "intensity",
+                        },
+                        "pga": {
+                            "bias": pgaBias,
+                            "max": pgaMax,
+                            "units": "%g",
+                        },
+                        "pgv": {
+                            "bias": pgvBias,
+                            "max": pgvMax,
+                            "units": "cm/s",
+                        },
+                        "psa03": {
+                            "bias": psa03Bias,
+                            "max": psa03Max,
+                            "units": "%g",
+                        },
+                        "psa10": {
+                            "bias": psa10Bias,
+                            "max": psa10Max,
+                            "units": "%g",
+                        },
+                        "psa30": {
+                            "bias": psa30Bias,
+                            "max": psa30Max,
+                            "units": "%g",
+                        },
+                    },
+                },
+                "processing": {
+                    "ground_motion_modules": {
+                        "gmpe": {
+                            "module": gmpeStr,
+                            "reference": gmpeStr,
+                        },
+                        "pgm2mi": {
+                            "module": pgm2miStr,
+                            "reference": pgm2miStr,
+                        },
+                    },
+                    "shakemap_versions": {
+                        "shakemap_revision": shakemapVer,
+                    },
+                },
+            }
             with gzip.open(os.path.join(dataDir, "info.json.gz"), "w") as fjson:
                 import json
                 json.dump(data, fjson)
@@ -238,13 +308,13 @@ class DownloaderApp(object):
             print("Setting up analysis database...")
             
         self.db.init(tables)
-        logging.getLogger(__name__).info(db.summary())
+        logging.getLogger(__name__).info(self.db.summary())
         return
 
     def _db_status(self):
         """Show summary of analysis database contents.
         """
-        print(db.summary())
+        print(self.db.summary())
         return
     
     def _db_populate_events(self, replace=False):
@@ -263,7 +333,30 @@ class DownloaderApp(object):
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.load(os.path.join(dataDir, eqId+".geojson"))
             self.db.add_event(event, replace)
-        sys.stdout.write("\n")
+        if self.showProgress:
+            sys.stdout.write("\n")
+        return
+    
+    def _db_populate_shakemaps(self, replace=False):
+        import json
+        if self.showProgress:
+            print("Updating ComCat ShakeMap info in analysis database...")
+
+        dirTemplate = self.config.get("files", "event_dir")
+        events = self.config.options("events")
+        numEvents = len(events)
+        for iEvent,eqId in enumerate(events):
+            if self.showProgress:
+                sys.stdout.write("\rProcessing ComCat events...{:d}%%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.flush()
+
+            dataDir = dirTemplate.replace("[EVENTID]", eqId)
+            with gzip.open(os.path.join(dataDir, "info.json.gz"), "r") as fh:
+                info = json.load(fh)
+                info["event_id"] = eqId
+                self.db.add_shakemap_info(info, replace)
+        if self.showProgress:
+            sys.stdout.write("\n")
         return
     
     def _db_populate_eewalerts(self, all=False, replace=False):
@@ -308,7 +401,8 @@ class DownloaderApp(object):
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
             self.db.add_alerts(alerts, replace)
-        sys.stdout.write("\n")
+        if self.showProgress:
+            sys.stdout.write("\n")
         return
 
     def _show_matches(self):
@@ -356,9 +450,9 @@ class DownloaderApp(object):
         parser.add_argument("--fetch-eewalerts", action="store", dest="fetch_eewalerts", default=None, metavar="DATE_BEGIN,DATE_END")
         parser.add_argument("--fetch-events", action="store_true", dest="fetch_events")
         parser.add_argument("--fetch-shakemaps", action="store_true", dest="fetch_shakemaps")
-        parser.add_argument("--db-init", action="store", dest="db_init", choices=["eew_alerts", "comcat_events", "performance", "all"])
+        parser.add_argument("--db-init", action="store", dest="db_init", choices=["eew_alerts", "comcat_events", "comcat_shakemaps", "performance", "all"])
         parser.add_argument("--db-status", action="store_true", dest="db_status")
-        parser.add_argument("--db-populate", action="store", dest="db_populate", choices=["all_eew_alerts", "new_eew_alerts", "comcat_events", "all"])
+        parser.add_argument("--db-populate", action="store", dest="db_populate", choices=["all_eew_alerts", "new_eew_alerts", "comcat_events", "comcat_shakemaps", "all"])
         parser.add_argument("--db-replace-rows", action="store_true", dest="db_replace_rows")
         parser.add_argument("--show-matches", action="store_true", dest="show_matches")
         parser.add_argument("--all", action="store_true", dest="all")

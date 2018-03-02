@@ -15,8 +15,6 @@ import pytz
 
 import numpy
 
-import greatcircle
-
 TABLES = [
     ("eew_alerts", [
         "server TEXT NOT NULL",
@@ -45,6 +43,25 @@ TABLES = [
         "description TEXT",
         "UNIQUE(event_id) ON CONFLICT FAIL",
     ]),
+    ("comcat_shakemaps", [
+        "event_id TEXT NOT NULL PRIMARY KEY",
+        "mmi_bias REAL",
+        "mmi_max REAL",
+        "pga_bias REAL",
+        "pga_max REAL",
+        "pgv_bias REAL",
+        "pgv_max REAL",
+        "psa03_bias REAL",
+        "psa03_max REAL",
+        "psa10_bias REAL",
+        "psa10_max REAL",
+        "psa30_bias REAL",
+        "psa30_max REAL",
+        "gmpe TEXT",
+        "pgm2mi TEXT",
+        "software_version TEXT",
+        "UNIQUE(event_id) ON CONFLICT FAIL",
+    ]),
     ("performance", [
         "comcat_id TEXT NOT NULL",
         "eew_server TEXT NOT NULL",
@@ -66,7 +83,7 @@ TABLES = [
         "population_cost_noeew REAL NOT NULL",
         "population_cost_perfecteew REAL NOT NULL",
         "population_metric REAL NOT NULL",
-        "UNIQUE(comcat_id, eew_server, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
+        "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
     ]),
 ]
 
@@ -169,6 +186,69 @@ class AnalysisData(object):
             logging.getLogger(__name__).debug(str(event))
         return
 
+    def add_shakemap_info(self, info, replace=False):
+        """Add ComCat ShakeMap info to database.
+
+        :type info: dict
+        :param info: ComCat ShakeMap info (from info.json or info.xml).
+        """
+        COLUMNS = (
+            "event_id",
+            "mmi_bias",
+            "mmi_max",
+            "pga_bias",
+            "pga_max",
+            "pgv_bias",
+            "pgv_max",
+            "psa03_bias",
+            "psa03_max",
+            "psa10_bias",
+            "psa10_max",
+            "psa30_bias",
+            "psa30_max",
+            "gmpe",
+            "pgm2mi",
+            "software_version",
+            )
+
+        insertCols = ", ".join(COLUMNS)
+
+        gmmod = info["processing"]["ground_motion_modules"]
+        infoDict = {
+            "event_id": info["event_id"],
+            "mmi_bias": 0.0,
+            "mmi_max": 0.0,
+            "pga_bias": 0.0,
+            "pga_max": 0.0,
+            "pgv_bias": 0.0,
+            "pgv_max": 0.0,
+            "psa03_bias": 0.0,
+            "psa03_max": 0.0,
+            "psa10_bias": 0.0,
+            "psa10_max": 0.0,
+            "psa30_bias": 0.0,
+            "psa30_max": 0.0,
+            "gmpe": gmmod["gmpe"]["module"],
+            "pgm2mi": gmmod["pgm2mi"]["module"],
+            "software_version": info["processing"]["shakemap_versions"]["shakemap_revision"],
+        }
+        # Update infoDict with available values.
+        gm = info["output"]["ground_motions"]
+        for key,value in gm.items():
+            infoDict[key] = value
+        infoValues = tuple([infoDict[col] for col in COLUMNS])
+        valueCols = ",".join("?"*len(infoValues))
+        cmd = "INSERT"
+        if replace:
+            cmd += " OR REPLACE"
+        try:
+            self.cursor.execute("{0} INTO comcat_shakemaps({1}) VALUES({2})".format(cmd, insertCols, valueCols), infoValues)
+            self.connection.commit()
+        except sqlite3.IntegrityError as ex:
+            logging.getLogger(__name__).debug(str(ex))
+            logging.getLogger(__name__).debug(str(info))
+        return
+
     def add_performance(self, stats, replace=False):
         """Add performance stats to database.
 
@@ -215,6 +295,8 @@ class AnalysisData(object):
     def find_match(self, comcatId, server):
         """Find initial alert matching ComCat event.
         """
+        import greatcircle
+        
         MAX_DISTANCE_DEG = 3.0
         MAX_DISTANCE_KM = 150.0
         MAX_TIME_SECS = 15.0
