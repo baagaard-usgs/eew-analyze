@@ -222,9 +222,6 @@ class DownloaderApp(object):
         #             reference
         #     shakemap_versions
         #         shakemap_revision
-
-
-        """
         with gzip.open(os.path.join(dataDir, "info.xml.gz"), "r") as fxml:
             import pdb
             pdb.set_trace()
