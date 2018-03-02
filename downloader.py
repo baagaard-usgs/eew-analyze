@@ -87,8 +87,8 @@ class DownloaderApp(object):
         if args.db_init or args.all:
             self._db_init(args.db_init)
 
-        if args.db_status or args.all:
-            self._db_status()
+        if args.db_summary or args.all:
+            self._db_summary(args.db_summary)
 
         if args.db_populate or args.all:
             if "eew_alerts" in args.db_populate or args.db_populate == "all" or args.all:
@@ -170,60 +170,6 @@ class DownloaderApp(object):
 
         Get MMI bias.
         """
-        # XML
-        # <tag name="mi_bias" value="-0.31" desc="magnitude bias for Intensity" />
-        # <tag name="bias" value="-0.04 -0.14 -0.30 -0.27 -0.45 " desc="magnitude bias (pga pgv psa03 psa10 psa30 )" />
-        #
-        # <tag name="pga_max" value="83.83" desc="Max value of grid" />
-        # <tag name="pgv_max" value="52.53" desc="Max value of grid" />
-        # <tag name="mi_max" value="7.89" desc="Max value of grid" />
-        # <tag name="psa03_max" value="112.13" desc="Max value of grid" />
-        # <tag name="psa10_max" value="54.42" desc="Max value of grid" />
-        # <tag name="psa30_max" value="5.72" desc="Max value of grid" />
-        #
-        # <tag name="GMPE" value="GMPE::BA08" desc="GMPE type" />
-        # <tag name="pgm2mi" value="GMICE::Wald99 - Wald, et al.; 1999" desc="Intensity Function" />
-        #
-        # <tag name="ShakeMap revision" value="3.5.687" desc="ShakeMap source code revision number" />
-        #
-        #
-        # JSON
-        # output
-        #    ground_motions
-        #      intensity
-        #          bias
-        #          max
-        #          units: "intensity"
-        #      pga
-        #          bias
-        #          max
-        #          units: "%g"
-        #      pgv
-        #          bias
-        #          max
-        #          units: "cm/s"
-        #      psa03
-        #          bias
-        #          max
-        #          units: "%g"
-        #      psa10
-        #          bias
-        #          max
-        #          units: "%g"
-        #      pds30
-        #          bias
-        #          max
-        #          units: "%g"
-        # processing
-        #     ground_motion_modules
-        #         gmpe
-        #             module
-        #             reference
-        #         pgm2mi
-        #             module
-        #             reference
-        #     shakemap_versions
-        #         shakemap_revision
         with gzip.open(os.path.join(dataDir, "info.xml.gz"), "r") as fxml:
 
             bytes = fxml.read()
@@ -308,15 +254,18 @@ class DownloaderApp(object):
             print("Setting up analysis database...")
             
         self.db.init(tables)
-        logging.getLogger(__name__).info(self.db.summary())
+        logging.getLogger(__name__).info(self.db.tables_info())
         return
 
-    def _db_status(self):
+    def _db_summary(self, style="tables_info"):
         """Show summary of analysis database contents.
         """
-        print(self.db.summary())
+        if style == "tables_info":
+            print(self.db.tables_info())
+        else:
+            print(self.db.summary())
         return
-    
+
     def _db_populate_events(self, replace=False):
         if self.showProgress:
             print("Updating ComCat events in analysis database...")
@@ -451,7 +400,7 @@ class DownloaderApp(object):
         parser.add_argument("--fetch-events", action="store_true", dest="fetch_events")
         parser.add_argument("--fetch-shakemaps", action="store_true", dest="fetch_shakemaps")
         parser.add_argument("--db-init", action="store", dest="db_init", choices=["eew_alerts", "comcat_events", "comcat_shakemaps", "performance", "all"])
-        parser.add_argument("--db-status", action="store_true", dest="db_status")
+        parser.add_argument("--db-summary", action="store", dest="db_summary", default=None, choices=[None, "tables_only", "summary"])
         parser.add_argument("--db-populate", action="store", dest="db_populate", choices=["all_eew_alerts", "new_eew_alerts", "comcat_events", "comcat_shakemaps", "all"])
         parser.add_argument("--db-replace-rows", action="store_true", dest="db_replace_rows")
         parser.add_argument("--show-matches", action="store_true", dest="show_matches")

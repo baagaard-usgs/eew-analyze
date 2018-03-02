@@ -235,7 +235,12 @@ class AnalysisData(object):
         # Update infoDict with available values.
         gm = info["output"]["ground_motions"]
         for key,value in gm.items():
-            infoDict[key] = value
+            if key != "intensity":
+                infoDict[key+"_bias"] = value["bias"]
+                infoDict[key+"_max"] = value["max"]
+            else:
+                infoDict["mmi_bias"] = value["bias"]
+                infoDict["mmi_max"] = value["max"]
         infoValues = tuple([infoDict[col] for col in COLUMNS])
         valueCols = ",".join("?"*len(infoValues))
         cmd = "INSERT"
@@ -449,7 +454,7 @@ class AnalysisData(object):
         return event
 
     
-    def summary(self):
+    def tables_info(self):
         """Returns string with database summary.
         """
         sout = ""
@@ -464,6 +469,38 @@ class AnalysisData(object):
             for column in info:
                 sout += "    {name:16} {type:16}\n".format(name=column[1], type=column[2])
             sout += "  Number of rows: {}\n".format(nrows)
+        return sout
+
+    def summary(self):
+        """Returns string with database summary.
+        """
+        sout = ""
+
+        # Comcat events
+        sout += "\nComCat Events\n"
+        self.cursor.execute("SELECT * FROM comcat_events")
+        rows = self.cursor.fetchall()
+        for row in rows:
+            ot = dateutil.parser.parse(row["origin_time"])
+            sout += "{row[event_id]} {row[longitude]:9.4f} {row[latitude]:8.4f} {row[depth_km]:4.1f} {ot:%Y-%m-%dT%H:%M} {row[magnitude_type]:3s}{row[magnitude]:.2f} {row[description]}\n".format(row=row, ot=ot)
+
+        # Comcat Shakemap
+        sout += "\nShakeMap Info\n"
+        self.cursor.execute("SELECT * FROM comcat_shakemaps")
+        rows = self.cursor.fetchall()
+        for row in rows:
+            event = self.comcat_event(row["event_id"])
+            sout += "{row[event_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[mmi_max]:3.1f} {row[pga_max]:6.2f}%g {row[pgv_max]:5.1f}cm/s {row[mmi_bias]:5.2f} {row[pga_bias]:5.2f} {row[pgv_bias]:5.2f} {row[gmpe]} {row[pgm2mi]} v{row[software_version]} {event[description]}\n".format(row=row, event=event)
+            
+        # Alerts
+
+        # Performance
+        sout += "\nPerformance Data\n"
+        self.cursor.execute("SELECT * FROM performance")
+        rows = self.cursor.fetchall()
+        for row in rows:
+            event = self.comcat_event(row["comcat_id"])
+            sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[mag_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_metric]:6.2f} {row[pop_metric]:6.2f} {event[description]}\n".format(row=row, event=event)
         return sout
 
     def show_matches(self, server):
