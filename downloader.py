@@ -151,8 +151,89 @@ class DownloaderApp(object):
             if len(shakemap) > 1:
                 raise ValueError("Expected to get preferred ShakeMap.")
             shakemap[0].fetch("grid.xml", dataDir)
+            shakemap[0].fetch("info.json", dataDir)
+            if not os.path.isfile(os.path.join(dataDir, "info.json.gz")):
+                shakemap[0].fetch("info.xml", dataDir)
+                if not os.path.isfile(os.path.join(dataDir, "info.xml.gz")):
+                    logging.getLogger(__name__).error("Could not retrieve ShakeMap info JSON or XML file for {}.".format(eqId))
+                else:
+                    logging.getLogger(__name__).info("Performing minimal conversion of ShakeMap info XML file to JSON for {}.".format(eqId))
+                    #self._extract_shakemap_info(dataDir)
+                
         return
 
+
+    def _extract_shakemap_info(self, dataDir):
+        """Perform minimal conversion of ShakeMap info XML file to JSON.
+
+        Get MMI bias.
+        """
+        # XML
+        # <tag name="mi_bias" value="-0.31" desc="magnitude bias for Intensity" />
+        # <tag name="bias" value="-0.04 -0.14 -0.30 -0.27 -0.45 " desc="magnitude bias (pga pgv psa03 psa10 psa30 )" />
+        #
+        # <tag name="pga_max" value="83.83" desc="Max value of grid" />
+        # <tag name="pgv_max" value="52.53" desc="Max value of grid" />
+        # <tag name="mi_max" value="7.89" desc="Max value of grid" />
+        # <tag name="psa03_max" value="112.13" desc="Max value of grid" />
+        # <tag name="psa10_max" value="54.42" desc="Max value of grid" />
+        # <tag name="psa30_max" value="5.72" desc="Max value of grid" />
+        #
+        # <tag name="GMPE" value="GMPE::BA08" desc="GMPE type" />
+        # <tag name="pgm2mi" value="GMICE::Wald99 - Wald, et al.; 1999" desc="Intensity Function" />
+        #
+        # <tag name="ShakeMap revision" value="3.5.687" desc="ShakeMap source code revision number" />
+        #
+        #
+        # JSON
+        # output
+        #    ground_motions
+        #      intensity
+        #          bias
+        #          max
+        #          units: "intensity"
+        #      pga
+        #          bias
+        #          max
+        #          units: "%g"
+        #      pgv
+        #          bias
+        #          max
+        #          units: "cm/s"
+        #      psa03
+        #          bias
+        #          max
+        #          units: "%g"
+        #      psa10
+        #          bias
+        #          max
+        #          units: "%g"
+        #      pds30
+        #          bias
+        #          max
+        #          units: "%g"
+        # processing
+        #     ground_motion_modules
+        #         gmpe
+        #             module
+        #             reference
+        #         pgm2mi
+        #             module
+        #             reference
+        #     shakemap_versions
+        #         shakemap_revision
+
+
+        """
+        with gzip.open(os.path.join(dataDir, "info.xml.gz"), "r") as fxml:
+            import pdb
+            pdb.set_trace()
+            
+            with gzip.open(os.path.join(dataDir, "info.json.gz"), "w") as fjson:
+                import json
+                json.dump(data, fjson)
+        return
+    
     def _db_init(self, tables):
         """Create analysis database with ShakeAlert DM alerts and ComCat events.
         """
