@@ -14,11 +14,12 @@ import logging
 from importlib import import_module
 import numpy
 
-from eewperformance import shakemap
 from osgeo import osr
 
+from eewperformance import shakemap
+
 from eewperformance import greatcircle
-from comcat import comcat
+from eewperformance import comcat
 
 DEFAULTS = """
 [events]
@@ -26,9 +27,8 @@ DEFAULTS = """
 # nc72923380 = Mw 4.6 Paicines, 2017-11-13
 
 [mmi_predicted]
-function = shakemap.gmpe
+function = eewperformance.shakemap.mmi_via_gmpe_gmice
 gmpe = ASK2014
-#gmice = WordenEtal2012
 gmice = WaldEtal1999
 
 [region]
@@ -93,12 +93,14 @@ class ShakeMapRegionApp(object):
     def calc_regions(self, filename, showMap=False):
         """Compute target rectangular region for customized ShakeMap.
         """
+        import json
+        import gzip
+        
         event = comcat.DetailEvent()
-        shakemap = shakemap.ShakeMap()
         eventDir = self.config.get("files", "event_dir")
 
         functionPath = self.config.get("mmi_predicted", "function").split(".")
-        gmpe = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
+        mmiFn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
 
         buffer_km = self.config.getfloat("region", "buffer_km")
         
@@ -113,13 +115,27 @@ class ShakeMapRegionApp(object):
                 sys.stdout.flush()
 
             dataDir = eventDir.replace("[EVENTID]", eqId)
-            event.load(os.path.join(dataDir, eqId+".geojson"))
 
-            distance = self._calc_distance(event, gmpe)
+            with gzip.open(os.path.join(dataDir, "info.json.gz"), "r") as finfo:
+                shakemapInfo = json.load(finfo)
+                mmiMagBias = shakemapInfo["output"]["ground_motions"]["intensity"]["bias"]
+                mapInfo = shakemapInfo["output"]["map_information"]
+                mapRegion = {
+                   "longitude_min": mapInfo["min"]["longitude"],
+                   "latitude_min": mapInfo["min"]["latitude"],
+                   "longitude_max": mapInfo["max"]["longitude"],
+                   "latitude_max": mapInfo["max"]["latitude"],
+                }
+
+
+            event.load(os.path.join(dataDir, eqId+".geojson"))
+            distance = self._calc_distance(event, mmiFn, mmiMagBias)
             gridSpec = self._calc_grid(event, distance + buffer_km*1000.0)
 
-            shakemap.load(os.path.join(dataDir, "grid.xml.gz"))
-            if shakemap.num_lon() >= gridSpec["longitude_npoints"] and shakemap.num_lat() >= gridSpec["latitude_npoints"]:
+            if mapRegion["longitude_min"] <= gridSpec["longitude_min"] \
+              and mapRegion["longitude_max"] >= gridSpec["longitude_max"] \
+              and mapRegion["latitude_min"] <= gridSpec["latitude_min"] \
+              and mapRegion["latitude_max"] >= gridSpec["latitude_max"]:
                 gridSpec["new"] = 0
             if showMap:
                 self._show_map(event, gridSpec)
@@ -190,7 +206,7 @@ class ShakeMapRegionApp(object):
         figure.savefig("mmi_threshold_distance.pdf")
         return
     
-    def _calc_distance(self, event, gmpe):
+    def _calc_distance(self, event, mmiFn, magnitudeBias=0.0):
         """
         :returns: Distance in m
         """
@@ -200,7 +216,8 @@ class ShakeMapRegionApp(object):
             "latitude": event.latitude,
             "depth_km": event.depth,
             }
-
+        eventDict["magnitude"] += max(magnitudeBias, 0.0)
+            
         cols = [
             ("longitude", "float32",),
             ("latitude", "float32",),
@@ -214,7 +231,7 @@ class ShakeMapRegionApp(object):
 
         gmpe = self.config.get("mmi_predicted", "gmpe")
         gmice = self.config.get("mmi_predicted", "gmice")
-        mmi = mmi_via_gmpe_gmice(eventDict, points, gmpe, gmice)
+        mmi = mmiFn(eventDict, points, gmpe, gmice)
         mmiThreshold = self.config.getfloat("region", "mmi_threshold")
         index = numpy.where(mmi < mmiThreshold)[0][0]
 
