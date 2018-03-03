@@ -38,7 +38,7 @@ resolution_latitude = 0.008333333
 buffer_km = 25.0
 
 [map]
-scale = 1.0e+6
+scale = 2.0e+6
 zoom_level = 8
 
 [files]
