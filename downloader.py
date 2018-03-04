@@ -161,6 +161,7 @@ class DownloaderApp(object):
                 for candidate in shakemaps:
                     if candidate.source != "atlas":
                         shakemap = candidate
+                        break
             shakemap.fetch("grid.xml", dataDir)
             shakemap.fetch("info.json", dataDir)
             if not os.path.isfile(os.path.join(dataDir, "info.json.gz")):

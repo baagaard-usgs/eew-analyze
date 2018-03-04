@@ -59,7 +59,8 @@ class AnalysisSummary(object):
         """
         db = AnalysisData(self.config.get("files", "analysis_db"))
         event = db.comcat_event(eqId)
-
+        shakemap = db.comcat_shakemap(eqId)
+        
         # Get alerts
         server = self.config.get("shakealert.production", "server")
         alerts = db.alerts(eqId, server)
@@ -142,7 +143,7 @@ class AnalysisSummary(object):
 
         return
 
-    def _render_event_stats(self, event, alerts, perfStats):
+    def _render_event_stats(self, event, shakemap, alerts, perfStats):
         self.canvas.saveState()
         self.canvas.translate(7.25*inch, 3.5*inch)
 
@@ -152,6 +153,8 @@ class AnalysisSummary(object):
         text.textLine("ANSS")
         text.textLine("   {event[magnitude_type]}{event[magnitude]:.1f}".format(event=event))
         text.textLine("   {ot:%Y-%m-%d %H:%M:%S.%f}".format(ot=ot))
+        text.textLine("ShakeMap")
+        text.textLine("   MMI bias {:%6.2f}".format(shakemap["mmi_bias"]))
 
         # First alert
         alert = alerts[0]

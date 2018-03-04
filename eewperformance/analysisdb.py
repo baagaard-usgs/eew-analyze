@@ -454,6 +454,17 @@ class AnalysisData(object):
         return event
 
     
+    def comcat_shakemap(self, comcatId):
+        """Get ComCat ShakeMap information.
+
+        :type comcatId: str
+        :param comcatId: ComCat event id
+        """
+        self.cursor.execute("SELECT * FROM comcat_shakemaps WHERE event_id=?", (comcatId,))
+        shakemap = self.cursor.fetchone()
+        return shakemap
+
+    
     def tables_info(self):
         """Returns string with database summary.
         """
