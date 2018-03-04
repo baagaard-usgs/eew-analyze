@@ -256,7 +256,7 @@ class DetailEvent(object):
             df = df[df["source"] == prefsource]
             df.sort(order="time")
         elif source == 'all':
-            df.sort(order=["source','time"])
+            df.sort(order=["source", "time"])
         else:
             df = df[df["source"] == source]
             df.sort(order='time')
@@ -272,18 +272,18 @@ class DetailEvent(object):
                 df_source.sort(order="time")
                 if version == VersionOption.PREFERRED:
                     df_source.sort(order=["weight","time"])
-                    index = df_source.iloc[-1]["index"]
-                    pversion = df_source.iloc[-1]["version"]
+                    index = df_source[-1]["index"]
+                    pversion = df_source[-1]["version"]
                     product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                     products.append(product)    
                 elif version == VersionOption.LAST:
-                    index = df_source.iloc[-1]["index"]
-                    pversion = df_source.iloc[-1]["version"]
+                    index = df_source[-1]["index"]
+                    pversion = df_source[-1]["version"]
                     product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                     products.append(product)
                 elif version == VersionOption.FIRST:
-                    index = df_source.iloc[0]["index"]
-                    pversion = df_source.iloc[0]["version"]
+                    index = df_source[0]["index"]
+                    pversion = df_source[0]["version"]
                     product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                     products.append(product)
                 elif version == VersionOption.ALL:

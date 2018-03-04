@@ -15,8 +15,6 @@ import pytz
 
 import numpy
 
-import greatcircle
-
 TABLES = [
     ("eew_alerts", [
         "server TEXT NOT NULL",
@@ -45,6 +43,25 @@ TABLES = [
         "description TEXT",
         "UNIQUE(event_id) ON CONFLICT FAIL",
     ]),
+    ("comcat_shakemaps", [
+        "event_id TEXT NOT NULL PRIMARY KEY",
+        "mmi_bias REAL",
+        "mmi_max REAL",
+        "pga_bias REAL",
+        "pga_max REAL",
+        "pgv_bias REAL",
+        "pgv_max REAL",
+        "psa03_bias REAL",
+        "psa03_max REAL",
+        "psa10_bias REAL",
+        "psa10_max REAL",
+        "psa30_bias REAL",
+        "psa30_max REAL",
+        "gmpe TEXT",
+        "pgm2mi TEXT",
+        "software_version TEXT",
+        "UNIQUE(event_id) ON CONFLICT FAIL",
+    ]),
     ("performance", [
         "comcat_id TEXT NOT NULL",
         "eew_server TEXT NOT NULL",
@@ -66,7 +83,7 @@ TABLES = [
         "population_cost_noeew REAL NOT NULL",
         "population_cost_perfecteew REAL NOT NULL",
         "population_metric REAL NOT NULL",
-        "UNIQUE(comcat_id, eew_server, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
+        "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
     ]),
 ]
 
@@ -169,6 +186,74 @@ class AnalysisData(object):
             logging.getLogger(__name__).debug(str(event))
         return
 
+    def add_shakemap_info(self, info, replace=False):
+        """Add ComCat ShakeMap info to database.
+
+        :type info: dict
+        :param info: ComCat ShakeMap info (from info.json or info.xml).
+        """
+        COLUMNS = (
+            "event_id",
+            "mmi_bias",
+            "mmi_max",
+            "pga_bias",
+            "pga_max",
+            "pgv_bias",
+            "pgv_max",
+            "psa03_bias",
+            "psa03_max",
+            "psa10_bias",
+            "psa10_max",
+            "psa30_bias",
+            "psa30_max",
+            "gmpe",
+            "pgm2mi",
+            "software_version",
+            )
+
+        insertCols = ", ".join(COLUMNS)
+
+        gmmod = info["processing"]["ground_motion_modules"]
+        infoDict = {
+            "event_id": info["event_id"],
+            "mmi_bias": 0.0,
+            "mmi_max": 0.0,
+            "pga_bias": 0.0,
+            "pga_max": 0.0,
+            "pgv_bias": 0.0,
+            "pgv_max": 0.0,
+            "psa03_bias": 0.0,
+            "psa03_max": 0.0,
+            "psa10_bias": 0.0,
+            "psa10_max": 0.0,
+            "psa30_bias": 0.0,
+            "psa30_max": 0.0,
+            "gmpe": gmmod["gmpe"]["module"],
+            "pgm2mi": gmmod["pgm2mi"]["module"],
+            "software_version": info["processing"]["shakemap_versions"]["shakemap_revision"],
+        }
+        # Update infoDict with available values.
+        gm = info["output"]["ground_motions"]
+        for key,value in gm.items():
+            if key != "intensity":
+                infoDict[key+"_bias"] = value["bias"]
+                infoDict[key+"_max"] = value["max"]
+            else:
+                infoDict["mmi_bias"] = value["bias"]
+                infoDict["mmi_max"] = value["max"]
+        infoValues = tuple([infoDict[col] for col in COLUMNS])
+        valueCols = ",".join("?"*len(infoValues))
+        cmd = "INSERT"
+        if replace:
+            cmd += " OR REPLACE"
+        try:
+            self.cursor.execute("{0} INTO comcat_shakemaps({1}) VALUES({2})".format(cmd, insertCols, valueCols), infoValues)
+            self.connection.commit()
+        except sqlite3.IntegrityError as ex:
+            logging.getLogger(__name__).debug(str(ex))
+            logging.getLogger(__name__).debug(str(info))
+        return
+
     def add_performance(self, stats, replace=False):
         """Add performance stats to database.
 
@@ -215,6 +300,8 @@ class AnalysisData(object):
     def find_match(self, comcatId, server):
         """Find initial alert matching ComCat event.
         """
+        import greatcircle
+        
         MAX_DISTANCE_DEG = 3.0
         MAX_DISTANCE_KM = 150.0
         MAX_TIME_SECS = 15.0
@@ -367,7 +454,18 @@ class AnalysisData(object):
         return event
 
     
-    def summary(self):
+    def comcat_shakemap(self, comcatId):
+        """Get ComCat ShakeMap information.
+
+        :type comcatId: str
+        :param comcatId: ComCat event id
+        """
+        self.cursor.execute("SELECT * FROM comcat_shakemaps WHERE event_id=?", (comcatId,))
+        shakemap = self.cursor.fetchone()
+        return shakemap
+
+    
+    def tables_info(self):
         """Returns string with database summary.
         """
         sout = ""
@@ -382,6 +480,38 @@ class AnalysisData(object):
             for column in info:
                 sout += "    {name:16} {type:16}\n".format(name=column[1], type=column[2])
             sout += "  Number of rows: {}\n".format(nrows)
+        return sout
+
+    def summary(self):
+        """Returns string with database summary.
+        """
+        sout = ""
+
+        # Comcat events
+        sout += "\nComCat Events\n"
+        self.cursor.execute("SELECT * FROM comcat_events")
+        rows = self.cursor.fetchall()
+        for row in rows:
+            ot = dateutil.parser.parse(row["origin_time"])
+            sout += "{row[event_id]} {row[longitude]:9.4f} {row[latitude]:8.4f} {row[depth_km]:4.1f} {ot:%Y-%m-%dT%H:%M} {row[magnitude_type]:3s}{row[magnitude]:.2f} {row[description]}\n".format(row=row, ot=ot)
+
+        # Comcat Shakemap
+        sout += "\nShakeMap Info\n"
+        self.cursor.execute("SELECT * FROM comcat_shakemaps")
+        rows = self.cursor.fetchall()
+        for row in rows:
+            event = self.comcat_event(row["event_id"])
+            sout += "{row[event_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[mmi_max]:3.1f} {row[pga_max]:6.2f}%g {row[pgv_max]:5.1f}cm/s {row[mmi_bias]:5.2f} {row[pga_bias]:5.2f} {row[pgv_bias]:5.2f} {row[gmpe]} {row[pgm2mi]} v{row[software_version]} {event[description]}\n".format(row=row, event=event)
+            
+        # Alerts
+
+        # Performance
+        sout += "\nPerformance Data\n"
+        self.cursor.execute("SELECT * FROM performance")
+        rows = self.cursor.fetchall()
+        for row in rows:
+            event = self.comcat_event(row["comcat_id"])
+            sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[mag_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_metric]:6.2f} {row[pop_metric]:6.2f} {event[description]}\n".format(row=row, event=event)
         return sout
 
     def show_matches(self, server):
