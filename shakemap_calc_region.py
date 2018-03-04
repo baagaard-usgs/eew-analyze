@@ -111,7 +111,7 @@ class ShakeMapRegionApp(object):
         
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing events...{:d}%%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing events...{:d}%".format(((iEvent+1)*100)/numEvents))
                 sys.stdout.flush()
 
             dataDir = eventDir.replace("[EVENTID]", eqId)

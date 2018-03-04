@@ -14,6 +14,7 @@ import logging
 import datetime
 import dateutil.parser
 import gzip
+from lxml import etree
 
 from eewperformance import comcat
 from eewperformance import shakealert
@@ -141,27 +142,37 @@ class DownloaderApp(object):
     def _fetch_shakemaps(self):
         """Fetch geojson event file from USGS ComCat using web services.
         """
-        if self.showProgress:
-            print("Fetching ShakeMaps...")
-
         event = comcat.DetailEvent()
         dirTemplate = self.config.get("files", "event_dir")
-        for eqId in self.config.options("events"):
+        events = self.config.options("events")
+        numEvents = len(events)
+        for iEvent, eqId in enumerate(events):
+            if self.showProgress:
+                sys.stdout.write("\rFetching ShakeMaps...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.flush()
+
+            
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
             event.load(os.path.join(dataDir, eqId+".geojson"))
-            shakemap = event.get_product("shakemap")
-            if len(shakemap) > 1:
-                raise ValueError("Expected to get preferred ShakeMap.")
-            shakemap[0].fetch("grid.xml", dataDir)
-            shakemap[0].fetch("info.json", dataDir)
+            shakemaps = event.get_product("shakemap", source="all")
+            shakemap = shakemaps[0]
+            if len(shakemaps) > 1:
+                # Avoid "atlas" source
+                for candidate in shakemaps:
+                    if candidate.source != "atlas":
+                        shakemap = candidate
+            shakemap.fetch("grid.xml", dataDir)
+            shakemap.fetch("info.json", dataDir)
             if not os.path.isfile(os.path.join(dataDir, "info.json.gz")):
-                shakemap[0].fetch("info.xml", dataDir)
+                shakemap.fetch("info.xml", dataDir)
                 if not os.path.isfile(os.path.join(dataDir, "info.xml.gz")):
                     logging.getLogger(__name__).error("Could not retrieve ShakeMap info JSON or XML file for {}.".format(eqId))
                 else:
                     logging.getLogger(__name__).info("Performing minimal conversion of ShakeMap info XML file to JSON for {}.".format(eqId))
-                    #self._extract_shakemap_info(dataDir)
-                
+                    self._extract_shakemap_info(dataDir)
+
+        if self.showProgress:
+            sys.stdout.write("\n")
         return
 
 
@@ -170,26 +181,39 @@ class DownloaderApp(object):
 
         Get MMI bias.
         """
+        def _get_value(element, pattern, default):
+
+            target = element.xpath(pattern)
+            value = default
+            if len(target) == 1:
+                value = target[0].get("value")
+            elif len(target) > 1:
+                raise ValueError("Found multiple values for {} in element {}.".format(pattern, element.text))
+            return value
+        
         with gzip.open(os.path.join(dataDir, "info.xml.gz"), "r") as fxml:
 
             bytes = fxml.read()
             elRoot = etree.fromstring(bytes) # info
 
             # Values
-            mmiBias = float(elRoot.xpath("tag[@name='mi_bias']")[0].get("value"))
-            pgmBias = tuple(map(float, elRoot.xpath("tag[@name='bias']")[0].get("value").split()))
+            mmiBias = float(_get_value(elRoot, "tag[@name='mi_bias']", default=0.0))
+            pgmBias = tuple(map(float, _get_value(elRoot, "tag[@name='bias']", default=["0 0 0 0 0"]).split()))
             (pgaBias, pgvBias, psa03Bias, psa10Bias, psa30Bias) = pgmBias
 
-            mmiMax = float(elRoot.xpath("tag[@name='mi_max']")[0].get("value"))
-            pgvMax = float(elRoot.xpath("tag[@name='pgv_max']")[0].get("value"))
-            pgaMax = float(elRoot.xpath("tag[@name='pga_max']")[0].get("value"))
-            psa03Max = float(elRoot.xpath("tag[@name='psa03_max']")[0].get("value"))
-            psa10Max = float(elRoot.xpath("tag[@name='psa10_max']")[0].get("value"))
-            psa30Max = float(elRoot.xpath("tag[@name='psa30_max']")[0].get("value"))
-    
-            gmpeStr = elRoot.xpath("tag[@name='GMPE']")[0].get("value")
-            pgm2miStr = elRoot.xpath("tag[@name='pgm2mi']")[0].get("value")
-            shakemapVer = elRoot.xpath("tag[@name='ShakeMap revision']")[0].get("value")
+            mmiMax = float(_get_value(elRoot, "tag[@name='mi_max']", default=0.0))
+            pgvMax = float(_get_value(elRoot, "tag[@name='pgv_max']", default=0.0))
+            pgaMax = float(_get_value(elRoot, "tag[@name='pga_max']", default=0.0))
+            psa03Max = float(_get_value(elRoot, "tag[@name='psa03_max']", default=0.0))
+            psa10Max = float(_get_value(elRoot, "tag[@name='psa10_max']", default=0.0))
+            psa30Max = float(_get_value(elRoot, "tag[@name='psa30_max']", default=0.0))
+
+            boundingBox = tuple(map(float, _get_value(elRoot, "tag[@name='map_bound']", default=["0/0/0/0"]).split("/")))
+            (longitudeMin, longitudeMax, latitudeMin, latitudeMax) = boundingBox
+            
+            gmpeStr = _get_value(elRoot, "tag[@name='GMPE']", default="unknown")
+            pgm2miStr = _get_value(elRoot, "tag[@name='pgm2mi']", default="unknown")
+            shakemapVer = _get_value(elRoot, "tag[@name='ShakeMap revision']", default="unknown")
 
             data = {
                 "output": {
@@ -223,6 +247,16 @@ class DownloaderApp(object):
                             "bias": psa30Bias,
                             "max": psa30Max,
                             "units": "%g",
+                        },
+                    },
+                   "map_information": {
+                       "min": {
+                           "latitude": latitudeMin,
+                           "longitude": longitudeMin,
+                        },
+                        "max": {
+                            "latitude": latitudeMax,
+                            "longitude": longitudeMax,
                         },
                     },
                 },
@@ -276,7 +310,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...{:d}%%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)/numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -296,7 +330,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...{:d}%%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)/numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -346,7 +380,7 @@ class DownloaderApp(object):
         logging.getLogger(__name__).info("Processing {:d} DM logs starting with {:s}.".format(numFiles, files[0]))
         for iFile,filename in enumerate(files):
             if self.showProgress:
-                sys.stdout.write("\rProcessing DM logs...{:d}%%".format(((iFile+1)*100)/numFiles))
+                sys.stdout.write("\rProcessing DM logs...{:d}%".format(((iFile+1)*100)/numFiles))
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
             self.db.add_alerts(alerts, replace)
