@@ -435,7 +435,7 @@ class DownloaderApp(object):
         parser.add_argument("--fetch-events", action="store_true", dest="fetch_events")
         parser.add_argument("--fetch-shakemaps", action="store_true", dest="fetch_shakemaps")
         parser.add_argument("--db-init", action="store", dest="db_init", choices=["eew_alerts", "comcat_events", "comcat_shakemaps", "performance", "all"])
-        parser.add_argument("--db-summary", action="store", dest="db_summary", default=None, choices=[None, "tables_only", "summary"])
+        parser.add_argument("--db-summary", action="store", dest="db_summary", default=None, choices=[None, "tables_info", "summary"])
         parser.add_argument("--db-populate", action="store", dest="db_populate", choices=["all_eew_alerts", "new_eew_alerts", "comcat_events", "comcat_shakemaps", "all"])
         parser.add_argument("--db-replace-rows", action="store_true", dest="db_replace_rows")
         parser.add_argument("--show-matches", action="store_true", dest="show_matches")
