@@ -75,8 +75,9 @@ class MapPanels(object):
         for iband in range(rasterData.RasterCount):
             band = rasterData.GetRasterBand(1+iband)
             description = band.GetDescription()
-            print iband, description
-            self.data["layers"][description] = numpy.array(band.ReadAsArray())
+            data = numpy.array(band.ReadAsArray())
+            data = numpy.ma.masked_values(data, band.GetNoDataValue())
+            self.data["layers"][description] = data
 
         self._mmi_colormap()
         return    
@@ -91,25 +92,19 @@ class MapPanels(object):
         dataCRS = self.data["crs"]
         
         mmi = self.data["layers"]["mmi_obs"]
-        ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
+        im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
         contourLevels = numpy.arange(1.0, 10.01, 0.5)
         chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
         ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
 
-        ax.set_title("Observed Shaking")
-
-        #colorbar = pyplot.colorbar(cmap="MMI")
-        #colorbar.set_label("MMI")
-
         # Epicenter
 
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.eqId)
-        filename += "-map_mmi_obs.jpg"
-        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
+        ax.set_title("Observed Shaking")
+        colorbar = pyplot.colorbar(im)
+        colorbar.set_label("MMI")
+
+        self._save(figure, "mmi_obs")
         return
 
     def mmi_predicted(self):
@@ -122,36 +117,27 @@ class MapPanels(object):
         dataCRS = self.data["crs"]
         
         mmi = self.data["layers"]["mmi_pred"]
-        ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
+        im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
         contourLevels = numpy.arange(1.0, 10.01, 0.5)
         chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
         ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
 
-        ax.set_title("ShakeAlert Predicted Shaking")
-
-        #colorbar = pyplot.colorbar(cmap="MMI")
-        #colorbar.set_label("MMI")
-
         # Epicenter
 
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.eqId)
-        filename += "-map_mmi_pred.jpg"
+        ax.set_title("ShakeAlert Predicted Shaking")
+        colorbar = pyplot.colorbar(im)
+        colorbar.set_label("MMI")
+
+        self._save(figure, "mmi_pred")
         # if self.alert
         # :TODO:
-        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         return
 
     def mmi_residual(self):
-        # residual (observed - predicted)
-        mmiObs = self.data["mmi_obs"]
-        mmiPred = self.data["mmi_pred"]
-        noDataValue = gdalraster.NO_DATA_VALUE
-        mask = mmiPred != noDataValue
-        mmiResidual = mask*(mmiObs - mmiPred) + ~mask*noDataValue
+        mmiObs = self.data["layers"]["mmi_obs"]
+        mmiPred = self.data["layers"]["mmi_pred"]
+        mmiResidual = mmiObs - mmiPred
 
         figure = self._create_figure()
         ax = figure.gca()
@@ -159,25 +145,21 @@ class MapPanels(object):
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
         
-        ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="BlueRed", alpha=0.67, zorder=2)
+        im = ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="RdBu_r", alpha=0.67, zorder=2)
+        noData = numpy.ma.masked_array(numpy.ones(mmiResidual.shape), ~mmiResidual.mask)
+        ax.imshow(noData, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", vmin=0, vmax=1, alpha=0.3, zorder=3)
 
         contourLevels = numpy.arange(-2.0, 2.01, 0.5)
-        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        chandle = ax.contour(mmiResidual, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
         ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
-
-        ax.set_title("MMI Residual")
-
-        #colorbar = pyplot.colorbar(cmap="MMI")
-        #colorbar.set_label("MMI")
 
         # Epicenter
 
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.eqId)
-        filename += "-map_mmi_residual.jpg"
-        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
+        ax.set_title("MMI Residual")
+        colorbar = pyplot.colorbar(im)
+        colorbar.set_label("Residual (Obs-Pred)")
+
+        self._save(figure, "mmi_residual")
         return
 
     def mmi_warning_time(self, t):
@@ -213,7 +195,8 @@ class MapPanels(object):
         warningContours = self.dataLayers["warning_time_contour"]
         self._set_warning_time_style(warningContours)
         self._add_labels(warningContours)
-            
+
+        
         #epicenter = self.dataLayers["epicenter_obs"]
         # :TODO: set style
         
@@ -274,13 +257,15 @@ class MapPanels(object):
         ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")        
         return figure
     
-    def _set_warning_time_style(self, layer):
-        dashed = [2, 2]
-        contour_rules = (
-            ("negative", '"value" < 0.0', "#666666", dashed,),
-            ("positive", '"value" >= 0.0', "#000000", None,),
-        )
+    def _save(self, figure, label):
+        """
+        """
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_label(self.config, self.eqId)
+        filename += "-map_{}.jpg".format(label)
+        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         return
-
     
 # End of file
