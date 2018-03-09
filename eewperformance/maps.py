@@ -80,6 +80,7 @@ class MapPanels(object):
             self.data["layers"][description] = data
 
         self._mmi_colormap()
+        self._alert_colormap()
         return    
 
     def mmi_observed(self):
@@ -184,12 +185,30 @@ class MapPanels(object):
         return
 
     def alert_category(self):
-        basemap = self.baseLayers["basemap"]
+        figure = self._create_figure()
+        ax = figure.gca()
         
-        popDensity = self.dataLayers["population_density"]
-        popDensity.loadNamedStyle("pop_density.qml")
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
+        
+        popDensity = self.data["layers"]["population_density"]
+        norm = colors.LogNorm(vmin=0.01, vmax=1000)
+        ax.imshow(popDensity, norm=norm, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", alpha=0.5, zorder=2)
 
         category = self.dataLayers["alert_category"]
+        im = ax.imshow(category, extent=dataExtent, transform=dataCRS, origin="upper", cmap="AlertCategory", vmin=0, vmax=4, alpha=0.67, zorder=3)
+
+        # Warning time contours
+        
+        # Epicenter
+
+        ax.set_title("Alert Category and Warning Time (s)")
+        colorbar = pyplot.colorbar(im)
+        colorbar.set_label("Alert Category")
+
+        self._save(figure, "mmi_residual")
+        
+
         category.loadNamedStyle("alert_category.qml")
 
         warningContours = self.dataLayers["warning_time_contour"]
@@ -203,6 +222,17 @@ class MapPanels(object):
         self._render([warningContours, category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category], legendTitle="Alert Category", title="Alert Classification and Warning Time (s)") # , Alert Threshold: MMI X.X
         return
 
+    def _alert_colormap(self):
+        colors = (
+            "#abd9e9", # TN
+            "#d7191c", # FN
+            "#fdae61", # FP
+            "#2c7bb6", # TP
+            )
+        alertcmap = colors.ListedColormap(colors)
+        pyplot.register_cmap(name="AlertCategory", data=cdict)
+        return
+    
     def _mmi_colormap(self):
         cdict = {
             'red': [
@@ -236,8 +266,8 @@ class MapPanels(object):
                 (10.0/10.0,   0.0/255.0,   0.0/255.0),
                 ],
             }
-        mmicmap = colors.LinearSegmentedColormap('MMI', cdict)
-        pyplot.register_cmap(name='MMI', data=cdict)
+        mmicmap = colors.LinearSegmentedColormap("MMI", cdict)
+        pyplot.register_cmap(name="MMI", data=cdict)
         return
     
 
