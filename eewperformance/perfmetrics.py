@@ -18,9 +18,8 @@ class CostSavings(object):
     """Cost savings weighted by area and population.
     """
     
-    def __init__(self, config, maps):
+    def __init__(self, config):
         self.config = config
-        self.maps = maps
         return
 
     def compute(self, event, shakemap, alerts, shakingTime, populationDensity, magAlertThreshold, mmiAlertThreshold, plotAlertMaps=False):
@@ -69,9 +68,10 @@ class CostSavings(object):
                     ("warning_time", analysis_utils.timedelta_to_seconds(warningTimeCur),),
                 ]
                 gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
-                self.maps.load_data(event["event_id"], alert=alert)
+                mapPanels = maps.MapPanels(self.config)
+                mapPanels.load_data(event["event_id"], alert=alert)
                 tafterOT = analysis_utils.timedelta_to_seconds(numpy.datetime64(alert["timestamp"])-numpy.datetime64(event["origin_time"]))
-                self.maps.mmi_warning_time(tafterOT)
+                mapPanels.mmi_warning_time(tafterOT)
             
             # Update alert time if greater than previous
             maskAlert = numpy.bitwise_and(warningTimeCur > warningTime, mmiPredCur >= mmiAlertThreshold)

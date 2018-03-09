@@ -7,16 +7,17 @@
 #
 
 import os
+from importlib import import_module
 import numpy
 
-import qgis.core
-import qgis.gui
-import PyQt4.QtCore
-import PyQt4.QtGui
+import matplotlib.pyplot as pyplot
+import matplotlib.colors as colors
 from osgeo import gdal, osr
+from cartopy import crs
+
+from cartopy_extra_tiles import cached_tiler
 
 import gdalraster
-import qgisconverter
 import analysis_utils
 
 gdal.UseExceptions()
@@ -29,47 +30,17 @@ class MapPanels(object):
         :type config: ConfigParser
         :param config: Configuration for application.
         """
-        self.config = config        
+        self.config = config
 
-        self.baseLayers = {}
-        self.dataLayers = {}
-
-        self._initQgis()
-
-        self.fontFamily = "Arial Narrow"
+        self.eqId = None
+        self.alert = None
+        self.data = None
         return
     
-    def __del__(self):
-        """
-        """
-        self._exitQgis()
-        return
-
-    def load_basemap(self):
-        if self.baseLayers.has_key("basemap"):
-            return
-        
-        filename = self.config.get("maps", "basemap")
-        basemap = qgis.core.QgsRasterLayer(filename)
-        if not basemap.isValid():
-            raise IOError("Could not load basemap from '{}'.".format(filename))
-        basemap.loadNamedStyle("basemap.qml")
-        self.baseLayers["basemap"] = basemap
-
-        layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
-        layerRegistry.addMapLayers([layer for layer in self.baseLayers.values()], False)
-        return
-
     def load_data(self, eqId, alert=None):
         """
         :type eqId: str
         :param eqId: ComCat earthquake id.
-
-        :type config: ConfigParser
-        :param config: Configuration for application.
-
-        :type filename: str
-        :param config: Filename for analysis data in GDAL raster file.
 
         :type alert: dict
         :param alert: ShakeAlert alert information from analysis database.
@@ -77,107 +48,136 @@ class MapPanels(object):
         self.eqId = eqId
         self.alert = alert
 
-        layerRegistry = qgis.core.QgsMapLayerRegistry.instance()
-        layerRegistry.removeMapLayers([layer for layer in self.dataLayers.values()])
-        self.dataLayers = {}
-
-        # Generate temporary virtual raster bands
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, eqId) + ".tiff")
-        src = gdal.Open(filename, gdal.GA_ReadOnly)
-        for name,layer in qgisconverter.extract_raster_bands(src).items():
-            self.dataLayers[name] = layer
+        rasterData = gdal.Open(filename, gdal.GA_ReadOnly)
 
-        # Contours from temporary virtual raster bands.
-        values = ("mmi_obs", "mmi_pred", "warning_time",) if self.alert is None else ("mmi_pred", "warning_time",)
-        for value in values:
-            if value in ("mmi_obs", "mmi_pred",):
-                cstart = 1.5
-                cinterval = 0.5
-                clevels = []
-            else:
-                cstart = 0
-                cinterval = 2.0
-                clevels = []
-            cvalue = value+"_contour"
-            ogrLayer = gdalraster.contours_from_raster(src, value, cstart, cinterval, clevels)
-            fileSuffix = "_{}.shp".format(cvalue)
-            filenameLayer = filename.replace(".tiff", fileSuffix)
-            self.dataLayers[cvalue] = qgisconverter.ogr_to_qgisvector(ogrLayer, filenameLayer)
+        srs = osr.SpatialReference()
+        srs.ImportFromWkt(rasterData.GetProjection())
+        if srs.GetAuthorityCode("GEOGCS") == "4326":
+            rasterCRS = crs.PlateCarree()
+        else:
+            rasterCRS = crs.epsg(srs.GeoAuthorityCode("PROJCS"))
 
-        if self.dataLayers.has_key("mmi_obs") and self.dataLayers.has_key("mmi_pred"):
-            # MMI residual (observed - predicted)
-            mmiObs = numpy.array(src.GetRasterBand(1).ReadAsArray())
-            mmiPred = numpy.array(src.GetRasterBand(2).ReadAsArray())
-            noDataValue = src.GetRasterBand(2).GetNoDataValue()
-            mask = mmiPred != noDataValue
-            mmiResidual = mask*(mmiObs - mmiPred) + ~mask*noDataValue
-            filenameResidual = filename.replace(".tiff", "-mmi_residual.tiff")
-            gdalLayer = gdalraster.clone_new_data("mmi_residual", mmiResidual, src, noDataValue=None)
-            self.dataLayers["mmi_residual"] = qgisconverter.gdal_to_qgisraster(gdalLayer, filenameResidual)
-            del gdalLayer
+        geot = rasterData.GetGeoTransform()
+        extent = (
+            geot[0],
+            geot[0] + rasterData.RasterXSize * geot[1],
+            geot[3] + rasterData.RasterYSize * geot[5],
+            geot[3]
+        )
 
-        del src
+        self.data = {
+            "crs": rasterCRS,
+            "extent": extent,
+            "layers": {},
+        }
+        for iband in range(rasterData.RasterCount):
+            band = rasterData.GetRasterBand(1+iband)
+            description = band.GetDescription()
+            print iband, description
+            self.data["layers"][description] = numpy.array(band.ReadAsArray())
 
-        layerRegistry.addMapLayers([layer for layer in self.dataLayers.values()], False)
-        return # TEMPORARY
-    
-        # Epicenter
-        options = "delimiter={delimiter}&crs=EPSG:4326&xField={x}&yField={}".format(delimiter="|", x="longitude", y="latitude")
-        uri = "file://{filename}&{options}".format(filename, options)
-        self.dataLayers["epicenter_obs"] = qgis.core.QgsVectorLayer(uri, "epicenter_obs", "delimitedtext")
-
-        uri = "file://{filename}&{options}".format(filename, options)
-        self.dataLayers["epicenter_pred"] = qgis.core.QgsVectorLayer(uri, "epicenter_pred", "delimitedtext")
-        
+        self._mmi_colormap()
         return    
 
     def mmi_observed(self):
         """Create map with observed MMI with contours.
         """
-        basemap = self.baseLayers["basemap"]
+        figure = self._create_figure()
+        ax = figure.gca()
         
-        mmi = self.dataLayers["mmi_obs"]
-        mmi.loadNamedStyle("mmi.qml")
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
+        
+        mmi = self.data["layers"]["mmi_obs"]
+        ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
-        mmiContours = self.dataLayers["mmi_obs_contour"]
-        self._set_contour_style(mmiContours)
-        self._add_labels(mmiContours)
-            
-        #epicenter = self.dataLayers["epicenter_obs"]
-        # :TODO: set style
-        
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_obs", "jpg", legendLayers=[mmi], legendTitle="MMI", title="Observed Shaking")
+        contourLevels = numpy.arange(1.0, 10.01, 0.5)
+        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
+
+        ax.set_title("Observed Shaking")
+
+        #colorbar = pyplot.colorbar(cmap="MMI")
+        #colorbar.set_label("MMI")
+
+        # Epicenter
+
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_label(self.config, self.eqId)
+        filename += "-map_mmi_obs.jpg"
+        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         return
 
     def mmi_predicted(self):
         """Create map with observed MMI with contours.
         """
-        basemap = self.baseLayers["basemap"]
+        figure = self._create_figure()
+        ax = figure.gca()
         
-        mmi = self.dataLayers["mmi_pred"]
-        mmi.loadNamedStyle("mmi.qml")
-
-        mmiContours = self.dataLayers["mmi_pred_contour"]
-        self._set_contour_style(mmiContours)
-        self._add_labels(mmiContours)
-
-        #epicenter = self.dataLayers["epicenter_obs"]
-        # :TODO: set style
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
         
-        self._render([mmiContours, mmi, basemap], mmi.extent(), "mmi_pred", "jpg", legendLayers=[mmi], legendTitle="MMI", title="ShakeAlert Predicted Shaking")
+        mmi = self.data["layers"]["mmi_pred"]
+        ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
+
+        contourLevels = numpy.arange(1.0, 10.01, 0.5)
+        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
+
+        ax.set_title("ShakeAlert Predicted Shaking")
+
+        #colorbar = pyplot.colorbar(cmap="MMI")
+        #colorbar.set_label("MMI")
+
+        # Epicenter
+
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_label(self.config, self.eqId)
+        filename += "-map_mmi_pred.jpg"
+        # if self.alert
+        # :TODO:
+        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         return
 
     def mmi_residual(self):
-        basemap = self.baseLayers["basemap"]
-        
-        mmiResidual = self.dataLayers["mmi_residual"]
-        mmiResidual.loadNamedStyle("mmi_residual.qml")
+        # residual (observed - predicted)
+        mmiObs = self.data["mmi_obs"]
+        mmiPred = self.data["mmi_pred"]
+        noDataValue = gdalraster.NO_DATA_VALUE
+        mask = mmiPred != noDataValue
+        mmiResidual = mask*(mmiObs - mmiPred) + ~mask*noDataValue
 
-        #epicenter = self.dataLayers["epicenter_obs"]
-        # :TODO: set style
+        figure = self._create_figure()
+        ax = figure.gca()
         
-        self._render([mmiResidual, basemap], mmiResidual.extent(), "mmi_residual", "jpg", legendLayers=[mmiResidual], legendTitle="Residual (Obs - Pred)", title="MMI Residual")
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
+        
+        ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="BlueRed", alpha=0.67, zorder=2)
+
+        contourLevels = numpy.arange(-2.0, 2.01, 0.5)
+        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
+
+        ax.set_title("MMI Residual")
+
+        #colorbar = pyplot.colorbar(cmap="MMI")
+        #colorbar.set_label("MMI")
+
+        # Epicenter
+
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_label(self.config, self.eqId)
+        filename += "-map_mmi_residual.jpg"
+        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         return
 
     def mmi_warning_time(self, t):
@@ -220,188 +220,67 @@ class MapPanels(object):
         self._render([warningContours, category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category], legendTitle="Alert Category", title="Alert Classification and Warning Time (s)") # , Alert Threshold: MMI X.X
         return
 
-    def _add_labels(self, layer):
-        labels = qgis.core.QgsPalLayerSettings()
-        labels.readFromLayer(layer)
-        labels.enabled = True
-        labels.fieldName = "value"
-        labels.fontSizeInMapUnits = False
-        labels.fontLimitPixelSize = True
-        labels.fontMinPixelSize = 6
-        labels.textFont.setFamily(self.fontFamily)
-        labels.textFont.setPointSize(8)
-        labels.textFont.setWeight(labels.textFont.Normal)
-        labels.textColor = PyQt4.QtGui.QColor("#000000")
-        labels.placement = qgis.core.QgsPalLayerSettings.AboveLine
-        labels.writeToLayer(layer)
+    def _mmi_colormap(self):
+        cdict = {
+            'red': [
+                (0.0/10.0, 255.0/255.0, 255.0/255.0),
+                (1.0/10.0, 255.0/255.0, 255.0/255.0),
+                (2.0/10.0, 191.0/255.0, 191.0/255.0),
+                (3.0/10.0, 160.0/255.0, 160.0/255.0),
+                (4.0/10.0, 128.0/255.0, 128.0/255.0),
+                (5.0/10.0, 122.0/255.0, 122.0/255.0),
+                (6.0/10.0, 255.0/255.0, 255.0/255.0),
+                (10.0/10.0, 200.0/255.0, 200.0/255.0),
+                ],
+            'green': [
+                (0.0/10.0, 255.0/255.0, 255.0/255.0),
+                (1.0/10.0, 255.0/255.0, 255.0/255.0),
+                (2.0/10.0, 204.0/255.0, 204.0/255.0),
+                (3.0/10.0, 230.0/255.0, 230.0/255.0),
+                (4.0/10.0, 255.0/255.0, 255.0/255.0),
+                (5.0/10.0, 255.0/255.0, 255.0/255.0),
+                (6.0/10.0, 255.0/255.0, 255.0/255.0),
+                (7.0/10.0, 200.0/255.0, 200.0/255.0),
+                (8.0/10.0, 145.0/255.0, 145.0/255.0),
+                (9.0/10.0,   0.0/255.0,   0.0/255.0),
+                (10.0/10.0,  0.0/255.0,   0.0/255.0),
+                ],
+            'blue': [
+                (0.0/10.0, 255.0/255.0, 255.0/255.0),
+                (4.0/10.0, 255.0/255.0, 255.0/255.0),
+                (5.0/10.0, 147.0/255.0, 147.0/255.0),
+                (6.0/10.0,   0.0/255.0,   0.0/255.0),
+                (10.0/10.0,   0.0/255.0,   0.0/255.0),
+                ],
+            }
+        mmicmap = colors.LinearSegmentedColormap('MMI', cdict)
+        pyplot.register_cmap(name='MMI', data=cdict)
         return
+    
 
-    def _set_contour_style(self, layer):
-        symbolLayer = layer.rendererV2().symbol().symbolLayer(0)
-        symbolLayer.setColor(PyQt4.QtGui.QColor("#000000")) # works
-        symbolLayer.setWidth(1.5)
-        symbolLayer.setWidthUnit(qgis.core.QgsSymbolV2.Pixel)
-        return
+    def _create_figure(self):
+        tilerPath = self.config.get("maps", "tiler").split(".")
+        tilerObj = getattr(import_module(".".join(tilerPath[:-1])), tilerPath[-1])
+        tilerStyle = self.config.get("maps", "tiler_style")
+        tilerZoom = self.config.getint("maps", "zoom_level")
+        tilesDir = self.config.get("maps", "tiler_cache_dir")
+        tiler = cached_tiler.CachedTiler(tilerObj(desired_tile_form="L", style=tilerStyle), cache_dir=tilesDir)
 
+        figWidthIn = self.config.getfloat("maps", "width_in")
+        figHeightIn = self.config.getfloat("maps", "height_in")
+        figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
+        ax = pyplot.axes(projection=tiler.crs)
+        ax.set_extent(self.data["extent"])
+        ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")        
+        return figure
+    
     def _set_warning_time_style(self, layer):
         dashed = [2, 2]
         contour_rules = (
             ("negative", '"value" < 0.0', "#666666", dashed,),
             ("positive", '"value" >= 0.0', "#000000", None,),
         )
-        symbol = qgis.core.QgsSymbolV2.defaultSymbol(layer.geometryType())
-        renderer = qgis.core.QgsRuleBasedRendererV2(symbol)
-
-        root_rule = renderer.rootRule()
-
-        for label, expression, lineColor, lineStyle in contour_rules:
-            rule = root_rule.children()[0].clone()
-            rule.setLabel(label)
-            rule.setFilterExpression(expression)
-            rule.symbol().setColor(PyQt4.QtGui.QColor(lineColor))
-            symbolLayer = rule.symbol().symbolLayer(0)
-            if lineStyle is None:
-                symbolLayer.setPenStyle(PyQt4.QtCore.Qt.SolidLine)
-            else:
-                symbolLayer.setCustomDashPatternUnit(symbol.MM)
-                symbolLayer.setCustomDashVector(lineStyle)
-                symbolLayer.setUseCustomDashPattern(True)
-            root_rule.appendChild(rule)
-
-        root_rule.removeChildAt(0)
-        layer.setRendererV2(renderer)
         return
 
     
-    def _render(self, layers, extent, name, format, legendLayers=None, legendTitle=None, title=None):
-        """Render image to file in given format.
-        """
-        imageWidth = self.config.getint("maps", "width_pixels")
-        imageHeight = self.config.getint("maps", "height_pixels")
-        canvas = qgis.gui.QgsMapCanvas()
-        canvas.setCanvasColor(PyQt4.QtCore.Qt.white)
-        canvas.enableAntiAliasing(True)
-        canvas.setExtent(extent)
-        canvas.setLayerSet([qgis.gui.QgsMapCanvasLayer(layer) for layer in layers])
-        canvas.window().resize(imageWidth, imageHeight)
-        canvas.setScaleLocked(True)
-        renderer = canvas.mapRenderer()
-        
-        projection = self.config.get("maps", "projection")
-        renderer.setDestinationCrs(qgis.core.QgsCoordinateReferenceSystem(projection))
-        renderer.setProjectionsEnabled(True)
-
-        bgColor = self.config.get("maps", "bg_color")
-
-        composer = qgis.core.QgsComposition(renderer)
-        composer.setPlotStyle(qgis.core.QgsComposition.Print)
-        dpmm = 150 / 25.4
-        composer.setPaperSize(imageWidth/dpmm, imageHeight/dpmm)
-        composer.setPrintResolution(dpmm*25.4)
-
-        # Map
-        x, y = 0,0
-        w, h = composer.paperWidth(), composer.paperHeight()
-        map = qgis.core.QgsComposerMap(composer, x, y, w, h)
-        #grid = map.grid()
-        #grid.setUnits(grid.MapUnit)
-        #grid.setIntervalX(0.5)
-        #grid.setIntervalY(0.5)
-        #grid.setFrameStyle(grid.Zebra)
-        #grid.setStyle(grid.FrameAnnotationsOnly)
-        #grid.setAnnotationFormat(grid.Decimal)
-        #grid.setAnnotationPrecision(2)
-        #grid.setFrameSideFlag(grid.FrameLeft)
-        composer.addItem(map)
-
-        # Scale bar
-        scale = qgis.core.QgsComposerScaleBar(composer)
-        scale.setStyle('Single Box') # optionally modify the style
-        scale.setComposerMap(map)
-        scale.applyDefaultSize()
-        scale.setNumSegmentsLeft(0)
-        scale.setNumSegments(2)
-        scale.setFont(PyQt4.QtGui.QFont(self.fontFamily, 8))
-        scale.setHeight(1.5)
-        scale.setLabelBarSpace(1.0)
-        scale.setItemPosition(0.0, composer.paperHeight(), scale.LowerLeft)
-        composer.addItem(scale)
-
-        # Title/label
-        if title:
-            label = qgis.core.QgsComposerLabel(composer)
-            label.setText(title)
-            label.setHAlign(PyQt4.QtCore.Qt.AlignCenter)
-            label.setFont(PyQt4.QtGui.QFont(self.fontFamily, 12, PyQt4.QtGui.QFont.Bold))
-            label.adjustSizeToText()
-            label.setItemPosition(0.5*composer.paperWidth(), 0, label.UpperMiddle)
-            composer.addItem(label)
-
-        # Legend
-        if legendLayers:
-            legend = qgis.core.QgsComposerLegend(composer)
-            legend.modelV2().rootGroup().removeAllChildren()
-            for layer in legendLayers:
-                legend.modelV2().rootGroup().addLayer(layer)
-            legend.setBoxSpace(0.5)
-            legendSize = legend.paintAndDetermineSize(None)
-            legend.setItemPosition(composer.paperWidth()-legendSize.width(), composer.paperHeight()-legendSize.height())
-            legend.setStyleFont(qgis.core.QgsComposerLegendStyle.Title, PyQt4.QtGui.QFont(self.fontFamily, 10))
-            legend.setStyleFont(qgis.core.QgsComposerLegendStyle.SymbolLabel, PyQt4.QtGui.QFont(self.fontFamily, 8))
-            if legendTitle:
-                legend.setTitle(legendTitle)
-            legend.setBackgroundColor(PyQt4.QtGui.QColor(255, 255, 255, 128))
-            composer.addItem(legend)
-
-        # create output image and initialize it
-        image = PyQt4.QtGui.QImage(PyQt4.QtCore.QSize(imageWidth, imageHeight), PyQt4.QtGui.QImage.Format_ARGB32)
-        image.setDotsPerMeterX(dpmm * 1000)
-        image.setDotsPerMeterY(dpmm * 1000)
-        image.fill(PyQt4.QtGui.QColor(bgColor))
-
-        # render the composition
-        painter = PyQt4.QtGui.QPainter(image)
-        composer.renderPage(painter, 0)
-        painter.end()
-
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.eqId)
-        if self.alert is None:
-            filename += "-map_{name}.{format}".format(eq=self.eqId, name=name, format=format)
-        else:
-            filename += "-alert{ver:03d}_map_{name}.{format}".format(eq=self.eqId, ver=self.alert["version"], name=name, format=format)
-        image.save(os.path.join(plotsDir, filename), format)
-        return
-
-    def _initQgis(self):
-        self.qgis = qgis.core.QgsApplication([], True)
-        qgisPrefixPath = self.config.get("qgis", "prefix_path")
-        if qgisPrefixPath != "None":
-            # "/Applications/QGIS.app/Contents/MacOS"
-            qgis.core.QgsApplication.setPrefixPath(qgisPrefixPath, True)
-        self.qgis.initQgis()
-        return
-
-    def _exitQgis(self):
-        TEMPORARY_LAYERS = [
-            "mmi_obs",
-            "mmi_obs_contours",
-            "mmi_pred",
-            "mmi_pred_contours",
-            "warning_time",
-            "population_density",
-        ]
-
-        import subprocess
-        for name in TEMPORARY_LAYERS:
-            if name in self.dataLayers:
-                filename = self.dataLayers[name].source()
-                subprocess.call("rm {}".format(filename), shell=True)
-        self.dataLayers = {}
-                
-        if self.qgis:
-            self.qgis.exitQgis()
-
-        return
+# End of file

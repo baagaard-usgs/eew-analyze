@@ -15,9 +15,9 @@ from importlib import import_module
 import multiprocessing
 import numpy
 
-from eewperformance import shakemap # OpenQuake before osgeo
 from eewperformance import analysisdb
 from eewperformance import perfmetrics
+from eewperformance import shakemap
 from eewperformance import maps
 from eewperformance import plotsxy
 from eewperformance import reports
@@ -80,11 +80,13 @@ prefix_path = None
 # PYTHONPATH=/Applications/QGIS.app/Contents/Resources/python:$PYTHONPATH
 
 [maps]
-projection = EPSG:3857
-width_pixels = 1280
-height_pixels = 1024
-bg_color = white
-basemap = esri_streetmap.xml
+tiler = cartopy_extra_tiles.esri_tiles.ESRI
+tiler_style = streetmap
+tiler_cache_dir = ~/data_scratch/images/tiles
+#projection = EPSG:3857
+zoom_level = 8
+width_in = 8.0
+height_in = 8.0
 
 [files]
 event_dir = ./data/[EVENTID]/
@@ -92,7 +94,7 @@ analysis_cache_dir = ./data/cache/
 plots_dir = ./data/plots/
 report = report.pdf
 
-analysis_db = ./data/analysisdb_NEW.sqlite
+analysis_db = ./data/analysisdb.sqlite
 population_density = ~/data/gis/populationdensity.tiff
 """
 
@@ -132,7 +134,6 @@ class Event(object):
             self.showProgress = True
 
         self.db = None
-        self.maps = None
         self.shakemap = None
         self.alerts = None
         self.event = None
@@ -140,15 +141,14 @@ class Event(object):
         self.populationDensity = None
         return
 
-    def process(self, maps=None):
+    def process(self):
         """Perform processing steps for earthquake.
 
         :type multiprocessing: bool
         :param multiprocessing: True if using multiple processes.
         """
-        self.maps = maps
         self._load_data()
-        
+
         if self.steps.process_events or self.steps.all:
             self._process_event(plot_alert_maps=self.steps.plot_alert_maps)
 
@@ -161,7 +161,6 @@ class Event(object):
         if self.steps.plot_figures or self.steps.all:
             self._plot_figures()
 
-        self.maps = None
         return
 
     def _load_data(self):
@@ -172,7 +171,7 @@ class Event(object):
 
         # Database
         self.db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
-            
+        
         # ShakeMap
         dataDir = analysis_utils.get_dir(self.config, "event_dir").replace("[EVENTID]", self.eqId)
         filename = os.path.join(dataDir, "custom_grid.xml.gz")
@@ -218,7 +217,7 @@ class Event(object):
         if self.showProgress:
             print("Processing event {event[event_id]} with alert thresholds M{mag} and MMI {mmi} ...".format(event=self.event, mag=magAlertThreshold, mmi=mmiAlertThreshold))
             
-        costSavings = perfmetrics.CostSavings(self.config, self.maps)
+        costSavings = perfmetrics.CostSavings(self.config)
         stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, magAlertThreshold, mmiAlertThreshold, plot_alert_maps)
         stats.update({
             "comcat_id": self.event["event_id"],
@@ -259,7 +258,7 @@ class Event(object):
             "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
             }
         
-        costSavings = perfmetrics.CostSavings(self.config, self.maps)
+        costSavings = perfmetrics.CostSavings(self.config)
         for magnitude in magThresholds:
             for mmi in mmiThresholds:
                 if self.showProgress:
@@ -279,13 +278,14 @@ class Event(object):
             print("Plotting maps for event {event[event_id]}...".format(event=self.event))
 
         selection = self.steps.plot_maps if self.steps.plot_maps else "all"
-        self.maps.load_data(self.eqId)
+        mapPanels = maps.MapPanels(self.config)
+        mapPanels.load_data(self.eqId)
         if selection == "mmi" or selection == "all":
-            self.maps.mmi_observed()
-            self.maps.mmi_predicted()
-            self.maps.mmi_residual()
+            mapPanels.mmi_observed()
+            mapPanels.mmi_predicted()
+            mapPanels.mmi_residual()
         if selection == "alert" or selection == "all":
-            self.maps.alert_category()
+            mapPanels.alert_category()
         return
 
     def _plot_figures(self):
@@ -332,11 +332,9 @@ class EEWAnalyzeApp(object):
         # Event processing
         if args.process_events or args.optimize_events or args.plot_maps or args.plot_figures or args.all:
             if args.nthreads <= 0:
-                mapPanels = maps.MapPanels(self.config)
-                mapPanels.load_basemap()
                 for eqId in self.config.options("events"):
                     event = Event(args, self.config, eqId)
-                    event.process(mapPanels)
+                    event.process()
             else:
                 pool = multiprocessing.Pool(args.nthreads)
                 for eqId in self.config.options("events"):
