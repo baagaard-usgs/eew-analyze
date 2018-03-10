@@ -280,7 +280,7 @@ class Event(object):
 
         selection = self.steps.plot_maps if self.steps.plot_maps else "all"
         mapPanels = maps.MapPanels(self.config)
-        mapPanels.load_data(self.eqId)
+        mapPanels.load_data(self.eqId, self.event, self.alerts)
         if selection == "mmi" or selection == "all":
             mapPanels.mmi_observed()
             mapPanels.mmi_predicted()

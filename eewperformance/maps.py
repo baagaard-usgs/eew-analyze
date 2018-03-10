@@ -33,11 +33,12 @@ class MapPanels(object):
         self.config = config
 
         self.eqId = None
+        self.event = None
         self.alert = None
         self.data = None
         return
     
-    def load_data(self, eqId, alert=None):
+    def load_data(self, eqId, event, alerts):
         """
         :type eqId: str
         :param eqId: ComCat earthquake id.
@@ -46,7 +47,8 @@ class MapPanels(object):
         :param alert: ShakeAlert alert information from analysis database.
         """
         self.eqId = eqId
-        self.alert = alert
+        self.event = event
+        self.alerts = alerts
 
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, eqId) + ".tiff")
@@ -91,15 +93,16 @@ class MapPanels(object):
         
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
         
         mmi = self.data["layers"]["mmi_obs"]
         im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
         contourLevels = numpy.arange(1.0, 10.01, 0.5)
         chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
 
-        # Epicenter
+        ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
         ax.set_title("Observed Shaking")
         colorbar = pyplot.colorbar(im, cax=self.cbax)
@@ -116,23 +119,29 @@ class MapPanels(object):
         
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
         
         mmi = self.data["layers"]["mmi_pred"]
         im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
         contourLevels = numpy.arange(1.0, 10.01, 0.5)
         chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
 
-        # Epicenter
+        cols = [
+            ("longitude", "float32",),
+            ("latitude", "float32",),
+            ]
+        epicenters = numpy.zeros(len(self.alerts), dtype=cols)
+        for ialert,alert in enumerate(self.alerts):
+            epicenters[ialert] = (alert["longitude"], alert["latitude"],)
+        ax.plot(epicenters["longitude"], epicenters["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
         ax.set_title("ShakeAlert Predicted Shaking")
         colorbar = pyplot.colorbar(im, cax=self.cbax)
         colorbar.set_label("MMI")
 
         self._save(figure, "mmi_pred")
-        # if self.alert
-        # :TODO:
         return
 
     def mmi_residual(self):
@@ -145,6 +154,7 @@ class MapPanels(object):
         
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
         
         im = ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="RdBu_r", alpha=0.67, zorder=2)
         noData = numpy.ma.masked_array(numpy.ones(mmiResidual.shape), ~mmiResidual.mask)
@@ -152,9 +162,9 @@ class MapPanels(object):
 
         contourLevels = numpy.arange(-2.0, 2.01, 0.5)
         chandle = ax.contour(mmiResidual, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", fontsize=8)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", zoerder=4)
 
-        # Epicenter
+        ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=5)
 
         ax.set_title("MMI Residual")
         colorbar = pyplot.colorbar(im, cax=self.cbax)
@@ -171,6 +181,7 @@ class MapPanels(object):
         
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
         
         mmi = self.data["layers"]["mmi_pred"]
         im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
@@ -180,19 +191,25 @@ class MapPanels(object):
         tmax = numpy.max(warningTime.ravel())
         contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
         chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1fs", fontsize=8, color="black", zorder=4)
+        ax.clabel(chandle, inline=True, fmt="%3.1fs", color="black", zorder=4)
 
-        # Epicenter
+        cols = [
+            ("longitude", "float32",),
+            ("latitude", "float32",),
+            ]
+        epicenters = numpy.zeros(len(self.alerts), dtype=cols)
+        for ialert,alert in enumerate(self.alerts):
+            epicenters[ialert] = (alert["longitude"], alert["latitude"],)
+        ax.plot(epicenters["longitude"], epicenters["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=5)
 
         import dateutil.parser
-        tstamp = dateutil.parser.parse(self.alert["timestamp"])
-        title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alert, tstamp=tstamp, t=t)
+        tstamp = dateutil.parser.parse(self.alerts[0]["timestamp"])
+        title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alerts[0], tstamp=tstamp, t=t)
         ax.set_title(title)
         colorbar = pyplot.colorbar(im, cax=self.cbax)
         colorbar.set_label("MMI")
 
         self._save(figure, "mmi_pred")
-        self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "jpg", legendLayers=[mmi], legendTitle="MMI", title=title)
         return
 
     def alert_category(self):
@@ -201,23 +218,24 @@ class MapPanels(object):
         
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
         
         popDensity = self.data["layers"]["population_density"]
         norm = colors.LogNorm(vmin=0.01, vmax=1000)
-        ax.imshow(popDensity, norm=norm, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", alpha=0.5, zorder=2)
+        ax.imshow(popDensity, norm=norm, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", alpha=0.2, zorder=2)
 
         category = self.data["layers"]["alert_category"]
         norm = colors.BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5], 4)
-        im = ax.imshow(category, extent=dataExtent, transform=dataCRS, origin="upper", cmap="AlertCategory", norm=norm, alpha=0.67, zorder=3)
+        im = ax.imshow(category, extent=dataExtent, transform=dataCRS, origin="upper", cmap="AlertCategory", norm=norm, alpha=0.5, zorder=1)
 
         warningTime = self.data["layers"]["warning_time"]
         tmin = numpy.min(warningTime.ravel())
         tmax = numpy.max(warningTime.ravel())
         contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
         chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1fs", fontsize=8, color="black", zorder=4)
+        ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=5)
         
-        # Epicenter
+        ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=6)
 
         ax.set_title("Alert Classification and Warning Time (s)")
         colorbar = pyplot.colorbar(im, cax=self.cbax)
