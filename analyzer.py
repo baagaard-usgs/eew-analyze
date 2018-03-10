@@ -86,8 +86,8 @@ tiler_style = streetmap
 tiler_cache_dir = ~/data_scratch/images/tiles
 #projection = EPSG:3857
 zoom_level = 8
-width_in = 10.0
-height_in = 8.0
+width_in = 8.0
+height_in = 8.3
 
 [files]
 event_dir = ./data/[EVENTID]/

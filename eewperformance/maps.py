@@ -12,6 +12,7 @@ import numpy
 
 import matplotlib.pyplot as pyplot
 import matplotlib.colors as colors
+import matplotlib.patches as patches
 from osgeo import gdal, osr
 from cartopy import crs
 
@@ -105,8 +106,7 @@ class MapPanels(object):
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
         ax.set_title("Observed Shaking")
-        colorbar = pyplot.colorbar(im, cax=self.cbax)
-        colorbar.set_label("MMI")
+        pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
 
         self._save(figure, "mmi_obs")
         return
@@ -138,8 +138,7 @@ class MapPanels(object):
         ax.plot(epicenters["longitude"], epicenters["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
         ax.set_title("ShakeAlert Predicted Shaking")
-        colorbar = pyplot.colorbar(im, cax=self.cbax)
-        colorbar.set_label("MMI")
+        pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
 
         self._save(figure, "mmi_pred")
         return
@@ -167,7 +166,7 @@ class MapPanels(object):
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=5)
 
         ax.set_title("MMI Residual")
-        colorbar = pyplot.colorbar(im, cax=self.cbax)
+        colorbar = pyplot.colorbar(im)
         colorbar.set_label("Residual (Obs-Pred)")
 
         self._save(figure, "mmi_residual")
@@ -206,8 +205,7 @@ class MapPanels(object):
         tstamp = dateutil.parser.parse(self.alerts[0]["timestamp"])
         title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alerts[0], tstamp=tstamp, t=t)
         ax.set_title(title)
-        colorbar = pyplot.colorbar(im, cax=self.cbax)
-        colorbar.set_label("MMI")
+        pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
 
         self._save(figure, "mmi_pred")
         return
@@ -237,24 +235,24 @@ class MapPanels(object):
         
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=6)
 
-        ax.set_title("Alert Classification and Warning Time (s)")
-        colorbar = pyplot.colorbar(im, cax=self.cbax)
-        colorbar.set_ticks([0.0, 1.0, 2.0, 3.0])
-        colorbar.set_ticklabels(["TN", "FN", "FP", "TP"])
-        colorbar.set_label("Alert Classification")
+        ax.set_title("Alert Classification and Warning Time")
 
+        pyplot.legend(handles=self.alertPatches, title="Alert Classification", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
+        
         self._save(figure, "alert_category")
         return
 
     def _alert_colormap(self):
         clist = (
-            "#abd9e9", # TN
-            "#d7191c", # FN
-            "#fdae61", # FP
-            "#2c7bb6", # TP
+            ("#abd9e9", "True Negative",),
+            ("#d7191c", "False Negative",),
+            ("#fdae61", "False Positive",),
+            ("#2c7bb6", "True Positive",),
             )
-        alertcmap = colors.ListedColormap(clist)
+        alertcmap = colors.ListedColormap([c[0] for c in clist])
         pyplot.register_cmap(name="AlertCategory", cmap=alertcmap)
+
+        self.alertPatches = [patches.Patch(ec="black", fc=c[0], label=c[1]) for c in clist]
         return
     
     def _mmi_colormap(self):
@@ -292,10 +290,23 @@ class MapPanels(object):
             }
         mmicmap = colors.LinearSegmentedColormap("MMI", cdict)
         pyplot.register_cmap(name="MMI", cmap=mmicmap)
+
+        self.mmiPatches = [
+            patches.Patch(ec="black", fc=(255.0/255.0, 255.0/255.0, 255.0/255.0), label="I"),
+            patches.Patch(ec="black", fc=(191.0/255.0, 204.0/255.0, 255.0/255.0), label="II"),
+            patches.Patch(ec="black", fc=(160.0/255.0, 230.0/255.0, 255.0/255.0), label="III"),
+            patches.Patch(ec="black", fc=(128.0/255.0, 255.0/255.0, 255.0/255.0), label="IV"),
+            patches.Patch(ec="black", fc=(122.0/255.0, 255.0/255.0, 147.0/255.0), label="V"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 255.0/255.0,   0.0/255.0), label="VI"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 200.0/255.0,   0.0/255.0), label="VII"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 145.0/255.0,   0.0/255.0), label="VIII"),
+            patches.Patch(ec="black", fc=(255.0/255.0,   0.0/255.0,   0.0/255.0), label="IX"),
+            patches.Patch(ec="black", fc=(200.0/255.0,   0.0/255.0,   0.0/255.0), label="X"),
+            ]
         return
     
 
-    def _create_figure(self, useColorBar=True):
+    def _create_figure(self):
         tilerPath = self.config.get("maps", "tiler").split(".")
         tilerObj = getattr(import_module(".".join(tilerPath[:-1])), tilerPath[-1])
         tilerStyle = self.config.get("maps", "tiler_style")
@@ -307,11 +318,7 @@ class MapPanels(object):
         figHeightIn = self.config.getfloat("maps", "height_in")
         figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
 
-        if useColorBar:
-            figure.subplots_adjust(bottom=0.02, top=0.94, left=0, right=0.90)
-            self.cbax = figure.add_axes([0.92, 0.02, 0.02, 0.92])
-        else:
-            figure.subplots_adjust(bottom=0.0, top=0.94, left=0, right=1.0)
+        figure.subplots_adjust(bottom=0.01, top=0.97, left=0.01, right=0.99)
         ax = pyplot.axes(projection=tiler.crs)
         ax.set_extent(self.data["extent"])
 
