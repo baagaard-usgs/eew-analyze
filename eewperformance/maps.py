@@ -102,7 +102,7 @@ class MapPanels(object):
         # Epicenter
 
         ax.set_title("Observed Shaking")
-        colorbar = pyplot.colorbar(im)
+        colorbar = pyplot.colorbar(im, cax=self.cbax)
         colorbar.set_label("MMI")
 
         self._save(figure, "mmi_obs")
@@ -127,7 +127,7 @@ class MapPanels(object):
         # Epicenter
 
         ax.set_title("ShakeAlert Predicted Shaking")
-        colorbar = pyplot.colorbar(im)
+        colorbar = pyplot.colorbar(im, cax=self.cbax)
         colorbar.set_label("MMI")
 
         self._save(figure, "mmi_pred")
@@ -157,7 +157,7 @@ class MapPanels(object):
         # Epicenter
 
         ax.set_title("MMI Residual")
-        colorbar = pyplot.colorbar(im)
+        colorbar = pyplot.colorbar(im, cax=self.cbax)
         colorbar.set_label("Residual (Obs-Pred)")
 
         self._save(figure, "mmi_residual")
@@ -166,21 +166,32 @@ class MapPanels(object):
     def mmi_warning_time(self, t):
         """Create map with predicted MMI with warning time contours.
         """
-        basemap = self.baseLayers["basemap"]
+        figure = self._create_figure()
+        ax = figure.gca()
+        
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
+        
+        mmi = self.data["layers"]["mmi_pred"]
+        im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
-        mmi = self.dataLayers["mmi_pred"]
-        mmi.loadNamedStyle("mmi.qml")
+        warningTime = self.data["layers"]["warning_time"]
+        tmin = numpy.min(warningTime.ravel())
+        tmax = numpy.max(warningTime.ravel())
+        contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
+        chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        ax.clabel(chandle, inline=True, fmt="%3.1fs", fontsize=8, color="black", zorder=4)
 
-        warningContours = self.dataLayers["warning_time_contour"]
-        self._set_warning_time_style(warningContours)
-        self._add_labels(warningContours)
-            
-        #epicenter = self.dataLayers["epicenter_obs"]
-        # :TODO: set style
+        # Epicenter
 
         import dateutil.parser
         tstamp = dateutil.parser.parse(self.alert["timestamp"])
         title = "{tstamp:%Y-%m-%d %H:%M:%S.%f} ({t:6.3f}s after origin time), Alert {alert[version]:3d}, M{alert[magnitude]:4.2f}".format(alert=self.alert, tstamp=tstamp, t=t)
+        ax.set_title(title)
+        colorbar = pyplot.colorbar(im, cax=self.cbax)
+        colorbar.set_label("MMI")
+
+        self._save(figure, "mmi_pred")
         self._render([warningContours, mmi, basemap], mmi.extent(), "mmi_warning", "jpg", legendLayers=[mmi], legendTitle="MMI", title=title)
         return
 
@@ -195,42 +206,37 @@ class MapPanels(object):
         norm = colors.LogNorm(vmin=0.01, vmax=1000)
         ax.imshow(popDensity, norm=norm, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", alpha=0.5, zorder=2)
 
-        category = self.dataLayers["alert_category"]
-        im = ax.imshow(category, extent=dataExtent, transform=dataCRS, origin="upper", cmap="AlertCategory", vmin=0, vmax=4, alpha=0.67, zorder=3)
+        category = self.data["layers"]["alert_category"]
+        norm = colors.BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5], 4)
+        im = ax.imshow(category, extent=dataExtent, transform=dataCRS, origin="upper", cmap="AlertCategory", norm=norm, alpha=0.67, zorder=3)
 
-        # Warning time contours
+        warningTime = self.data["layers"]["warning_time"]
+        tmin = numpy.min(warningTime.ravel())
+        tmax = numpy.max(warningTime.ravel())
+        contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
+        chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        ax.clabel(chandle, inline=True, fmt="%3.1fs", fontsize=8, color="black", zorder=4)
         
         # Epicenter
 
-        ax.set_title("Alert Category and Warning Time (s)")
-        colorbar = pyplot.colorbar(im)
-        colorbar.set_label("Alert Category")
+        ax.set_title("Alert Classification and Warning Time (s)")
+        colorbar = pyplot.colorbar(im, cax=self.cbax)
+        colorbar.set_ticks([0.0, 1.0, 2.0, 3.0])
+        colorbar.set_ticklabels(["TN", "FN", "FP", "TP"])
+        colorbar.set_label("Alert Classification")
 
-        self._save(figure, "mmi_residual")
-        
-
-        category.loadNamedStyle("alert_category.qml")
-
-        warningContours = self.dataLayers["warning_time_contour"]
-        self._set_warning_time_style(warningContours)
-        self._add_labels(warningContours)
-
-        
-        #epicenter = self.dataLayers["epicenter_obs"]
-        # :TODO: set style
-        
-        self._render([warningContours, category, popDensity, basemap], category.extent(), "alert_category", "jpg", legendLayers=[category], legendTitle="Alert Category", title="Alert Classification and Warning Time (s)") # , Alert Threshold: MMI X.X
+        self._save(figure, "alert_category")
         return
 
     def _alert_colormap(self):
-        colors = (
+        clist = (
             "#abd9e9", # TN
             "#d7191c", # FN
             "#fdae61", # FP
             "#2c7bb6", # TP
             )
-        alertcmap = colors.ListedColormap(colors)
-        pyplot.register_cmap(name="AlertCategory", data=cdict)
+        alertcmap = colors.ListedColormap(clist)
+        pyplot.register_cmap(name="AlertCategory", cmap=alertcmap)
         return
     
     def _mmi_colormap(self):
@@ -267,11 +273,11 @@ class MapPanels(object):
                 ],
             }
         mmicmap = colors.LinearSegmentedColormap("MMI", cdict)
-        pyplot.register_cmap(name="MMI", data=cdict)
+        pyplot.register_cmap(name="MMI", cmap=mmicmap)
         return
     
 
-    def _create_figure(self):
+    def _create_figure(self, useColorBar=True):
         tilerPath = self.config.get("maps", "tiler").split(".")
         tilerObj = getattr(import_module(".".join(tilerPath[:-1])), tilerPath[-1])
         tilerStyle = self.config.get("maps", "tiler_style")
@@ -282,9 +288,16 @@ class MapPanels(object):
         figWidthIn = self.config.getfloat("maps", "width_in")
         figHeightIn = self.config.getfloat("maps", "height_in")
         figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
+
+        if useColorBar:
+            figure.subplots_adjust(bottom=0.02, top=0.94, left=0, right=0.90)
+            self.cbax = figure.add_axes([0.92, 0.02, 0.02, 0.92])
+        else:
+            figure.subplots_adjust(bottom=0.0, top=0.94, left=0, right=1.0)
         ax = pyplot.axes(projection=tiler.crs)
         ax.set_extent(self.data["extent"])
-        ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")        
+
+        ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")
         return figure
     
     def _save(self, figure, label):
