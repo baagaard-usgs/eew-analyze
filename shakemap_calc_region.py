@@ -14,6 +14,7 @@ import logging
 from importlib import import_module
 import numpy
 
+import h5py # Avoid gdal loading incompatible h5py
 from osgeo import osr
 
 from eewperformance import shakemap
