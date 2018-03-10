@@ -28,8 +28,8 @@ class CostSavings(object):
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
         shape = shakemap.data["mmi"].shape
-        warningTimeZero = numpy.zeros((1,), dtype="timedelta64[s]")
-        warningTime = gdalraster.NO_DATA_VALUE * numpy.ones(shape, dtype="timedelta64[s]")
+        warningTimeZero = numpy.zeros((1,), dtype="timedelta64[us]")
+        warningTime = gdalraster.NO_DATA_VALUE * 1.0e+6 * numpy.ones(shape, dtype="timedelta64[us]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones(shape, numpy.float32)
         
         shakingTimeRel = analysis_utils.timedelta_to_seconds(shakingTime - numpy.datetime64(event["origin_time"]))
@@ -120,7 +120,7 @@ class CostSavings(object):
         maskFP = numpy.bitwise_and(mmiPred >= mmiAlertThreshold, costDamage < costActionObs)
         maskTP = numpy.bitwise_and(mmiPred >= mmiAlertThreshold, costDamage >= costActionObs)
         alertCategory = maskTN*0.0 + maskFN*1.0 + maskFP*2.0 + maskTP*3.0
-        
+
         values = [
             ("mmi_obs", shakemap.data["mmi"],),
             ("mmi_pred", mmiPred,),
