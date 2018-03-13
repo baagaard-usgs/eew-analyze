@@ -38,7 +38,7 @@ class MapPanels(object):
         self.alert = None
         self.data = None
         return
-    
+
     def load_data(self, eqId, event, alerts):
         """
         :type eqId: str
@@ -144,10 +144,6 @@ class MapPanels(object):
         return
 
     def mmi_residual(self):
-        mmiObs = self.data["layers"]["mmi_obs"]
-        mmiPred = self.data["layers"]["mmi_pred"]
-        mmiResidual = mmiObs - mmiPred
-
         figure = self._create_figure()
         ax = figure.gca()
         
@@ -155,7 +151,12 @@ class MapPanels(object):
         dataCRS = self.data["crs"]
         wgs84CRS = crs.Geodetic()
         
+        mmiObs = self.data["layers"]["mmi_obs"]
+        mmiPred = self.data["layers"]["mmi_pred"]
+        mmiResidual = mmiObs - mmiPred
+
         im = ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="RdBu_r", alpha=0.67, zorder=2)
+
         noData = numpy.ma.masked_array(numpy.ones(mmiResidual.shape), ~mmiResidual.mask)
         ax.imshow(noData, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", vmin=0, vmax=1, alpha=0.3, zorder=3)
 
@@ -166,9 +167,10 @@ class MapPanels(object):
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=5)
 
         ax.set_title("MMI Residual")
-        colorbar = pyplot.colorbar(im)
+        cbax = figure.add_axes([0.02, 0.33, 0.02, 0.33])
+        colorbar = pyplot.colorbar(im, cax=cbax)
         colorbar.set_label("Residual (Obs-Pred)")
-
+        
         self._save(figure, "mmi_residual")
         return
 
@@ -229,9 +231,10 @@ class MapPanels(object):
         warningTime = self.data["layers"]["warning_time"]
         tmin = numpy.min(warningTime.ravel())
         tmax = numpy.max(warningTime.ravel())
-        contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
-        chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=5)
+        if tmax > tmin:
+            contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
+            chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+            ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=5)
         
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=6)
 
@@ -254,7 +257,7 @@ class MapPanels(object):
 
         self.alertPatches = [patches.Patch(ec="black", fc=c[0], label=c[1]) for c in clist]
         return
-    
+
     def _mmi_colormap(self):
         cdict = {
             'red': [
@@ -324,7 +327,7 @@ class MapPanels(object):
 
         ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")
         return figure
-    
+
     def _save(self, figure, label):
         """
         """
@@ -334,6 +337,7 @@ class MapPanels(object):
         filename = analysis_utils.analysis_label(self.config, self.eqId)
         filename += "-map_{}.jpg".format(label)
         figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
+        pyplot.close(figure)
         return
     
 # End of file
