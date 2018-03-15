@@ -91,6 +91,7 @@ class Figures(object):
         filename = analysis_utils.analysis_label(self.config, self.event["event_id"])
         filename += "-alert_error.png"
         figure.figure.savefig(os.path.join(plotsDir, filename))
+        pyplot.close(figure)
         return
 
 # End of file
