@@ -26,34 +26,27 @@ gdal.UseExceptions()
 class MapPanels(object):
     """Maps of MMI, warning time, etc.
     """
-    def __init__(self, config):
+    def __init__(self, config, eqId, event, alerts):
         """
         :type config: ConfigParser
         :param config: Configuration for application.
         """
         self.config = config
-
-        self.eqId = None
-        self.event = None
-        self.alert = None
-        self.data = None
-        return
-
-    def load_data(self, eqId, event, alerts):
-        """
-        :type eqId: str
-        :param eqId: ComCat earthquake id.
-
-        :type alert: dict
-        :param alert: ShakeAlert alert information from analysis database.
-        """
         self.eqId = eqId
         self.event = event
         self.alerts = alerts
 
+        self.data = None
+        return
+
+    def load_data(self):
+        """
+        :type filename: str
+        :param filename: Name of raster file with analysis data without path.
+        """
         cacheDir = self.config.get("files", "analysis_cache_dir")
-        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, eqId) + ".tiff")
-        rasterData = gdal.Open(filename, gdal.GA_ReadOnly)
+        filename = "analysis_" + analysis_utils.analysis_label(self.config, self.eqId) + ".tiff"
+        rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
 
         srs = osr.SpatialReference()
         srs.ImportFromWkt(rasterData.GetProjection())
@@ -285,26 +278,34 @@ class MapPanels(object):
                 ],
             'blue': [
                 (0.0/10.0, 255.0/255.0, 255.0/255.0),
+                (1.0/10.0, 255.0/255.0, 255.0/255.0),
                 (4.0/10.0, 255.0/255.0, 255.0/255.0),
                 (5.0/10.0, 147.0/255.0, 147.0/255.0),
                 (6.0/10.0,   0.0/255.0,   0.0/255.0),
                 (10.0/10.0,   0.0/255.0,   0.0/255.0),
                 ],
+            'alpha': [
+                (0.0/10.0, 0.0/255.0, 0.0/255.0),
+                (1.0/10.0, 0.0/255.0, 0.0/255.0),
+                (2.0/10.0, 255.0/255.0, 255.0/255.0),
+                (3.0/10.0, 255.0/255.0, 255.0/255.0),
+                (10.0/10.0, 255.0/255.0, 255.0/255.0),
+                ]
             }
         mmicmap = colors.LinearSegmentedColormap("MMI", cdict)
         pyplot.register_cmap(name="MMI", cmap=mmicmap)
 
         self.mmiPatches = [
-            patches.Patch(ec="black", fc=(255.0/255.0, 255.0/255.0, 255.0/255.0), label="I"),
-            patches.Patch(ec="black", fc=(191.0/255.0, 204.0/255.0, 255.0/255.0), label="II"),
-            patches.Patch(ec="black", fc=(160.0/255.0, 230.0/255.0, 255.0/255.0), label="III"),
-            patches.Patch(ec="black", fc=(128.0/255.0, 255.0/255.0, 255.0/255.0), label="IV"),
-            patches.Patch(ec="black", fc=(122.0/255.0, 255.0/255.0, 147.0/255.0), label="V"),
-            patches.Patch(ec="black", fc=(255.0/255.0, 255.0/255.0,   0.0/255.0), label="VI"),
-            patches.Patch(ec="black", fc=(255.0/255.0, 200.0/255.0,   0.0/255.0), label="VII"),
-            patches.Patch(ec="black", fc=(255.0/255.0, 145.0/255.0,   0.0/255.0), label="VIII"),
-            patches.Patch(ec="black", fc=(255.0/255.0,   0.0/255.0,   0.0/255.0), label="IX"),
             patches.Patch(ec="black", fc=(200.0/255.0,   0.0/255.0,   0.0/255.0), label="X"),
+            patches.Patch(ec="black", fc=(255.0/255.0,   0.0/255.0,   0.0/255.0), label="IX"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 145.0/255.0,   0.0/255.0), label="VIII"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 200.0/255.0,   0.0/255.0), label="VII"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 255.0/255.0,   0.0/255.0), label="VI"),
+            patches.Patch(ec="black", fc=(122.0/255.0, 255.0/255.0, 147.0/255.0), label="V"),
+            patches.Patch(ec="black", fc=(128.0/255.0, 255.0/255.0, 255.0/255.0), label="IV"),
+            patches.Patch(ec="black", fc=(160.0/255.0, 230.0/255.0, 255.0/255.0), label="III"),
+            patches.Patch(ec="black", fc=(191.0/255.0, 204.0/255.0, 255.0/255.0), label="II"),
+            patches.Patch(ec="black", fc=(255.0/255.0, 255.0/255.0, 255.0/255.0), label="I"),
             ]
         return
     

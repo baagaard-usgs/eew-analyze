@@ -32,8 +32,6 @@ class CostSavings(object):
         warningTime = gdalraster.NO_DATA_VALUE * 1.0e+6 * numpy.ones(shape, dtype="timedelta64[us]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones(shape, numpy.float32)
         
-        shakingTimeRel = analysis_utils.timedelta_to_seconds(shakingTime - numpy.datetime64(event["origin_time"]))
-
         thresholdReached = False
         for alert in alerts:
             if numpy.datetime64(alert["timestamp"]) > numpy.max(shakingTime):
@@ -84,8 +82,16 @@ class CostSavings(object):
             maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur >= warningTimeZero)
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
-        # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
+        filename = "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff"
+        metrics = self._cost(mmiPred, shakemap, warningTime, populationDensity, mmiAlertThreshold, filename)
+        return metrics
+
+    def _cost(self, mmiPred, shakemap, warningTime, populationDensity, mmiAlertThreshold, filename):
+        """Compute cost savings metrics.
+        """
         mmiObs = shakemap.data["mmi"]
+        
+        # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
         objectPath = self.config.get("fragility_curves", "object").split(".")
         fragilityOptions = dict(self.config.items("fragility_curves"))
         fragilityOptions.pop("object")
@@ -122,10 +128,9 @@ class CostSavings(object):
         alertCategory = maskTN*0.0 + maskFN*1.0 + maskFP*2.0 + maskTP*3.0
 
         values = [
-            ("mmi_obs", shakemap.data["mmi"],),
+            ("mmi_obs", mmiObs,),
             ("mmi_pred", mmiPred,),
             ("warning_time", analysis_utils.timedelta_to_seconds(warningTime),),
-            ("shaking_time", shakingTimeRel,),
             ("population_density", populationDensity,),
             ("cost_no_eew", costNoEEW,),
             ("cost_perfect_eew", costPerfectEEW,),
@@ -135,8 +140,7 @@ class CostSavings(object):
         cacheDir = self.config.get("files", "analysis_cache_dir")
         if not os.path.isdir(cacheDir):
             os.makedirs(cacheDir)
-        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff")
-        gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
+        gdalraster.write(os.path.join(cacheDir, filename), values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
 
         metrics = {
             "area_damage": areaDamage,
