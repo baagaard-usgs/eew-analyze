@@ -148,7 +148,12 @@ class MapPanels(object):
         mmiPred = self.data["layers"]["mmi_pred"]
         mmiResidual = mmiObs - mmiPred
 
-        im = ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="RdBu_r", alpha=0.67, zorder=2)
+        cmap = pyplot.cm.get_cmap("RdBu_r")
+        cmap._init()
+        alpha = numpy.minimum(1.0, numpy.abs(numpy.linspace(-4.0, 4.0, cmap.N)))
+        cmap._lut[:-3,-1] = alpha
+        
+        im = ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap=cmap, alpha=0.67, zorder=2)
 
         noData = numpy.ma.masked_array(numpy.ones(mmiResidual.shape), ~mmiResidual.mask)
         ax.imshow(noData, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", vmin=0, vmax=1, alpha=0.3, zorder=3)
