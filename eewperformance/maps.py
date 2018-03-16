@@ -113,22 +113,23 @@ class MapPanels(object):
         dataExtent = self.data["extent"]
         dataCRS = self.data["crs"]
         wgs84CRS = crs.Geodetic()
-        
-        mmi = self.data["layers"]["mmi_pred"]
-        im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
-        contourLevels = numpy.arange(1.0, 10.01, 0.5)
-        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
+        if len(self.alerts) > 0:
+            mmi = self.data["layers"]["mmi_pred"]
+            im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
-        cols = [
-            ("longitude", "float32",),
-            ("latitude", "float32",),
-            ]
-        epicenters = numpy.zeros(len(self.alerts), dtype=cols)
-        for ialert,alert in enumerate(self.alerts):
-            epicenters[ialert] = (alert["longitude"], alert["latitude"],)
-        ax.plot(epicenters["longitude"], epicenters["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
+            contourLevels = numpy.arange(1.0, 10.01, 0.5)
+            chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+            ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
+
+            cols = [
+                ("longitude", "float32",),
+                ("latitude", "float32",),
+                ]
+            epicenters = numpy.zeros(len(self.alerts), dtype=cols)
+            for ialert,alert in enumerate(self.alerts):
+                epicenters[ialert] = (alert["longitude"], alert["latitude"],)
+            ax.plot(epicenters["longitude"], epicenters["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
         ax.set_title("ShakeAlert Predicted Shaking")
         pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
