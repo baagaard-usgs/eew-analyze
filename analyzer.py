@@ -75,19 +75,13 @@ magnitude_threshold_min = 2.95
 magnitude_threshold_max = 4.45
 magnitude_threshold_step = 0.50
 
-[qgis]
-prefix_path = None
-#prefix_path = /Applications/QGIS.app/Contents/MacOS
-# PYTHONPATH=/Applications/QGIS.app/Contents/Resources/python:$PYTHONPATH
-
 [maps]
 tiler = cartopy_extra_tiles.esri_tiles.ESRI
 tiler_style = streetmap
 tiler_cache_dir = ~/data_scratch/images/tiles
-#projection = EPSG:3857
-zoom_level = 8
-width_in = 8.0
-height_in = 8.3
+zoom_level = 7
+width_in = 6.0
+height_in = 6.3
 
 [files]
 event_dir = ./data/[EVENTID]/
