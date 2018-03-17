@@ -335,7 +335,10 @@ class DownloaderApp(object):
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
-            with gzip.open(os.path.join(dataDir, "info.json.gz"), "r") as fh:
+            filename = os.path.join(dataDir, "custom_info.json.gz")
+            if not os.path.isfile(filename):
+                filename = os.path.join(dataDir, "info.json.gz")
+            with gzip.open(os.path.join(dataDir, filename), "r") as fh:
                 info = json.load(fh)
                 info["event_id"] = eqId
                 self.db.add_shakemap_info(info, replace)

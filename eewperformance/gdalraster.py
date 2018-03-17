@@ -77,7 +77,6 @@ def write(filename, values, numX, numY, spatialRef, geoTransform):
         band.SetDescription(name)
         band.SetNoDataValue(NO_DATA_VALUE)
         band.WriteArray(value.reshape((numY,numX,)))
-        band.FlushCache()
     dest.FlushCache()
     return
 
@@ -107,57 +106,8 @@ def clone_new_data(name, values, src, noDataValue=None):
     if not noDataValue is None:
         band.SetNoDataValue(noDataValue)
     band.WriteArray(values)
-    band.FlushCache()
     dest.FlushCache()
     return dest
-
-
-def contours_from_raster(raster, bandName, cstart=0.0, cinterval=10.0, clevels=[]):
-    """Create GDAL raster in memory with values as data with grid specs from src raster.
-
-    :type raster: GDAL raster
-    :param raster: 
-        GDAL raster.
-
-    :type band: int
-    :param band:
-        Band number to use for contours. =1 for first band.
-
-    :type cstart: float
-    :param cstart:
-        Starting value for contours
-
-    :type cinterval: float
-    :param cinterval:
-        Contour interval.
-
-    :type levels: list
-    :param levels:
-        List of contour values. cstart and cstep are ignored if levels is given.
-    """
-    cband = None
-    for iband in range(raster.RasterCount):
-        band = raster.GetRasterBand(1+iband)
-        if band.GetDescription() == bandName:
-            cband = band
-    if not cband:
-        filename = raster.GetFileList()[0]
-        raise ValueError("Could not find band '{band}' in raster '{filename}'.".format(band=bandName, filename=filename))
-    
-    driverMemory = ogr.GetDriverByName("MEMORY")
-    contours = driverMemory.CreateDataSource("temp")
-    driverMemory.Open("temp", gdal.GA_Update)
-
-    spatialRef = osr.SpatialReference()
-    spatialRef.ImportFromWkt(raster.GetProjectionRef())
-    
-    ogrLayer = contours.CreateLayer(bandName+"_contour", spatialRef, ogr.wkbLineString25D)
-    ogrLayer.CreateField(ogr.FieldDefn("id", ogr.OFTInteger))
-    ogrLayer.CreateField(ogr.FieldDefn("value", ogr.OFTReal))
-
-    gdal.ContourGenerate(cband, cinterval, cstart, clevels, 1, NO_DATA_VALUE, ogrLayer, 0, 1)
-
-    return contours
 
 
 # End of file

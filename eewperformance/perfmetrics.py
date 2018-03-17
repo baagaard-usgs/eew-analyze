@@ -18,9 +18,8 @@ class CostSavings(object):
     """Cost savings weighted by area and population.
     """
     
-    def __init__(self, config, maps):
+    def __init__(self, config):
         self.config = config
-        self.maps = maps
         return
 
     def compute(self, event, shakemap, alerts, shakingTime, populationDensity, magAlertThreshold, mmiAlertThreshold, plotAlertMaps=False):
@@ -29,12 +28,10 @@ class CostSavings(object):
         fn = getattr(import_module(".".join(functionPath[:-1])), functionPath[-1])
             
         shape = shakemap.data["mmi"].shape
-        warningTimeZero = numpy.zeros((1,), dtype="timedelta64[s]")
-        warningTime = gdalraster.NO_DATA_VALUE * numpy.ones(shape, dtype="timedelta64[s]")
+        warningTimeZero = numpy.zeros((1,), dtype="timedelta64[us]")
+        warningTime = gdalraster.NO_DATA_VALUE * 1.0e+6 * numpy.ones(shape, dtype="timedelta64[us]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones(shape, numpy.float32)
         
-        shakingTimeRel = analysis_utils.timedelta_to_seconds(shakingTime - numpy.datetime64(event["origin_time"]))
-
         thresholdReached = False
         for alert in alerts:
             if numpy.datetime64(alert["timestamp"]) > numpy.max(shakingTime):
@@ -69,9 +66,10 @@ class CostSavings(object):
                     ("warning_time", analysis_utils.timedelta_to_seconds(warningTimeCur),),
                 ]
                 gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
-                self.maps.load_data(event["event_id"], alert=alert)
+                mapPanels = maps.MapPanels(self.config)
+                mapPanels.load_data(event["event_id"], alert=alert)
                 tafterOT = analysis_utils.timedelta_to_seconds(numpy.datetime64(alert["timestamp"])-numpy.datetime64(event["origin_time"]))
-                self.maps.mmi_warning_time(tafterOT)
+                mapPanels.mmi_warning_time(tafterOT)
             
             # Update alert time if greater than previous
             maskAlert = numpy.bitwise_and(warningTimeCur > warningTime, mmiPredCur >= mmiAlertThreshold)
@@ -84,8 +82,16 @@ class CostSavings(object):
             maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur >= warningTimeZero)
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
-        # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
+        filename = "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff"
+        metrics = self._cost(mmiPred, shakemap, warningTime, populationDensity, mmiAlertThreshold, filename)
+        return metrics
+
+    def _cost(self, mmiPred, shakemap, warningTime, populationDensity, mmiAlertThreshold, filename):
+        """Compute cost savings metrics.
+        """
         mmiObs = shakemap.data["mmi"]
+        
+        # Compute costNoEEW, costEEW, costPerfectEEW, costSavings
         objectPath = self.config.get("fragility_curves", "object").split(".")
         fragilityOptions = dict(self.config.items("fragility_curves"))
         fragilityOptions.pop("object")
@@ -120,12 +126,11 @@ class CostSavings(object):
         maskFP = numpy.bitwise_and(mmiPred >= mmiAlertThreshold, costDamage < costActionObs)
         maskTP = numpy.bitwise_and(mmiPred >= mmiAlertThreshold, costDamage >= costActionObs)
         alertCategory = maskTN*0.0 + maskFN*1.0 + maskFP*2.0 + maskTP*3.0
-        
+
         values = [
-            ("mmi_obs", shakemap.data["mmi"],),
+            ("mmi_obs", mmiObs,),
             ("mmi_pred", mmiPred,),
             ("warning_time", analysis_utils.timedelta_to_seconds(warningTime),),
-            ("shaking_time", shakingTimeRel,),
             ("population_density", populationDensity,),
             ("cost_no_eew", costNoEEW,),
             ("cost_perfect_eew", costPerfectEEW,),
@@ -135,8 +140,7 @@ class CostSavings(object):
         cacheDir = self.config.get("files", "analysis_cache_dir")
         if not os.path.isdir(cacheDir):
             os.makedirs(cacheDir)
-        filename = os.path.join(cacheDir, "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff")
-        gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
+        gdalraster.write(os.path.join(cacheDir, filename), values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
 
         metrics = {
             "area_damage": areaDamage,

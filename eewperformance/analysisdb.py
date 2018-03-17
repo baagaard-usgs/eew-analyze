@@ -339,7 +339,7 @@ class AnalysisData(object):
         for alert in alerts:
             # :TODO: Ignore deleted alerts
             # Ignore alerts from non-target servers
-            if alert["server"]!="unknown" and alert["server"]!="eew2" and alert["server"]!=server:
+            if alert["server"] !="unknown" and alert["server"] !="eew2" and alert["server"] != server:
                 continue
             # Limit to distance range 
             dist = greatcircle.distance(lon, lat, alert["longitude"], alert["latitude"])
@@ -453,7 +453,6 @@ class AnalysisData(object):
         event = self.cursor.fetchone()
         return event
 
-    
     def comcat_shakemap(self, comcatId):
         """Get ComCat ShakeMap information.
 
@@ -463,7 +462,6 @@ class AnalysisData(object):
         self.cursor.execute("SELECT * FROM comcat_shakemaps WHERE event_id=?", (comcatId,))
         shakemap = self.cursor.fetchone()
         return shakemap
-
     
     def tables_info(self):
         """Returns string with database summary.
@@ -511,7 +509,7 @@ class AnalysisData(object):
         rows = self.cursor.fetchall()
         for row in rows:
             event = self.comcat_event(row["comcat_id"])
-            sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[mag_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_metric]:6.2f} {row[pop_metric]:6.2f} {event[description]}\n".format(row=row, event=event)
+            sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_metric]:6.2f} {row[population_metric]:6.2f} {event[description]}\n".format(row=row, event=event)
         return sout
 
     def show_matches(self, server):

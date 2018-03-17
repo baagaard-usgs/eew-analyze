@@ -14,6 +14,7 @@ import logging
 from importlib import import_module
 import numpy
 
+import h5py # Avoid gdal loading incompatible h5py
 from osgeo import osr
 
 from eewperformance import shakemap
@@ -115,8 +116,10 @@ class ShakeMapRegionApp(object):
                 sys.stdout.flush()
 
             dataDir = eventDir.replace("[EVENTID]", eqId)
-
-            with gzip.open(os.path.join(dataDir, "info.json.gz"), "r") as finfo:
+            filename = os.path.join(dataDir, "custom_info.json.gz")
+            if not os.path.isfile(filename):
+                filename = os.path.join(dataDir, "info.json.gz")
+            with gzip.open(os.path.join(dataDir, filename), "r") as finfo:
                 shakemapInfo = json.load(finfo)
                 mmiMagBias = shakemapInfo["output"]["ground_motions"]["intensity"]["bias"]
                 mapInfo = shakemapInfo["output"]["map_information"]
@@ -126,7 +129,6 @@ class ShakeMapRegionApp(object):
                    "longitude_max": mapInfo["max"]["longitude"],
                    "latitude_max": mapInfo["max"]["latitude"],
                 }
-
 
             event.load(os.path.join(dataDir, eqId+".geojson"))
             distance = self._calc_distance(event, mmiFn, mmiMagBias)
