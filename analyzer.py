@@ -48,11 +48,11 @@ gmice = default
 #mmi_threshold = 0.0
 #magnitude_threshold = 2.95001
 
-#mmi_threshold = 2.0
-#magnitude_threshold = 4.45001
-
 mmi_threshold = 2.0
-magnitude_threshold = 2.95001
+magnitude_threshold = 4.45001
+
+#mmi_threshold = 2.0
+#magnitude_threshold = 3.45001
 
 [fragility_curves]
 object = eewperformance.fragility_curves.PublicFearAvoidance
