@@ -46,10 +46,13 @@ gmice = default
 
 [alerts]
 #mmi_threshold = 0.0
-#magnitude_threshold = 2.95
+#magnitude_threshold = 2.95001
+
+#mmi_threshold = 2.0
+#magnitude_threshold = 4.45001
 
 mmi_threshold = 2.0
-magnitude_threshold = 4.45
+magnitude_threshold = 2.95001
 
 [fragility_curves]
 object = eewperformance.fragility_curves.PublicFearAvoidance
@@ -71,8 +74,8 @@ mmi_threshold_min = 2.0
 mmi_threshold_max = 4.0
 mmi_threshold_step = 0.5
 
-magnitude_threshold_min = 2.95
-magnitude_threshold_max = 4.45
+magnitude_threshold_min = 3.45001
+magnitude_threshold_max = 4.45001
 magnitude_threshold_step = 0.50
 
 [maps]

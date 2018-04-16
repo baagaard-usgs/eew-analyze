@@ -41,16 +41,19 @@ class Figures(object):
         
         horizDistKmError = 1.0e-3*greatcircle.distance(self.event["longitude"], self.event["latitude"], alertsLon, alertsLat)
 
-        t = (alertsTime - originTime).astype("timedelta64[us]").astype("float32")/1.0e+6
-        
+        if len(alertsTime) > 0:
+            t = (alertsTime - originTime).astype("timedelta64[us]").astype("float32")/1.0e+6
+        else:
+            t = []
+                
         figure = Figure()
-        figure.open(6.0, 5.0, margins=((0.45, 0.8, 0.2), (0.4, 0.8, 0.3)))
-        nrows = 2
-        ncols = 2
+        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.2), (0.4, 0.8, 0.3)))
+        nrows = 1
+        ncols = 3
         irow = 1
         icol = 1
 
-        tmax = max(30.0, t[0]+30.0)
+        tmax = max(30.0, t[0]+30.0) if len(t) > 0 else 30.0
         
         # Magnitude
         ax = figure.axes(nrows, ncols, irow, icol)
@@ -59,11 +62,9 @@ class Figures(object):
         ax.set_ylabel("Magnitude (Mw)")
         ax.set_title("Magnitude")
         ax.set_xlim(0, tmax)
-
         ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_blue")
         ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_blue")
-        icol = 1
-        irow += 1
+        icol += 1
         
         # Horizontal location error
         ax = figure.axes(nrows, ncols, irow, icol)
@@ -91,7 +92,7 @@ class Figures(object):
         filename = analysis_utils.analysis_label(self.config, self.event["event_id"])
         filename += "-alert_error.png"
         figure.figure.savefig(os.path.join(plotsDir, filename))
-        pyplot.close(figure)
+        figure.close()
         return
 
 # End of file
