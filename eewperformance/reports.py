@@ -28,6 +28,8 @@ class AnalysisSummary(object):
     HEADER = 0.5*inch
     MARGIN = 0.5*inch
     PAGE_WIDTH, PAGE_HEIGHT = landscape(letter)
+    MAP_SIZE = 3.25*inch
+    SPACING = 0.125*inch
     
     def __init__(self, config):
         """Constructor.
@@ -69,14 +71,24 @@ class AnalysisSummary(object):
         #comcat_id, eew_server, gmpe, fragility, magnitude_threshold
         gmpe = self.config.get("mmi_predicted", "gmpe")
         fragility = self.config.get("fragility_curves", "object").split(".")[-1]
-        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
-        perfStats = numpy.array(db.performance_stats(eqId, server, gmpe, fragility, magThreshold))
-        
-        self._render_event_header(event)
-        self._render_event_plots(event)
-        self._render_event_stats(event, alerts, perfStats)
+        perfEEW = numpy.array(db.performance_stats(eqId, server, gmpe, fragility))
+        perfTheoryMag = numpy.array(db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility))
+        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility))
 
+        # Page 1
+        self._render_event_header(event)
+        self._render_event_info(event, shakemap, alerts)
+        self._render_event_perf_table(perfEEW, perfTheoryMag, perfTheoryMagBias)
+        self._render_event_alert_maps(event, server)
         self.canvas.showPage()
+
+        # Page 2
+        self._render_event_header(event)
+        self._render_event_mmi_maps(event)
+        self._render_event_error(event)
+        #self._render_event_mmi_correlation(event)
+        self.canvas.showPage()
+
         return
 
     def _render_event_header(self, event):
@@ -108,45 +120,101 @@ class AnalysisSummary(object):
         self.canvas.restoreState()
         return
 
-    def _render_event_plots(self, event):
-        MAP_SIZE = 3.25*inch
-        SPACING = 0.125*inch
-        
-        # Maps of MMI observed, predicted, and residual (observed-predicted)
+    def _render_event_mmi_maps(self, event):
+        """Maps of MMI observed, predicted, and residual (observed-predicted).
+        """
         x = self.MARGIN
-        y = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-MAP_SIZE
+        y = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-self.MAP_SIZE
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-map_mmi_obs.jpg")
-        self._render_image(filename, x, y, width=MAP_SIZE)
+        self._render_image(filename, x, y, width=self.MAP_SIZE)
     
-        x += MAP_SIZE + SPACING
+        x += self.MAP_SIZE + self.SPACING
         filename = os.path.join(plots_dir, label+"-map_mmi_pred.jpg")
-        self._render_image(filename, x, y, width=MAP_SIZE)
+        self._render_image(filename, x, y, width=self.MAP_SIZE)
 
-        x += MAP_SIZE + SPACING
+        x += self.MAP_SIZE + self.SPACING
         filename = os.path.join(plots_dir, label+"-map_mmi_residual.jpg")
-        self._render_image(filename, x, y, width=MAP_SIZE)
-
-        # Map of alert categories w/warning time
-        x = self.MARGIN
-        y -= MAP_SIZE + SPACING
-        filename = os.path.join(plots_dir, label+"-map_alert_category.jpg")
-        self._render_image(filename, x, y, width=MAP_SIZE)
-
-        # Figure of magnitude and location error
-        x += MAP_SIZE + SPACING
-        filename = os.path.join(plots_dir, label+"-alert_error.png")
-        self._render_image(filename, x, y, width=MAP_SIZE)
+        self._render_image(filename, x, y, width=self.MAP_SIZE)
 
         return
 
-    def _render_event_stats(self, event, shakemap, alerts, perfStats):
+    def _figure_label(self, x, y, label):
+        """
+        """
         self.canvas.saveState()
-        self.canvas.translate(7.25*inch, 3.5*inch)
+        self.canvas.translate(x, y)
+        text = self.canvas.beginText()
+        text.setFont("Helvetica-Bold", 10)
+        text.textLines(label)
+        self.canvas.drawText(text)
+        self.canvas.restoreState()
+        return
 
+    
+    def _render_event_alert_maps(self, event, server):
+        """Maps of alert categories w/warning time for EEW and
+        theoretical with catalog magnitude and theoretical with catalog
+        magnitude with event bias.
+        """
+        x = self.MARGIN
+        y = self.MARGIN
+
+        plots_dir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config, event["event_id"])
+
+        filename = os.path.join(plots_dir, label+"-map_alert_category.jpg")
+        self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+self.MAP_SIZE, "ShakeAlert")
+        
+        x += self.MAP_SIZE + self.SPACING
+        filenameMag = filename.replace(server, "catalog-magnitude")
+        self._render_image(filenameMag, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+self.MAP_SIZE, "Theoretical Ideal: Catalog Mag.")
+
+        x += self.MAP_SIZE + self.SPACING
+        filenameMagBias = filename.replace(server, "catalog-magnitude-bias")
+        self._render_image(filenameMagBias, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+self.MAP_SIZE, "Theoretical Ideal: Catalog Mag. w/Bias")
+        return
+
+    def _render_event_error(self, event):
+        """Figure of magnitude and location error.
+        """
+        x = self.MARGIN
+        y = self.MARGIN
+
+        plots_dir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config, event["event_id"])
+
+        filename = os.path.join(plots_dir, label+"-alert_error.png")
+        self._render_image(filename, x, y, width=2.0*self.MAP_SIZE)
+        return
+
+    def _render_event_mmi_correlation(self, event):
+        """Figure of MMI correlation (observed vs predicted) with inset
+        of residual histogram.
+        """
+        x = self.PAGE_WIDTH - 3.5*inch
+        y = self.MARGIN
+
+        plots_dir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config, event["event_id"])
+
+        filename = os.path.join(plots_dir, label+"-mmi_correlation.png")
+        self._render_image(filename, x, y, height=self.MAP_SIZE)
+        return
+
+    def _render_event_info(self, event, shakemap, alerts):
+        x = self.MARGIN
+        y = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)
+
+        self.canvas.saveState()
+        self.canvas.translate(x, y)
+        
         ot = dateutil.parser.parse(event["origin_time"])
         text = self.canvas.beginText()
         text.setFont("Courier", 8)
@@ -154,15 +222,19 @@ class AnalysisSummary(object):
         text.textLine("   {event[magnitude_type]}{event[magnitude]:.1f}".format(event=event))
         text.textLine("   {ot:%Y-%m-%d %H:%M:%S.%f}".format(ot=ot))
         text.textLine("ShakeMap")
-        text.textLine("   MMI bias {:%6.2f}".format(shakemap["mmi_bias"]))
+        text.textLine("   MMI bias {:6.2f}".format(shakemap["mmi_bias"]))
 
         # First alert
-        alert = alerts[0]
-        text.textLine("First alert")
-        text.textLine("   M{:.1f}".format(alert["magnitude"]))
-        at = dateutil.parser.parse(alert["timestamp"])
-        dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
-        text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
+        if len(alerts) > 0:
+            alert = alerts[0]
+            text.textLine("First alert")
+            text.textLine("   M{:.1f}".format(alert["magnitude"]))
+            at = dateutil.parser.parse(alert["timestamp"])
+            dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
+            text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
+            vs = self.config.getfloat("shaking_time", "vs_kmps")
+            blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5
+            text.textLine("   Radius of no-warning zone: {:.0f} km".format(blindDist))
 
         # First alert exceeding threshold
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
@@ -179,46 +251,75 @@ class AnalysisSummary(object):
             dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
         self.canvas.drawText(text)
-
-        self._render_event_stats_table(event, perfStats)
-
         self.canvas.restoreState()
         return
 
-    def _render_event_stats_table(self, event, results):
+    def _render_event_perf_table(self, perfEEW, perfTheoryMag, perfTheoryMagBias):
         data = [
-            ["MMI\nThreshold", "Alert", "", "Q", ""],
-            ["", "Area (km^2)", "Population", "Area", "Population"],
+            ["Magnitude\nThreshold", "MMI\nThreshold", "Alert", "", "EEW", "", "Catalog Mag.", "", "Catalog Mag. w/Bias"],
+            ["", "", "Area (km^2)", "Population", "Q-Area", "Q-Pop", "Q-Area", "Q-Pop", "Q-Area", "Q-Pop"],
         ]
         tableCols = (
+            ("magnitude_threshold", "{:3.1f}"),
             ("mmi_threshold", "{:3.1f}"),
             ("area_alert", "{:7.1e}"),
             ("population_alert", "{:7.1e}"),
             ("area_metric", "{:5.2f}"),
             ("population_metric", "{:5.2f}"),
         )
-        rowQPopMax = 2 + numpy.argmax(results["population_metric"])
-        rowQAreaMax = 2 + numpy.argmax(results["area_metric"])
-        for result in results:
-            data.append([s.format(result[v]) for v,s in tableCols])
+        
+        for pEEW in perfEEW:
+            row = [s.format(pEEW[v]) for v,s in tableCols]
+            mask = numpy.logical_and(perfTheoryMag["magnitude_threshold"] == pEEW["magnitude_threshold"],
+                                         perfTheoryMag["mmi_threshold"] == pEEW["mmi_threshold"])
+            if numpy.sum(mask) > 0:
+                row += [s.format(perfTheoryMag[mask][0][v]) for v,s in tableCols[-2:]]
+            else:
+                row += [""]*2
+            mask = numpy.logical_and(perfTheoryMagBias["magnitude_threshold"] == pEEW["magnitude_threshold"],
+                                         perfTheoryMagBias["mmi_threshold"] == pEEW["mmi_threshold"])
+            if numpy.sum(mask) > 0:
+                row += [s.format(perfTheoryMagBias[mask][0][v]) for v,s in tableCols[-2:]]
+            else:
+                row += [""]*2
+            data.append(row)
             
         style = [
-            ("FONT", (0,0), (-1,-1), "Courier", 8),
+            ("FONT", (0,0), (-1,-1), "Courier", 7),
             ("LEFTPADDING", (0,0), (-1,-1), 2),
             ("RIGHTPADDING", (0,0), (-1,-1), 2),
             ("BOTTOMPADDING", (0,0), (-1,-1), 2),
             ("TOPPADDING", (0,0), (-1,-1), 2),
             ("GRID", (0,0), (-1,-1), 0.5, (0.5, 0.5, 0.5)),
             ("SPAN", (0,0), (0,1)),
-            ("SPAN", (1,0), (2,0)),
-            ("SPAN", (3,0), (4,0)),
+            ("SPAN", (1,0), (1,1)),
+            ("SPAN", (2,0), (3,0)),
+            ("SPAN", (4,0), (5,0)),
+            ("SPAN", (6,0), (7,0)),
+            ("SPAN", (8,0), (9,0)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("BACKGROUND", (-1,rowQPopMax),(-1,rowQPopMax), (0.7, 1.0, 0.7)),
-            ("BACKGROUND", (-2,rowQAreaMax),(-2,rowQAreaMax), (0.7, 1.0, 0.7)),
+            #("BACKGROUND", (-5,rowQPopMax),(-5,rowQPopMax), (0.7, 1.0, 0.7)),
+            #("BACKGROUND", (-6,rowQAreaMax),(-6,rowQAreaMax), (0.7, 1.0, 0.7)),
         ]
+        if perfEEW["population_metric"].shape[-1] > 0:
+            maxQ = numpy.max(perfEEW["population_metric"])
+            rowsMaxQ = 2 + numpy.where(perfEEW["population_metric"] >= maxQ)[0]
+            for row in rowsMaxQ:
+                style.append(("BACKGROUND", (-6,row),(-6,row), (0.7, 1.0, 0.7)))
+                             
+        if perfEEW["area_metric"].shape[-1] > 0:
+            maxQ = numpy.max(perfEEW["area_metric"])
+            rowMaxQ = 2 + numpy.where(perfEEW["area_metric"] >= maxQ)[0]
+            for row in rowsMaxQ:
+                style.append(("BACKGROUND", (-5,row),(-5,row), (0.7, 1.0, 0.7)))
+
+        self.canvas.saveState()
+        self.canvas.translate(self.MARGIN+self.MAP_SIZE+self.SPACING, self.PAGE_HEIGHT-self.MARGIN-self.MAP_SIZE)
+
         t = Table(data, style=style)
-        t.wrapOn(self.canvas, 3.0*inch, 2.0*inch)
-        t.drawOn(self.canvas, *self._coord(0.0, -2.5, inch)) #0.0, y-2.0, inch))
+        t.wrapOn(self.canvas, 6.0*inch, 3.25*inch)
+        t.drawOn(self.canvas, *self._coord(0.0, 0.0, inch)) #0.0, y-2.0, inch))
+        self.canvas.restoreState()
         return
 
     def _render_image(self, filename, x, y, width=None, height=None):

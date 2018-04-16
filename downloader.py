@@ -338,7 +338,7 @@ class DownloaderApp(object):
             filename = os.path.join(dataDir, "custom_info.json.gz")
             if not os.path.isfile(filename):
                 filename = os.path.join(dataDir, "info.json.gz")
-            with gzip.open(os.path.join(dataDir, filename), "r") as fh:
+            with gzip.open(filename, "r") as fh:
                 info = json.load(fh)
                 info["event_id"] = eqId
                 self.db.add_shakemap_info(info, replace)
@@ -381,7 +381,10 @@ class DownloaderApp(object):
         # Read DM logs
         dmlog = shakealert.DMLogXML(config=self.config)
         numFiles = len(files)
-        logging.getLogger(__name__).info("Processing {:d} DM logs starting with {:s}.".format(numFiles, files[0]))
+        if numFiles > 0:
+            logging.getLogger(__name__).info("Processing {:d} DM logs starting with {:s}.".format(numFiles, files[0]))
+        else:
+            logging.getLogger(__name__).info("No DM logs found.")
         for iFile,filename in enumerate(files):
             if self.showProgress:
                 sys.stdout.write("\rProcessing DM logs...{:d}%".format(((iFile+1)*100)/numFiles))
