@@ -382,7 +382,7 @@ class AnalysisData(object):
         alerts = self.cursor.fetchall()
         return alerts
 
-    def performance_stats(self, comcatId, server, gmpe, fragility, magnitude_threshold):
+    def performance_stats(self, comcatId, server, gmpe, fragility):
         """
         """
         conditions = [
@@ -390,18 +390,16 @@ class AnalysisData(object):
             "eew_server=?",
             "gmpe=?",
             "fragility=?",
-            "magnitude_threshold=?",
             ]
         values = (
             comcatId,
             server,
             gmpe,
             fragility,
-            magnitude_threshold,
             )
-        self.cursor.execute("SELECT * FROM performance WHERE " + " AND ".join(conditions) + " ORDER BY mmi_threshold", values)
+        self.cursor.execute("SELECT * FROM performance WHERE " + " AND ".join(conditions) + " ORDER BY magnitude_threshold,mmi_threshold", values)
         # :TODO: :KLUDGE: to get structured array
-        # Can we use PRAGMA TABLE_INFO to get column name and type (to map to numpy.dtype)
+        # Can we use PRAGMA TABLE_INFO to get column name and type (to map to numpy.dtype)?
         dtype = [
             ("comcat_id", "|S32"),
             ("eew_server", "|S32"),
@@ -487,7 +485,7 @@ class AnalysisData(object):
 
         # Comcat events
         sout += "\nComCat Events\n"
-        self.cursor.execute("SELECT * FROM comcat_events")
+        self.cursor.execute("SELECT * FROM comcat_events ORDER BY origin_time")
         rows = self.cursor.fetchall()
         for row in rows:
             ot = dateutil.parser.parse(row["origin_time"])
@@ -495,7 +493,7 @@ class AnalysisData(object):
 
         # Comcat Shakemap
         sout += "\nShakeMap Info\n"
-        self.cursor.execute("SELECT * FROM comcat_shakemaps")
+        self.cursor.execute("SELECT * FROM comcat_shakemaps ORDER BY event_id")
         rows = self.cursor.fetchall()
         for row in rows:
             event = self.comcat_event(row["event_id"])
@@ -505,7 +503,7 @@ class AnalysisData(object):
 
         # Performance
         sout += "\nPerformance Data\n"
-        self.cursor.execute("SELECT * FROM performance")
+        self.cursor.execute("SELECT * FROM performance ORDER BY comcat_id,fragility,gmpe,magnitude_threshold,mmi_threshold")
         rows = self.cursor.fetchall()
         for row in rows:
             event = self.comcat_event(row["comcat_id"])
