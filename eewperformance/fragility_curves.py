@@ -111,8 +111,9 @@ class PublicFearAvoidance(CostActionDamage):
     """Rough estimate of cost of action and damage for public
     fear avoidance (public perception of utility of EEW).
 
-    Cost of action is uniform with respect to MMI, while cost of
-    damage is a linear ramp.
+    Cost of action is 1/10 of maximum cost of damage and uniform with
+    respect to MMI, while cost of damage is a linear ramp.
+
     """
 
     def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
@@ -127,11 +128,12 @@ class PublicFearAvoidance20(CostActionDamage):
     """Rough estimate of cost of action and damage for public
     fear avoidance (public perception of utility of EEW).
 
-    Cost of action is uniform with respect to MMI, while cost of
-    damage is a linear ramp.
+    Cost of action is 1/20 of maximum cost of damage and uniform with
+    respect to MMI, while cost of damage is a linear ramp.
+
     """
 
-    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
+    def __init__(self, cost_action=0.05, damage_low_mmi=2.5, damage_high_mmi=5.5):
         CostActionDamage.__init__(self)
 
         self.action = Constant(cost_action)
@@ -143,11 +145,12 @@ class PublicFearAvoidance50(CostActionDamage):
     """Rough estimate of cost of action and damage for public
     fear avoidance (public perception of utility of EEW).
 
-    Cost of action is uniform with respect to MMI, while cost of
-    damage is a linear ramp.
+    Cost of action is 1/50 of maximum cost of damage and uniform with
+    respect to MMI, while cost of damage is a linear ramp.
+
     """
 
-    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
+    def __init__(self, cost_action=0.02, damage_low_mmi=2.5, damage_high_mmi=5.5):
         CostActionDamage.__init__(self)
 
         self.action = Constant(cost_action)
