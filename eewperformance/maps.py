@@ -40,9 +40,7 @@ class MapPanels(object):
         return
 
     def load_data(self):
-        """
-        :type filename: str
-        :param filename: Name of raster file with analysis data without path.
+        """Load data from GDAL raster file.
         """
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = "analysis_" + analysis_utils.analysis_label(self.config, self.eqId) + ".tiff"
