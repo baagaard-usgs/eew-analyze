@@ -86,7 +86,7 @@ class AnalysisSummary(object):
         self._render_event_header(event)
         self._render_event_mmi_maps(event)
         self._render_event_error(event)
-        #self._render_event_mmi_correlation(event)
+        self._render_event_mmi_correlation(event)
         self.canvas.showPage()
 
         return
@@ -167,18 +167,18 @@ class AnalysisSummary(object):
         label = analysis_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-map_alert_category.jpg")
-        self._render_image(filename, x, y, width=self.MAP_SIZE)
-        self._figure_label(x, y+self.MAP_SIZE, "ShakeAlert")
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+imageHeight, "ShakeAlert")
         
         x += self.MAP_SIZE + self.SPACING
         filenameMag = filename.replace(server, "catalog-magnitude")
-        self._render_image(filenameMag, x, y, width=self.MAP_SIZE)
-        self._figure_label(x, y+self.MAP_SIZE, "Theoretical Ideal: Catalog Mag.")
+        imageWidth, imageHeight, self._render_image(filenameMag, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag.")
 
         x += self.MAP_SIZE + self.SPACING
         filenameMagBias = filename.replace(server, "catalog-magnitude-bias")
-        self._render_image(filenameMagBias, x, y, width=self.MAP_SIZE)
-        self._figure_label(x, y+self.MAP_SIZE, "Theoretical Ideal: Catalog Mag. w/Bias")
+        imageWidth, imageHeight = self._render_image(filenameMagBias, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag. w/Bias")
         return
 
     def _render_event_error(self, event):
@@ -233,7 +233,7 @@ class AnalysisSummary(object):
             dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
             vs = self.config.getfloat("shaking_time", "vs_kmps")
-            blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5
+            blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt > 0 else 0.0
             text.textLine("   Radius of no-warning zone: {:.0f} km".format(blindDist))
 
         # First alert exceeding threshold
@@ -250,6 +250,9 @@ class AnalysisSummary(object):
             at = dateutil.parser.parse(alert["timestamp"])
             dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
+            vs = self.config.getfloat("shaking_time", "vs_kmps")
+            blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt > 0 else 0.0
+            text.textLine("   Radius of no-warning zone: {:.0f} km".format(blindDist))
         self.canvas.drawText(text)
         self.canvas.restoreState()
         return
@@ -331,7 +334,7 @@ class AnalysisSummary(object):
         h = height if height else width*image.height/image.width
 
         self.canvas.drawImage(ImageReader(image), x, y, width=w, height=h)
-        return
+        return (w,h)
     
     def _coord(self, x, y, unit=1):
         return x * unit, y * unit
