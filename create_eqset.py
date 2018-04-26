@@ -21,7 +21,7 @@ max_radius_deg = 2.5
 [losangeles]
 longitude = -117.396
 latitude = 33.953
-max_radius_deg = 3.0
+max_radius_deg = 2.5
 
 [eureka]
 longitude = -124.4
