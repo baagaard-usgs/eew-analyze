@@ -37,7 +37,7 @@ projection = EPSG:3311
 function = eewperformance.userdisplay.shaking_time_vs
 #vs_kmps = 3.55 ; User display
 #vs_kmps = 3.4 ; From NC record section
-vs_kmps = 3.5 ; From NC record section
+vs_kmps = 3.5 ; Avg NC/SC
 
 [mmi_predicted]
 function = eewperformance.shakemap.mmi_via_gmpe_gmice
@@ -48,26 +48,17 @@ gmice = default
 #mmi_threshold = 0.0
 #magnitude_threshold = 2.95001
 
-mmi_threshold = 2.0
-magnitude_threshold = 4.45001
-
 #mmi_threshold = 2.0
-#magnitude_threshold = 3.45001
+#magnitude_threshold = 4.45001
+
+mmi_threshold = 2.0
+magnitude_threshold = 3.45001
 
 [fragility_curves]
 object = eewperformance.fragility_curves.PublicFearAvoidance
 cost_action = 0.1
 damage_low_mmi = 2.5
 damage_high_mmi = 5.5
-
-#object = eewperformance.fragility_curves.PublicInjury
-#cost_action = 0.1
-#damage_low_mmi = 4.5
-#damage_high_mmi = 7.5
-
-#object = eewperformance.fragility_curves.StepDamage
-#cost_action = 0.1
-#damage_mmi = 3.5
 
 [optimize]
 mmi_threshold_min = 2.0
@@ -267,8 +258,8 @@ class Event(object):
         statsExtra = {
             "comcat_id": self.event["event_id"],
             "eew_server": self.config.get("shakealert.production", "server"),
-            "dm_id": self.alerts[0]["event_id"],
-            "dm_timestamp": self.alerts[0]["timestamp"],
+            "dm_id": self.alerts[0]["event_id"] if len(self.alerts) > 0 else -1,
+            "dm_timestamp": self.alerts[0]["timestamp"] if len(self.alerts) > 0 else "",
             "gmpe": self.config.get("mmi_predicted", "gmpe"),
             "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
             }
@@ -314,6 +305,8 @@ class Event(object):
         figures = plotsxy.Figures(self.config, self.event)
         if selection == "alert_error" or selection == "all":
             figures.alert_error(self.alerts)
+        if selection == "mmi_correlation" or selection == "all":
+            figures.mmi_correlation()
         return
 
 
@@ -353,9 +346,13 @@ class EEWAnalyzeApp(object):
                     event.process()
             else:
                 pool = multiprocessing.Pool(args.nthreads)
+                result = []
                 for eqId in self.config.options("events"):
                     event = Event(args, self.config, eqId)
-                    pool.apply_async(event_worker, args=(event,))
+                    r = pool.apply_async(event_worker, args=(event,))
+                    result.append(r)
+                for r in result:
+                    r.get()
                 pool.close()
                 pool.join()
 
@@ -411,7 +408,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--optimize-events", action="store_true", dest="optimize_events")
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
-        parser.add_argument("--plot-figures", action="store", dest="plot_figures", default=None, choices=[None, "all", "alert_error"])
+        parser.add_argument("--plot-figures", action="store", dest="plot_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=1)
         parser.add_argument("--all", action="store_true", dest="all")
