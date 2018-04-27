@@ -31,6 +31,11 @@ class CostSavings(object):
         warningTimeZero = numpy.zeros((1,), dtype="timedelta64[us]")
         warningTime = gdalraster.NO_DATA_VALUE * 1.0e+6 * numpy.ones(shape, dtype="timedelta64[us]")
         mmiPred = gdalraster.NO_DATA_VALUE * numpy.ones(shape, numpy.float32)
+
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        gmice = self.config.get("mmi_predicted", "gmice")
+        if gmice == "default":
+            gmice = shakemap.gmiceGrid
         
         thresholdReached = False
         for alert in alerts:
@@ -50,9 +55,7 @@ class CostSavings(object):
                     msg = "Alert threshold reached at {tstamp}, {wtime:.1f}s after origin time.".format(tstamp=tstamp, wtime=wtime)
                     logging.getLogger(__name__).info(msg)
                     thresholdReached = True
-
-            gmpe = self.config.get("mmi_predicted", "gmpe")
-            gmice = self.config.get("mmi_predicted", "gmice")
+                
             mmiPredCur = fn(alert, shakemap.data, gmpe, gmice)
             warningTimeCur = shakingTime - numpy.datetime64(alert["timestamp"])
             

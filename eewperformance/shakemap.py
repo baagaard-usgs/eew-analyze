@@ -24,6 +24,7 @@ class ShakeMap(object):
         self.data = None
         self.grid = None
         self.gmice = gmice
+        self.gmice_internal = None
         return
 
     def load(self, filename):
@@ -282,7 +283,7 @@ def mmi_via_gmpe_gmice(alert, points, gmpe="ASK2014", gmice="WaldEtal1999"):
 
     if gmice == "WordenEtal2012":
         gmiceFn = mmi_WordenEtal2012
-    elif gmice == "WaldEtal1999" or gmice == "default":
+    elif gmice == "WaldEtal1999":
         gmiceFn = mmi_WaldEtal1999
     else:
         raise ValueError("Unknown GMIC '{}'.".format(gmice))

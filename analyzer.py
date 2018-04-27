@@ -168,17 +168,25 @@ class Event(object):
             filename = os.path.join(dataDir, "grid.xml.gz")
         gmice = self.config.get("mmi_predicted", "gmice")
         if gmice == "WaldEtal1999":
-            from shakemap import mmi_WaldEtal1999
-            gmiceFn = mmi_WaldEtal1999
+            gmiceFn = shakemap.mmi_WaldEtal1999
+            gmiceGrid = None
         elif gmice == "WordenEtal2012":
-            from shakemap import mmi_WordenEtal2012
-            gmiceFn = mmi_WordenEtal2012
+            gmiceFn = shakemap.mmi_WordenEtal2012
+            gmiceGrid = None
         elif gmice == "default":
             gmiceFn = None
+            shakemapInfo = self.db.comcat_shakemap(self.eqId)
+            if "Wald99" in shakemapInfo["pgm2mi"]:
+                gmiceGrid = "WaldEtal1999"
+            elif "WGRW11" in shakemapInfo["pgm2mi"]:
+                gmiceGrid = "WordenEtal2012"
+            else:
+                gmiceGrid = None
         else:
             raise ValueError("Unknown GMICE '{}'.".format(gmice))
         self.shakemap = shakemap.ShakeMap(gmiceFn)
         self.shakemap.load(filename)
+        self.shakemap.gmiceGrid = gmiceGrid
 
         # Analsis DB data (event and alerts)
         self.event = self.db.comcat_event(self.eqId)
