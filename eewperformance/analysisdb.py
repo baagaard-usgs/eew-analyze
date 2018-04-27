@@ -127,9 +127,6 @@ class AnalysisData(object):
         """
         self.filename = filename
         
-        #self.connection = sqlite3.connect(filename, timeout=2.0)
-        #self.connection.row_factory = sqlite3.Row
-        #self.cursor = self.connection.cursor()
         return
 
     def operation(self):
@@ -175,15 +172,15 @@ class AnalysisData(object):
         cmd = "INSERT"
         if replace:
             cmd += " OR REPLACE"
-        try:
-            #self.cursor.executemany("INSERT INTO eew_alerts({}) VALUES({})".format(insertCols, valueCols), alerts)
-            for alert in alerts:
-                self.cursor.execute("{} INTO eew_alerts({}) VALUES({})".format(cmd, insertCols, valueCols), alert)
-            self.connection.commit()
-        except sqlite3.IntegrityError as ex:
-            logging.getLogger(__name__).debug(str(ex))
-            #logging.getLogger(__name__).debug(str(alerts))
-            logging.getLogger(__name__).debug(str(alert))
+        with self.operation() as op:
+            try:
+                #self.cursor.executemany("INSERT INTO eew_alerts({}) VALUES({})".format(insertCols, valueCols), alerts)
+                for alert in alerts:
+                    op.cursor.execute("{} INTO eew_alerts({}) VALUES({})".format(cmd, insertCols, valueCols), alert)
+            except sqlite3.IntegrityError as ex:
+                logging.getLogger(__name__).debug(str(ex))
+                #logging.getLogger(__name__).debug(str(alerts))
+                logging.getLogger(__name__).debug(str(alert))
         return
     
     def add_event(self, event, replace=False):
@@ -210,12 +207,12 @@ class AnalysisData(object):
         cmd = "INSERT"
         if replace:
             cmd += " OR REPLACE"
-        try:
-            self.cursor.execute("{0} INTO comcat_events({1}) VALUES({2})".format(cmd, insertCols, valueCols), eventValues)
-            self.connection.commit()
-        except sqlite3.IntegrityError as ex:
-            logging.getLogger(__name__).debug(str(ex))
-            logging.getLogger(__name__).debug(str(event))
+        with self.operation() as op:
+            try:
+                op.cursor.execute("{0} INTO comcat_events({1}) VALUES({2})".format(cmd, insertCols, valueCols), eventValues)
+            except sqlite3.IntegrityError as ex:
+                logging.getLogger(__name__).debug(str(ex))
+                logging.getLogger(__name__).debug(str(event))
         return
 
     def add_shakemap_info(self, info, replace=False):
@@ -278,12 +275,12 @@ class AnalysisData(object):
         cmd = "INSERT"
         if replace:
             cmd += " OR REPLACE"
-        try:
-            self.cursor.execute("{0} INTO comcat_shakemaps({1}) VALUES({2})".format(cmd, insertCols, valueCols), infoValues)
-            self.connection.commit()
-        except sqlite3.IntegrityError as ex:
-            logging.getLogger(__name__).debug(str(ex))
-            logging.getLogger(__name__).debug(str(info))
+        with self.operation() as op:
+            try:
+                op.cursor.execute("{0} INTO comcat_shakemaps({1}) VALUES({2})".format(cmd, insertCols, valueCols), infoValues)
+            except sqlite3.IntegrityError as ex:
+                logging.getLogger(__name__).debug(str(ex))
+                logging.getLogger(__name__).debug(str(info))
         return
 
     def add_performance(self, stats, replace=False):
@@ -527,7 +524,7 @@ class AnalysisData(object):
         """
         sout = ""
 
-        with self.operation as op:
+        with self.operation() as op:
         
             # Comcat events
             sout += "\nComCat Events\n"
