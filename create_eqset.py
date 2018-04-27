@@ -16,7 +16,7 @@ DEFAULTS = """
 [sanfrancisco]
 longitude = -122.419
 latitude = 37.775
-max_radius_deg = 2.5
+max_radius_deg = 2.0
 
 [losangeles]
 longitude = -117.396
