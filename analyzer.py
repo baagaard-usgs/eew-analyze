@@ -310,7 +310,7 @@ class Event(object):
             print("Plotting figures for event {event[event_id]}...".format(event=self.event))
 
         selection = self.steps.plot_figures if self.steps.plot_figures else "all"
-        figures = plotsxy.Figures(self.config, self.event)
+        figures = plotsxy.EventFigures(self.config, self.event)
         if selection == "alert_error" or selection == "all":
             figures.alert_error(self.alerts)
         if selection == "mmi_correlation" or selection == "all":
@@ -365,6 +365,10 @@ class EEWAnalyzeApp(object):
                 pool.join()
 
         # Generate report
+        if args.plot_optimal_thresholds or args.all:
+            self.plot_optimal_thresholds()
+
+        # Generate report
         if args.generate_report or args.all:
             self.generate_report()
         return
@@ -394,6 +398,15 @@ class EEWAnalyzeApp(object):
         self.config.write(sys.stdout)
         return
 
+    def plot_optimal_thresholds(self):
+        """Plot optimal mag and MMI thresholds to maximum Q.
+        """
+        db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
+        events = self.config.options("events")
+        figures = plotsxy.SummaryFigures(self.config, events, db)
+        figures.optimal_mmithresholds()
+        return
+    
     def generate_report(self):
         """Assemble plots, etc into PDF file.
         """
@@ -417,8 +430,9 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-figures", action="store", dest="plot_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation"])
+        parser.add_argument("--plot-optimal-thresholds", action="store_true", dest="plot_optimal_thresholds")
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
-        parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=1)
+        parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug", default=True)
