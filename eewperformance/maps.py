@@ -43,7 +43,7 @@ class MapPanels(object):
         """Load data from GDAL raster file.
         """
         cacheDir = self.config.get("files", "analysis_cache_dir")
-        filename = "analysis_" + analysis_utils.analysis_label(self.config, self.eqId) + ".tiff"
+        filename = "analysis_" + analysis_utils.analysis_event_label(self.config, self.eqId) + ".tiff"
         rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
 
         srs = osr.SpatialReference()
@@ -339,7 +339,7 @@ class MapPanels(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.eqId)
+        filename = analysis_utils.analysis_event_label(self.config, self.eqId)
         filename += "-map_{}.jpg".format(label)
         figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         pyplot.close(figure)

@@ -45,13 +45,16 @@ gmpe = ASK2014
 gmice = default
 
 [alerts]
+# Current User Display?
 #mmi_threshold = 0.0
 #magnitude_threshold = 2.95001
 
+# Proposed public
 #mmi_threshold = 2.0
 #magnitude_threshold = 4.45001
 
-mmi_threshold = 2.0
+# Optimum thresholds
+mmi_threshold = 3.0
 magnitude_threshold = 3.45001
 
 [fragility_curves]
@@ -144,11 +147,11 @@ class Event(object):
         if self.steps.optimize_events or self.steps.all:
             self._optimize_thresholds()
 
-        if self.steps.plot_maps or self.steps.all:
+        if self.steps.plot_event_maps or self.steps.all:
             self._plot_maps()
 
-        if self.steps.plot_figures or self.steps.all:
-            self._plot_figures()
+        if self.steps.plot_event_figures or self.steps.all:
+            self._plot_event_figures()
 
         return
 
@@ -295,11 +298,11 @@ class Event(object):
 
         mapPanels = maps.MapPanels(self.config, self.eqId, self.event, self.alerts)
         mapPanels.load_data()
-        if selection == "mmi" or selection == "all":
+        if "mmi" in selection or "all" == selection:
             mapPanels.mmi_observed()
             mapPanels.mmi_predicted()
             mapPanels.mmi_residual()
-        if selection == "alert" or selection == "all":
+        if "alert" in selection or "all" == selection:
             mapPanels.alert_category()
         return
 
@@ -309,11 +312,11 @@ class Event(object):
         if self.showProgress:
             print("Plotting figures for event {event[event_id]}...".format(event=self.event))
 
-        selection = self.steps.plot_figures if self.steps.plot_figures else "all"
+        selection = self.steps.plot_event_figures or "all"
         figures = plotsxy.EventFigures(self.config, self.event)
-        if selection == "alert_error" or selection == "all":
+        if "alert_error" in selection or "all" == selection:
             figures.alert_error(self.alerts)
-        if selection == "mmi_correlation" or selection == "all":
+        if "mmi_correlation" in selection or "all" == selection:
             figures.mmi_correlation()
         return
 
@@ -347,7 +350,7 @@ class EEWAnalyzeApp(object):
             self.show_parameters()
 
         # Event processing
-        if args.process_events or args.optimize_events or args.plot_maps or args.plot_figures or args.all:
+        if args.process_events or args.optimize_events or args.plot_event_maps or args.plot_event_figures or args.all:
             if args.nthreads <= 0:
                 for eqId in self.config.options("events"):
                     event = Event(args, self.config, eqId)
@@ -364,9 +367,11 @@ class EEWAnalyzeApp(object):
                 pool.close()
                 pool.join()
 
-        # Generate report
-        if args.plot_optimal_thresholds or args.all:
-            self.plot_optimal_thresholds()
+        # Summary maps and figures
+        if args.plot_summary_maps or args.all:
+            self.plot_summary_maps(args.plot_summary_maps or args.all)
+        if args.plot_summary_figures or args.all:
+            self.plot_summary_figures(args.plot_summary_figures or args.all)
 
         # Generate report
         if args.generate_report or args.all:
@@ -398,13 +403,33 @@ class EEWAnalyzeApp(object):
         self.config.write(sys.stdout)
         return
 
-    def plot_optimal_thresholds(self):
-        """Plot optimal mag and MMI thresholds to maximum Q.
+    def plot_summary_maps(self, selection):
+        """Plot summary maps.
         """
+        if self.showProgress:
+            print("Plotting summary maps...")
+
+        db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
+        events = self.config.options("events")
+        # ADD STUFF HERE
+        return
+    
+    def plot_summary_figures(self, selection):
+        """Plot summary figures.
+        """
+        if self.showProgress:
+            print("Plotting summary figures...")
+
         db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
         events = self.config.options("events")
         figures = plotsxy.SummaryFigures(self.config, events, db)
-        figures.optimal_mmithresholds()
+
+        if "magnitude_time" in selection or "all" == selection:
+            figures.magnitude_versus_time()
+        if "optimum_thresholds" in selection or "all" == selection:
+            figures.optimal_mmithresholds()
+        if "metric_time" in selection or "all" == selection:
+            figures.metric_versus_time()
         return
     
     def generate_report(self):
@@ -428,9 +453,10 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--process-events", action="store_true", dest="process_events")
         parser.add_argument("--optimize-events", action="store_true", dest="optimize_events")
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
-        parser.add_argument("--plot-maps", action="store", dest="plot_maps", default=None, choices=[None, "all", "mmi", "alert"])
-        parser.add_argument("--plot-figures", action="store", dest="plot_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation"])
-        parser.add_argument("--plot-optimal-thresholds", action="store_true", dest="plot_optimal_thresholds")
+        parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
+        parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation"])
+        parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "eqs"])
+        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")

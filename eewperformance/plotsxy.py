@@ -7,10 +7,13 @@
 #
 
 import os
+import dateutil.parser
+from datetime import datetime
 import numpy
 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib.pyplot as pyplot
+import matplotlib.patches as patches
 
 from osgeo import gdal, osr
 from basemap.Figure import Figure
@@ -94,7 +97,7 @@ class EventFigures(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.event["event_id"])
+        filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
         filename += "-alert_error.png"
         figure.figure.savefig(os.path.join(plotsDir, filename))
         figure.close()
@@ -104,7 +107,7 @@ class EventFigures(object):
         """Plot observed versus predicted MMI.
         """
         cacheDir = self.config.get("files", "analysis_cache_dir")
-        filename = "analysis_" + analysis_utils.analysis_label(self.config, self.event["event_id"]) + ".tiff"
+        filename = "analysis_" + analysis_utils.analysis_event_label(self.config, self.event["event_id"]) + ".tiff"
         rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
 
         layers = {}
@@ -175,7 +178,7 @@ class EventFigures(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_label(self.config, self.event["event_id"])
+        filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
         filename += "-mmi_correlation.png"
         figure.figure.savefig(os.path.join(plotsDir, filename))
         figure.close()
@@ -224,69 +227,61 @@ class SummaryFigures(object):
         dtype = [
             ("area_metric", "float32",),
             ("population_metric", "float32",),
-            ("area_metric_posonly", "float32",),
-            ("population_metric_posonly", "float32",),
         ]
         metricAllEqs = numpy.zeros((mmiThresholds.shape[0], magThresholds.shape[0]), dtype=dtype)
-        for imag,magThreshold in enumerate(magThresholds):
+        for iMag,magThreshold in enumerate(magThresholds):
             maskMag = numpy.ma.masked_values(perfs["magnitude_threshold"], magThreshold).mask
             perfsMag = perfs[maskMag]
-            for immi,mmiThreshold in enumerate(mmiThresholds):
+            for iMMI,mmiThreshold in enumerate(mmiThresholds):
                 maskMMI = numpy.ma.masked_values(perfsMag["mmi_threshold"], mmiThreshold).mask
                 perfsMMI = perfsMag[maskMMI]
 
-                savingsEEW = numpy.sum(perfsMMI["area_cost_eew"]) - numpy.sum(perfsMMI["area_cost_noeew"])
-                savingsPerfectEEW = numpy.sum(perfsMMI["area_cost_perfecteew"]) - numpy.sum(perfsMMI["area_cost_noeew"])
+                savingsEEW = numpy.sum(perfsMMI["area_cost_noeew"]) - numpy.sum(perfsMMI["area_cost_eew"])
+                savingsPerfectEEW = numpy.sum(perfsMMI["area_cost_noeew"]) - numpy.sum(perfsMMI["area_cost_perfecteew"])
                 areaMetric = savingsEEW / savingsPerfectEEW
-                numEvents = len(perfsMMI["area_cost_eew"])
                 
-                savingsEEW = numpy.sum(perfsMMI["population_cost_eew"]) - numpy.sum(perfsMMI["population_cost_noeew"])
-                savingsPerfectEEW = numpy.sum(perfsMMI["population_cost_perfecteew"]) - numpy.sum(perfsMMI["population_cost_noeew"])
+                savingsEEW = numpy.sum(perfsMMI["population_cost_noeew"]) - numpy.sum(perfsMMI["population_cost_eew"])
+                savingsPerfectEEW = numpy.sum(perfsMMI["population_cost_noeew"]) - numpy.sum(perfsMMI["population_cost_perfecteew"])
                 popMetric = savingsEEW / savingsPerfectEEW
 
-                # Limit to events with cost savings
-                maskQ =  perfsMMI["area_cost_eew"] > perfsMMI["area_cost_noeew"]
-                savingsEEW = numpy.sum(perfsMMI["area_cost_eew"][maskQ]) - numpy.sum(perfsMMI["area_cost_noeew"][maskQ])
-                savingsPerfectEEW = numpy.sum(perfsMMI["area_cost_perfecteew"][maskQ]) - numpy.sum(perfsMMI["area_cost_noeew"][maskQ])
-                areaMetricPosOnly = savingsEEW / savingsPerfectEEW
-                numEventsPosOnly = numpy.sum(maskQ)
-                
-                maskQ =  perfsMMI["population_cost_eew"] > perfsMMI["population_cost_noeew"]
-                savingsEEW = numpy.sum(perfsMMI["population_cost_eew"][maskQ]) - numpy.sum(perfsMMI["population_cost_noeew"][maskQ])
-                savingsPerfectEEW = numpy.sum(perfsMMI["population_cost_perfecteew"][maskQ]) - numpy.sum(perfsMMI["population_cost_noeew"][maskQ])
-                popMetricPosOnly = savingsEEW / savingsPerfectEEW
-                
-                metricAllEqs[immi, imag] = (areaMetric, popMetric, areaMetricPosOnly, popMetricPosOnly)
+                metricAllEqs[iMMI, iMag] = (areaMetric, popMetric,)
 
         figure = Figure()
-        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.2), (0.4, 0.8, 0.3)))
+        figure.open(6.0, 2.5, margins=((0.2, 0.65, 0.5), (0.4, 0.8, 0.3)))
         nrows = 1
         ncols = 2
         irow = 1
         icol = 1
         magOffset = 0.05
         barW = 0.5
-        
+
         from mpl_toolkits.mplot3d import Axes3D
+        # x and y are transposed from metricAllEqs
         x, y = numpy.meshgrid(mmiThresholds-0.25*barW, magThresholds-0.25*barW)
         z = numpy.zeros(x.shape)
         dx = barW*self.config.getfloat("optimize", "mmi_threshold_step")
         dy = barW*self.config.getfloat("optimize", "magnitude_threshold_step")
         c = numpy.zeros(metricAllEqs.shape, dtype=object)
-
+        indices = numpy.indices(metricAllEqs.shape)
+        indicesMMI = indices[0,:].ravel()
+        indicesMag = indices[1,:].ravel()
+        del indices
+        
         # Q-area
-        index = numpy.argmax(metricAllEqs["area_metric"].ravel())
-        areaMetric = metricAllEqs["area_metric"].transpose().ravel()[index]
-        areaOptMMI = x.ravel()[index]
-        areaOptMag = y.ravel()[index]
+        metric = "area_metric"
+        metricMasked = numpy.ma.masked_less(metricAllEqs[metric], 0.0)
+        c[metricAllEqs[metric] > 0.0] = "c_ltred"
+        c[metricAllEqs[metric] <= 0.0] = "c_bg"
+
+        iMax = numpy.argmax(metricAllEqs[metric].ravel())
+        areaMetric = metricAllEqs[metric][indicesMMI[iMax], indicesMag[iMax]]
+        areaOptMMI = 0.25*barW + x.T[indicesMMI[iMax], indicesMag[iMax]]
+        areaOptMag = 0.25*barW + magOffset + y.T[indicesMMI[iMax], indicesMag[iMax]]
+        c[indicesMMI[iMax], indicesMag[iMax]] = "c_ltblue"
 
         ax = figure.axes(nrows, ncols, irow, icol, projection="3d")
-        dz = numpy.ma.masked_less(metricAllEqs["area_metric"], 0.0).transpose()
-        c[metricAllEqs["area_metric"] > 0.0] = "c_ltred"
-        c[metricAllEqs["area_metric"] <= 0.0] = "c_bg"
-        color = c.transpose().ravel()
-        color[index] = "c_ltblue"
-        ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, dz.ravel(), color=color)
+        ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, metricMasked.ravel("F"), color=c.ravel("F"), zsort="max")
+        ax.set_title("Optimal Thresholds for Q-area")
         ax.set_xlabel("MMI Threshold")
         ax.set_ylabel("Magnitude Threshold")
         ax.set_zlabel("Q-area")
@@ -296,18 +291,20 @@ class SummaryFigures(object):
         icol += 1
         
         # Q-pop
-        index = numpy.argmax(metricAllEqs["population_metric"].ravel())
-        popMetric = metricAllEqs["population_metric"].ravel()[index]
-        popOptMMI = x.ravel()[index]
-        popOptMag = y.ravel()[index]
+        metric = "population_metric"
+        metricMasked = numpy.ma.masked_less(metricAllEqs[metric], 0.0)
+        c[metricAllEqs[metric] > 0.0] = "c_ltred"
+        c[metricAllEqs[metric] <= 0.0] = "c_bg"
+
+        iMax = numpy.argmax(metricAllEqs[metric].ravel())
+        popMetric = metricAllEqs[metric][indicesMMI[iMax], indicesMag[iMax]]
+        popOptMMI = 0.25*barW + x.T[indicesMMI[iMax], indicesMag[iMax]]
+        popOptMag = 0.25*barW + magOffset + y.T[indicesMMI[iMax], indicesMag[iMax]]
+        c[indicesMMI[iMax], indicesMag[iMax]] = "c_ltblue"
 
         ax = figure.axes(nrows, ncols, irow, icol, projection="3d")
-        dz = numpy.ma.masked_less(metricAllEqs["population_metric"], 0.0).transpose()
-        c[metricAllEqs["population_metric"] > 0.0] = "c_ltred"
-        c[metricAllEqs["population_metric"] <= 0.0] = "c_bg"
-        color = c.transpose().ravel()
-        color[index] = "c_ltblue"
-        ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, dz.ravel(), color=color)
+        ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, metricMasked.ravel("F"), color=c.ravel("F"), zsort="max")
+        ax.set_title("Optimal Thresholds for Q-pop")
         ax.set_xlabel("MMI Threshold")
         ax.set_ylabel("Magnitude Threshold")
         ax.set_zlabel("Q-pop")
@@ -319,14 +316,115 @@ class SummaryFigures(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = ""#analysis_utils.analysis_label(self.config, self.event["event_id"])
-        filename += "optimal_threshold.pdf"
+        filename = "eqset_" + analysis_utils.analysis_label(self.config)
+        filename += "_optimal_threshold.pdf"
         figure.figure.savefig(os.path.join(plotsDir, filename))
         figure.close()
 
-
-        print("# earthquakes: {}".format(numEvents))
         print("Q-area: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(areaMetric, areaOptMag, areaOptMMI))
+        print("Q-pop: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(popMetric, popOptMag, popOptMMI))
+
+        return
+    
+
+    def metric_versus_time(self):
+        """Plot Q-area and Q-pop versus ANSS origin time.
+        """
+        COLORS = {
+            "Q-area": "c_orange",
+            "Q-pop": "c_blue",
+        }
+        
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        
+        perfs = None
+        for eqId in self.events:
+            p = self.db.performance_stats(eqId, server, gmpe, fragility)
+            if perfs is None:
+                perfs = p
+            else:
+                perfs = numpy.append(perfs, p)
+
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        mask = numpy.logical_and(numpy.ma.masked_values(perfs["mmi_threshold"], mmiThreshold).mask,
+                                 numpy.ma.masked_values(perfs["magnitude_threshold"], magThreshold).mask)
+
+        perfs = perfs[mask]
+        originTime = numpy.zeros(perfs.shape, dtype="datetime64[s]")
+        magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
+        for i,p in enumerate(perfs):
+            event = self.db.comcat_event(p["comcat_id"])
+            originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
+            magnitude[i] = event["magnitude"]
+
+        figure = Figure()
+        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.1), (0.4, 0.8, 0.3)))
+        nrows = 1
+        ncols = 1
+        irow = 1
+        icol = 1
+
+        ax = figure.axes(nrows, ncols, irow, icol)
+        ms = 5.0e-4 * 10**magnitude
+        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, edgecolors="c_fg", c=COLORS["Q-area"], alpha=0.7, label="Q-area")
+        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, edgecolors="c_fg", c=COLORS["Q-pop"], alpha=0.7, label="Q-pop")
+        ax.set_title("Performance Metric versus Earthquake Origin Time")
+        ax.set_xlabel("Origin Time (UTC)")
+        ax.set_ylabel("Q")
+        ax.set_ylim(0, 1.0)
+
+        legPatches = [patches.Patch(ec="black", fc=COLORS[m], label=m) for m in ["Q-area", "Q-pop"]]
+        pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = "eqset_" + analysis_utils.analysis_label(self.config)
+        filename += "_metric_time.pdf"
+        figure.figure.savefig(os.path.join(plotsDir, filename))
+        figure.close()
+
+        return
+    
+
+    def magnitude_versus_time(self):
+        """Plot magnitude versys time.
+        """
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+
+        numEvents = len(self.events)
+        originTime = numpy.zeros(numEvents, dtype="datetime64[s]")
+        magnitude = numpy.zeros(numEvents, dtype=numpy.float32)
+        for i,eqId in enumerate(self.events):
+            event = self.db.comcat_event(eqId)
+            originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
+            magnitude[i] = event["magnitude"]
+
+        figure = Figure()
+        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.1), (0.4, 0.8, 0.3)))
+        nrows = 1
+        ncols = 1
+        irow = 1
+        icol = 1
+
+        ax = figure.axes(nrows, ncols, irow, icol)
+        ms = 5.0e-4 * 10**magnitude
+        ax.scatter(originTime.astype(datetime), magnitude, s=ms, edgecolors="c_fg", c="c_blue", alpha=0.7)
+        ax.set_title("Magnitude versus Earthquake Origin Time")
+        ax.set_xlabel("Origin Time (UTC)")
+        ax.set_ylabel("Moment Magnitude")
+
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = "eqset_magnitude_time.pdf"
+        figure.figure.savefig(os.path.join(plotsDir, filename))
+        figure.close()
 
         return
     

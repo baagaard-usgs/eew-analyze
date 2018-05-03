@@ -63,7 +63,7 @@ class CostSavings(object):
                 plotsDir = self.config.get("files", "plots_dir")
                 if not os.path.isdir(plotsDir):
                     os.makedirs(plotsDir)
-                filename = analysis_utils.analysis_label(self.config, self.eqId, magAlertThreshold, mmiAlertThreshold)+"_alert_snapshot.tiff"
+                filename = analysis_utils.analysis_event_label(self.config, self.eqId, magAlertThreshold, mmiAlertThreshold)+"_alert_snapshot.tiff"
                 values = [
                     ("mmi_pred", mmiPredCur,),
                     ("warning_time", analysis_utils.timedelta_to_seconds(warningTimeCur),),
@@ -85,7 +85,7 @@ class CostSavings(object):
             maskMMI = numpy.bitwise_and(mmiPredCur > mmiPred, warningTimeCur >= warningTimeZero)
             mmiPred[maskMMI] = mmiPredCur[maskMMI]
 
-        filename = "analysis_" + analysis_utils.analysis_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff"
+        filename = "analysis_" + analysis_utils.analysis_event_label(self.config, event["event_id"], magAlertThreshold, mmiAlertThreshold) + ".tiff"
         metrics = self._cost(mmiPred, shakemap, warningTime, populationDensity, mmiAlertThreshold, filename)
         return metrics
 

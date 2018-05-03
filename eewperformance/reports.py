@@ -20,7 +20,7 @@ from reportlab.platypus import Table
 from reportlab.lib.utils import ImageReader
 
 from analysisdb import AnalysisData
-from analysis_utils import analysis_label, timedelta_to_seconds
+from analysis_utils import analysis_event_label, timedelta_to_seconds
 
 class AnalysisSummary(object):
     """Summary of analysis.
@@ -127,7 +127,7 @@ class AnalysisSummary(object):
         y = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-self.MAP_SIZE
 
         plots_dir = self.config.get("files", "plots_dir")
-        label = analysis_label(self.config, event["event_id"])
+        label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-map_mmi_obs.jpg")
         self._render_image(filename, x, y, width=self.MAP_SIZE)
@@ -164,7 +164,7 @@ class AnalysisSummary(object):
         y = self.MARGIN
 
         plots_dir = self.config.get("files", "plots_dir")
-        label = analysis_label(self.config, event["event_id"])
+        label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-map_alert_category.jpg")
         imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
@@ -188,7 +188,7 @@ class AnalysisSummary(object):
         y = self.MARGIN
 
         plots_dir = self.config.get("files", "plots_dir")
-        label = analysis_label(self.config, event["event_id"])
+        label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-alert_error.png")
         self._render_image(filename, x, y, width=2.0*self.MAP_SIZE)
@@ -202,7 +202,7 @@ class AnalysisSummary(object):
         y = self.MARGIN
 
         plots_dir = self.config.get("files", "plots_dir")
-        label = analysis_label(self.config, event["event_id"])
+        label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-mmi_correlation.png")
         self._render_image(filename, x, y, height=self.MAP_SIZE)
