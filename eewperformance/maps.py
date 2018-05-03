@@ -23,7 +23,7 @@ import analysis_utils
 
 gdal.UseExceptions()
 
-class MapPanels(object):
+class EventMaps(object):
     """Maps of MMI, warning time, etc.
     """
     def __init__(self, config, eqId, event, alerts):
@@ -345,4 +345,42 @@ class MapPanels(object):
         pyplot.close(figure)
         return
     
+
+class SummaryMaps(object):
+    """Maps of earthquakes, Q, etc.
+    """
+    def __init__(self, config, db):
+        """
+        :type config: ConfigParser
+        :param config: Configuration for application.
+        """
+        self.config = config
+        self.db = db
+        return
+
+    def mmi_observed(self):
+        """Create map with observed MMI with contours.
+        """
+        figure = self._create_figure()
+        ax = figure.gca()
+        
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
+        
+        mmi = self.data["layers"]["mmi_obs"]
+        im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
+
+        contourLevels = numpy.arange(1.0, 10.01, 0.5)
+        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
+        ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
+
+        ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
+
+        ax.set_title("Observed Shaking")
+        pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
+
+        self._save(figure, "mmi_obs")
+        return
+
 # End of file

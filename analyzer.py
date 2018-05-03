@@ -151,7 +151,7 @@ class Event(object):
             self._plot_maps()
 
         if self.steps.plot_event_figures or self.steps.all:
-            self._plot_event_figures()
+            self._plot_figures()
 
         return
 
@@ -294,9 +294,9 @@ class Event(object):
         if self.showProgress:
             print("Plotting maps for event {event[event_id]}...".format(event=self.event))
 
-        selection = self.steps.plot_maps if self.steps.plot_maps else "all"
+        selection = self.steps.plot_event_maps or "all"
 
-        mapPanels = maps.MapPanels(self.config, self.eqId, self.event, self.alerts)
+        mapPanels = maps.EventMaps(self.config, self.eqId, self.event, self.alerts)
         mapPanels.load_data()
         if "mmi" in selection or "all" == selection:
             mapPanels.mmi_observed()
