@@ -8,6 +8,8 @@
 
 import os
 from importlib import import_module
+import dateutil.parser
+from datetime import datetime
 import numpy
 
 import matplotlib.pyplot as pyplot
@@ -349,38 +351,74 @@ class EventMaps(object):
 class SummaryMaps(object):
     """Maps of earthquakes, Q, etc.
     """
-    def __init__(self, config, db):
+    def __init__(self, config, events, db):
         """
         :type config: ConfigParser
         :param config: Configuration for application.
         """
         self.config = config
+        self.events = events
         self.db = db
         return
 
-    def mmi_observed(self):
-        """Create map with observed MMI with contours.
+    def _create_figure(self, extent):
+        tilerPath = self.config.get("maps", "tiler").split(".")
+        tilerObj = getattr(import_module(".".join(tilerPath[:-1])), tilerPath[-1])
+        tilerStyle = self.config.get("maps", "tiler_style")
+        tilerZoom = 6
+        tilesDir = self.config.get("maps", "tiler_cache_dir")
+        tiler = cached_tiler.CachedTiler(tilerObj(desired_tile_form="L", style=tilerStyle), cache_dir=tilesDir)
+
+        figWidthIn = self.config.getfloat("maps", "width_in")
+        figHeightIn = self.config.getfloat("maps", "height_in")
+        figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
+
+        figure.subplots_adjust(bottom=0.01, top=0.97, left=0.01, right=0.99)
+        ax = pyplot.axes(projection=tiler.crs)
+        ax.set_extent(extent)
+
+        ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")
+        return figure
+
+    def _save(self, figure, label):
         """
-        figure = self._create_figure()
+        """
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = "eqset_" + analysis_utils.analysis_label(self.config)
+        filename += "-map_{}.jpg".format(label)
+        figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
+        pyplot.close(figure)
+        return
+    
+
+    def earthquakes(self):
+        """Create map with earthquakes.
+        """
+        cols = [
+            ("longitude", "float32",),
+            ("latitude", "float32",),
+            ("magnitude", "float32",),
+            #("origin_time", "datetime",),
+        ]
+        eqs = numpy.zeros(len(self.events), dtype=cols)
+        for i,eqId in enumerate(self.events):
+            event = self.db.comcat_event(eqId)
+            ot = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
+            eqs[i] = (event["longitude"], event["latitude"], event["magnitude"],)
+        extent = [
+            numpy.min(eqs["longitude"])-0.5, numpy.max(eqs["longitude"])+0.5,
+            numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
+        ]
+            
+        figure = self._create_figure(extent)
         ax = figure.gca()
-        
-        dataExtent = self.data["extent"]
-        dataCRS = self.data["crs"]
-        wgs84CRS = crs.Geodetic()
-        
-        mmi = self.data["layers"]["mmi_obs"]
-        im = ax.imshow(mmi, vmin=0.0, vmax=10.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap="MMI", alpha=0.67, zorder=2)
 
-        contourLevels = numpy.arange(1.0, 10.01, 0.5)
-        chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
+        ms = 0.05 * 10**(0.75*eqs["magnitude"])
+        ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c="red", transform=crs.Geodetic(), edgecolors="black", alpha=0.5, zorder=4)
 
-        ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
-
-        ax.set_title("Observed Shaking")
-        pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
-
-        self._save(figure, "mmi_obs")
+        self._save(figure, "events")
         return
 
 # End of file

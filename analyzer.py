@@ -411,7 +411,10 @@ class EEWAnalyzeApp(object):
 
         db = analysisdb.AnalysisData(self.config.get("files", "analysis_db"))
         events = self.config.options("events")
-        # ADD STUFF HERE
+        figures = maps.SummaryMaps(self.config, events, db)
+
+        if "events" in selection or "all" == selection:
+            figures.earthquakes()
         return
     
     def plot_summary_figures(self, selection):
@@ -455,7 +458,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation"])
-        parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "eqs"])
+        parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events"])
         parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
