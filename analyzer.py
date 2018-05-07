@@ -15,6 +15,9 @@ from importlib import import_module
 import multiprocessing
 import numpy
 
+import matplotlib.pyplot as pyplot
+import matplotlib_extras
+
 import h5py # avoid gdal loading incompatible HDF5 library
 from eewperformance import analysisdb
 from eewperformance import perfmetrics
@@ -349,6 +352,10 @@ class EEWAnalyzeApp(object):
         if args.show_parameters or args.all:
             self.show_parameters()
 
+        pyplot.style.use("size-presentation")
+        pyplot.style.use(args.matplotlib_style)
+        matplotlib_extras.colors.add_general()
+            
         # Event processing
         if args.process_events or args.optimize_events or args.plot_event_maps or args.plot_event_figures or args.all:
             if args.nthreads <= 0:
@@ -465,6 +472,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug", default=True)
+        parser.add_argument("--matplotlib-style", action="store", dest="matplotlib_style", default="color-lightbg")
         return parser.parse_args()
 
 # ======================================================================

@@ -19,6 +19,7 @@ from osgeo import gdal, osr
 from cartopy import crs
 
 from cartopy_extra_tiles import cached_tiler
+import matplotlib_extras
 
 import gdalraster
 import analysis_utils
@@ -99,7 +100,7 @@ class EventMaps(object):
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
         ax.set_title("Observed Shaking")
-        pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
+        legend = pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
 
         self._save(figure, "mmi_obs")
         return
@@ -138,6 +139,8 @@ class EventMaps(object):
         return
 
     def mmi_residual(self):
+        RESIDUAL_MAX = 2.0
+        
         figure = self._create_figure()
         ax = figure.gca()
         
@@ -151,21 +154,24 @@ class EventMaps(object):
 
         cmap = pyplot.cm.get_cmap("RdBu_r")
         cmap._init()
-        alpha = numpy.minimum(1.0, numpy.abs(numpy.linspace(-4.0, 4.0, cmap.N)))
+        alpha = numpy.minimum(1.0, numpy.abs(numpy.linspace(-2*RESIDUAL_MAX, 2*RESIDUAL_MAX, cmap.N)))
+        alpha[alpha < 0.5] = 0.0
         cmap._lut[:-3,-1] = alpha
         
-        im = ax.imshow(mmiResidual, vmin=-2.0, vmax=2.0, extent=dataExtent, transform=dataCRS, origin="upper", cmap=cmap, alpha=0.67, zorder=2)
+        im = ax.imshow(mmiResidual, vmin=-RESIDUAL_MAX, vmax=RESIDUAL_MAX, extent=dataExtent, transform=dataCRS, origin="upper", cmap=cmap, alpha=0.67, zorder=2)
 
         noData = numpy.ma.masked_array(numpy.ones(mmiResidual.shape), ~mmiResidual.mask)
         ax.imshow(noData, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", vmin=0, vmax=1, alpha=0.3, zorder=3)
 
-        contourLevels = numpy.arange(-2.0, 2.01, 0.5)
+        contourLevels = numpy.arange(-RESIDUAL_MAX, RESIDUAL_MAX+0.01, 0.5)
         chandle = ax.contour(mmiResidual, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
         ax.clabel(chandle, inline=True, fmt="%3.1f", zoerder=4)
 
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=5)
 
         ax.set_title("MMI Residual")
+
+        matplotlib_extras.axes.add_background_axes(figure, [0.01, 0.31, 0.15, 0.37])
         cbax = figure.add_axes([0.02, 0.33, 0.02, 0.33])
         colorbar = pyplot.colorbar(im, cax=cbax)
         colorbar.set_label("Residual (Obs-Pred)")
@@ -420,12 +426,13 @@ class SummaryMaps(object):
         ax = figure.gca()
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
         ot = date2num(eqs["origin_time"].astype(datetime))
-        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=ot, cmap="plasma", transform=crs.Geodetic(), edgecolors="black", alpha=0.5, zorder=4)
+        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=ot, cmap="viridis", transform=crs.Geodetic(), edgecolors="black", alpha=0.8, zorder=4)
 
+        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.13, 0.36], facecolor="black")
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
         colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
         colorbar.set_label("Origin Time")
-                  
+        
         # domains (manual)
         import cartopy.geodesic as geodesic
         import cartopy.feature as feature

@@ -12,11 +12,12 @@ from datetime import datetime
 import numpy
 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import matplotlib
 import matplotlib.pyplot as pyplot
 import matplotlib.patches as patches
 
 from osgeo import gdal, osr
-from basemap.Figure import Figure
+import matplotlib_extras
 
 import analysis_utils
 import greatcircle
@@ -35,6 +36,15 @@ class EventFigures(object):
 
         self.event = event
         return
+
+    def _save(self, figure, label):
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
+        filename += "-{}.png".format(label)
+        figure.savefig(os.path.join(plotsDir, filename))
+        return
     
     def alert_error(self, alerts):
         """Create map with observed MMI with contours.
@@ -52,55 +62,42 @@ class EventFigures(object):
         if len(alertsTime) > 0:
             t = (alertsTime - originTime).astype("timedelta64[us]").astype("float32")/1.0e+6
         else:
-            t = []
-                
-        figure = Figure()
-        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.2), (0.4, 0.8, 0.3)))
-        nrows = 1
-        ncols = 3
-        irow = 1
-        icol = 1
-
+            t = []                
         tmax = max(30.0, t[0]+30.0) if len(t) > 0 else 30.0
         
+        figure = pyplot.figure(figsize=(10.0, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=3, margins=((0.6, 1.0, 0.2), (0.50, 0, 0.25)))
+        
         # Magnitude
-        ax = figure.axes(nrows, ncols, irow, icol)
-        ax.plot(t, alertsMag, marker="o", mfc="c_ltred", mec="c_fg", lw=0, alpha=0.5)
+        ax = figure.add_axes(rectFactory.rect(row=1, col=1))
+        ax.plot(t, alertsMag, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.8)
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Magnitude (Mw)")
         ax.set_title("Magnitude")
         ax.set_xlim(0, tmax)
-        ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_blue")
-        ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_blue")
-        icol += 1
+        ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_ltblue")
+        ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_ltblue")
         
         # Horizontal location error
-        ax = figure.axes(nrows, ncols, irow, icol)
-        ax.plot(t, horizDistKmError, marker="o", mfc="c_ltred", mec="c_fg", lw=0, alpha=0.5)
-        ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_blue")
+        ax = figure.add_axes(rectFactory.rect(row=1, col=2))
+        ax.plot(t, horizDistKmError, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.8)
+        ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
         ax.set_xlim(0, tmax)
         ax.set_title("Horiz. Location Error")
-        icol += 1
         
         # Depth location error
-        ax = figure.axes(nrows, ncols, irow, icol)
-        ax.plot(t, self.event["depth_km"]-alertsDepthKm, marker="o", mfc="c_ltred", mec="c_fg", lw=0, alpha=0.5)
-        ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_blue")
+        ax = figure.add_axes(rectFactory.rect(row=1, col=3))
+        ax.plot(t, self.event["depth_km"]-alertsDepthKm, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.8)
+        ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
         ax.set_xlim(0, tmax)
         ax.set_title("Depth Error (Obs-Pred)")
-        icol += 1
 
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
-        filename += "-alert_error.png"
-        figure.figure.savefig(os.path.join(plotsDir, filename))
-        figure.close()
+        self._save(figure, "alert_error")
+        pyplot.close(figure)
         return
 
     def mmi_correlation(self):
@@ -118,12 +115,6 @@ class EventFigures(object):
             data = numpy.ma.masked_values(data, band.GetNoDataValue())
             layers[description] = data
 
-        figure = Figure()
-        figure.open(4.0, 4.0, margins=((0.45, 0.65, 0.2), (0.4, 0.8, 0.3)))
-        nrows = 1
-        ncols = 1
-        irow = 1
-        icol = 1
 
         if numpy.isscalar(layers["mmi_pred"].mask):
             mmiObs = layers["mmi_obs"].ravel().data
@@ -133,12 +124,15 @@ class EventFigures(object):
             mmiObs = layers["mmi_obs"].ravel()[mask]
             mmiPred = layers["mmi_pred"].ravel()[mask]
 
+        figure = pyplot.figure(figsize=(4.0, 4.0))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.60, 0, 0.2), (0.45, 0, 0.1)))
+        
         # Correlation
         maxMMI = 10.0
         if mmiObs.shape[0] > 0:
             maxMMI = numpy.maximum(5.0, numpy.maximum(numpy.max(mmiPred), numpy.max(mmiObs)))
-        ax = figure.axes(nrows, ncols, irow, icol)
-        ax.plot(mmiPred, mmiObs, marker="o", ms=2, mfc="c_ltred", mec="c_fg", lw=0, alpha=0.5, zorder=1)
+        ax = figure.add_axes(rectFactory.rect())
+        ax.plot(mmiPred, mmiObs, marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.8, zorder=1)
         ax.plot([1,maxMMI],[1,maxMMI], "--", color="c_ltblue", zorder=2)
         ax.set_xlabel("Predicted MMI")
         ax.xaxis.set_ticks_position("bottom")
@@ -162,27 +156,24 @@ class EventFigures(object):
             ax.plot(bcenters, mmiMean, marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
         
             # Inset with residual histogram
+            fontsize = 8
             bwidth = 0.25
             bins = numpy.arange(-3.0-0.5*bwidth, +3.001+0.5*bwidth, bwidth)
             residual = mmiObs-mmiPred
             residualMean = numpy.mean(residual)
             residualStd = numpy.std(residual)
             axin = inset_axes(ax, width="33%", height="25%", loc=2, borderpad=1.7)
-            axin.hist(residual, bins=bins, normed=True, align="mid", color="c_ltred")
+            axin.hist(residual, bins=bins, normed=True, align="mid", color="c_ltred", ec="c_red")
             axin.set_yticks([])
             axin.xaxis.set_ticks_position("bottom")
+            for label in axin.xaxis.get_ticklabels():
+                label.set_fontsize(fontsize)
             axin.set_xlim(numpy.min(bins), numpy.max(bins))
-            axin.text(0.05, 0.95, "mean={m:.2f}\nstd={s:.2f}".format(m=residualMean, s=residualStd), transform=axin.transAxes, va="top", ha="left", fontsize=6)
-            axin.set_title("Residual (Obs-Pred)", fontsize=8)
+            axin.text(0.05, 0.95, "mean={m:.2f}\nstd={s:.2f}".format(m=residualMean, s=residualStd), transform=axin.transAxes, va="top", ha="left", fontsize=fontsize)
+            axin.set_title("Residual (Obs-Pred)", fontsize=fontsize)
 
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
-        filename += "-mmi_correlation.png"
-        figure.figure.savefig(os.path.join(plotsDir, filename))
-        figure.close()
-        
+        self._save(figure, "mmi_correlation")
+        pyplot.close(figure)
         return
     
 
@@ -197,6 +188,15 @@ class SummaryFigures(object):
         self.config = config
         self.events = events
         self.db = db
+        return
+
+    def _save(self, figure, label):
+        plotsDir = self.config.get("files", "plots_dir")
+        if not os.path.isdir(plotsDir):
+            os.makedirs(plotsDir)
+        filename = "eqset_" + analysis_utils.analysis_label(self.config)
+        filename += "_{}.pdf".format(label)
+        figure.savefig(os.path.join(plotsDir, filename))
         return
     
     def optimal_mmithresholds(self):
@@ -246,12 +246,8 @@ class SummaryFigures(object):
 
                 metricAllEqs[iMMI, iMag] = (areaMetric, popMetric,)
 
-        figure = Figure()
-        figure.open(6.0, 2.5, margins=((0.2, 0.65, 0.5), (0.4, 0.8, 0.3)))
-        nrows = 1
-        ncols = 2
-        irow = 1
-        icol = 1
+        figure = pyplot.figure(figsize=(8.0, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=((0.1, 0.5, 0.5), (0.5, 0, 0.2)))
         magOffset = 0.05
         barW = 0.5
 
@@ -271,7 +267,7 @@ class SummaryFigures(object):
         metric = "area_metric"
         metricMasked = numpy.ma.masked_less(metricAllEqs[metric], 0.0)
         c[metricAllEqs[metric] > 0.0] = "c_ltred"
-        c[metricAllEqs[metric] <= 0.0] = "c_bg"
+        c[metricAllEqs[metric] <= 0.0] = "c_mdgray"
 
         iMax = numpy.argmax(metricAllEqs[metric].ravel())
         areaMetric = metricAllEqs[metric][indicesMMI[iMax], indicesMag[iMax]]
@@ -279,7 +275,7 @@ class SummaryFigures(object):
         areaOptMag = 0.25*barW + magOffset + y.T[indicesMMI[iMax], indicesMag[iMax]]
         c[indicesMMI[iMax], indicesMag[iMax]] = "c_ltblue"
 
-        ax = figure.axes(nrows, ncols, irow, icol, projection="3d")
+        ax = figure.add_axes(rectFactory.rect(row=1, col=1), projection="3d")
         ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, metricMasked.ravel("F"), color=c.ravel("F"), zsort="max")
         ax.set_title("Optimal Thresholds for Q-area")
         ax.set_xlabel("MMI Threshold")
@@ -288,13 +284,12 @@ class SummaryFigures(object):
         ax.set_zlim(0, 1)
         ax.set_xticks(mmiThresholds)
         ax.set_yticks(magThresholds+magOffset)
-        icol += 1
         
         # Q-pop
         metric = "population_metric"
         metricMasked = numpy.ma.masked_less(metricAllEqs[metric], 0.0)
         c[metricAllEqs[metric] > 0.0] = "c_ltred"
-        c[metricAllEqs[metric] <= 0.0] = "c_bg"
+        c[metricAllEqs[metric] <= 0.0] = "c_mdgray"
 
         iMax = numpy.argmax(metricAllEqs[metric].ravel())
         popMetric = metricAllEqs[metric][indicesMMI[iMax], indicesMag[iMax]]
@@ -302,7 +297,7 @@ class SummaryFigures(object):
         popOptMag = 0.25*barW + magOffset + y.T[indicesMMI[iMax], indicesMag[iMax]]
         c[indicesMMI[iMax], indicesMag[iMax]] = "c_ltblue"
 
-        ax = figure.axes(nrows, ncols, irow, icol, projection="3d")
+        ax = figure.add_axes(rectFactory.rect(row=1, col=2), projection="3d")
         ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, metricMasked.ravel("F"), color=c.ravel("F"), zsort="max")
         ax.set_title("Optimal Thresholds for Q-pop")
         ax.set_xlabel("MMI Threshold")
@@ -311,19 +306,12 @@ class SummaryFigures(object):
         ax.set_zlim(0, 1)
         ax.set_xticks(mmiThresholds)
         ax.set_yticks(magThresholds+magOffset)
-        icol += 1
-        
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = "eqset_" + analysis_utils.analysis_label(self.config)
-        filename += "_optimal_threshold.pdf"
-        figure.figure.savefig(os.path.join(plotsDir, filename))
-        figure.close()
+
+        self._save(figure, "optimal_threshold.pdf")
+        pyplot.close(figure)
 
         print("Q-area: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(areaMetric, areaOptMag, areaOptMMI))
         print("Q-pop: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(popMetric, popOptMag, popOptMMI))
-
         return
     
 
@@ -360,17 +348,13 @@ class SummaryFigures(object):
             originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             magnitude[i] = event["magnitude"]
 
-        figure = Figure()
-        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.1), (0.4, 0.8, 0.3)))
-        nrows = 1
-        ncols = 1
-        irow = 1
-        icol = 1
+        figure = pyplot.figure(figsize=(8.0, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0, 0.3)))
 
-        ax = figure.axes(nrows, ncols, irow, icol)
+        ax = figure.add_axes(rectFactory.rect())
         ms = 5.0e-4 * 10**magnitude
-        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, edgecolors="c_fg", c=COLORS["Q-area"], alpha=0.7, label="Q-area")
-        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, edgecolors="c_fg", c=COLORS["Q-pop"], alpha=0.7, label="Q-pop")
+        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors="c_orange", alpha=0.8, label="Q-area")
+        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors="c_blue", alpha=0.8, label="Q-pop")
         ax.set_title("Performance Metric versus Earthquake Origin Time")
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Q")
@@ -378,15 +362,9 @@ class SummaryFigures(object):
 
         legPatches = [patches.Patch(ec="black", fc=COLORS[m], label=m) for m in ["Q-area", "Q-pop"]]
         pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
-        
-        plotsDir = self.config.get("files", "plots_dir")
-        if not os.path.isdir(plotsDir):
-            os.makedirs(plotsDir)
-        filename = "eqset_" + analysis_utils.analysis_label(self.config)
-        filename += "_metric_time.pdf"
-        figure.figure.savefig(os.path.join(plotsDir, filename))
-        figure.close()
 
+        self._save(figure, "metric_time")
+        pyplot.close(figure)
         return
     
 
@@ -405,16 +383,14 @@ class SummaryFigures(object):
             originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             magnitude[i] = event["magnitude"]
 
-        figure = Figure()
-        figure.open(6.0, 2.5, margins=((0.45, 0.65, 0.1), (0.4, 0.8, 0.3)))
-        nrows = 1
-        ncols = 1
-        irow = 1
-        icol = 1
-
-        ax = figure.axes(nrows, ncols, irow, icol)
+        from matplotlib.dates import YearLocator,date2num,DateFormatter
+        figure = pyplot.figure(figsize=(8.0, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0, 0.3)))
+        
+        ax = figure.add_axes(rectFactory.rect())
         ms = 5.0e-4 * 10**magnitude
-        ax.scatter(originTime.astype(datetime), magnitude, s=ms, edgecolors="c_fg", c="c_blue", alpha=0.7)
+        ot = originTime.astype(datetime)
+        ax.scatter(ot, magnitude, s=ms, edgecolors="white", c=date2num(ot), cmap="viridis", alpha=0.8)
         ax.set_title("Magnitude versus Earthquake Origin Time")
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Moment Magnitude")
@@ -423,9 +399,9 @@ class SummaryFigures(object):
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = "eqset_magnitude_time.pdf"
-        figure.figure.savefig(os.path.join(plotsDir, filename))
-        figure.close()
-
+        figure.savefig(os.path.join(plotsDir, filename))
+        pyplot.close(figure)
+        
         return
     
 # End of file
