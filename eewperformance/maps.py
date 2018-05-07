@@ -369,8 +369,8 @@ class SummaryMaps(object):
         tilesDir = self.config.get("maps", "tiler_cache_dir")
         tiler = cached_tiler.CachedTiler(tilerObj(desired_tile_form="L", style=tilerStyle), cache_dir=tilesDir)
 
-        figWidthIn = self.config.getfloat("maps", "width_in")
-        figHeightIn = self.config.getfloat("maps", "height_in")
+        figWidthIn = 1.5*5.0
+        figHeightIn = 1.5*4.2
         figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
 
         figure.subplots_adjust(bottom=0.01, top=0.97, left=0.01, right=0.99)
@@ -394,30 +394,49 @@ class SummaryMaps(object):
     
 
     def earthquakes(self):
-        """Create map with earthquakes.
+        """Create map with earthquakes colored by origin time.
         """
-        cols = [
+        COLS = [
             ("longitude", "float32",),
             ("latitude", "float32",),
             ("magnitude", "float32",),
-            #("origin_time", "datetime",),
-        ]
-        eqs = numpy.zeros(len(self.events), dtype=cols)
+            ("origin_time", "datetime64[us]",),
+            ]
+            
+        eqs = numpy.zeros(len(self.events), dtype=COLS)
         for i,eqId in enumerate(self.events):
             event = self.db.comcat_event(eqId)
             ot = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
-            eqs[i] = (event["longitude"], event["latitude"], event["magnitude"],)
+            eqs[i] = (event["longitude"], event["latitude"], event["magnitude"], ot)
+            
         extent = [
-            numpy.min(eqs["longitude"])-0.5, numpy.max(eqs["longitude"])+0.5,
+            numpy.min(eqs["longitude"])-2.0, numpy.max(eqs["longitude"])+2.0,
             numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
         ]
+
+        from matplotlib.dates import YearLocator,date2num,DateFormatter
             
         figure = self._create_figure(extent)
         ax = figure.gca()
-
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
-        ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c="red", transform=crs.Geodetic(), edgecolors="black", alpha=0.5, zorder=4)
+        ot = date2num(eqs["origin_time"].astype(datetime))
+        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=ot, cmap="plasma", transform=crs.Geodetic(), edgecolors="black", alpha=0.5, zorder=4)
 
+        cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
+        colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
+        colorbar.set_label("Origin Time")
+                  
+        # domains (manual)
+        import cartopy.geodesic as geodesic
+        import cartopy.feature as feature
+        import shapely.geometry as geometry
+        
+        geod = geodesic.Geodesic()
+        circleSF = geod.circle(-122.419, 37.775, 2.0*111e+3)
+        circleLA = geod.circle(-117.396, 33.953, 2.5*111e+3)
+        geometryDomains = [geometry.Polygon(circleSF), geometry.Polygon(circleLA)]
+        ax.add_feature(feature.ShapelyFeature(geometryDomains, crs.PlateCarree(), facecolor="none", edgecolor="blue"), zorder=3)
+                            
         self._save(figure, "events")
         return
 
