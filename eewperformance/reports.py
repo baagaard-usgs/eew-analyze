@@ -301,9 +301,16 @@ class AnalysisSummary(object):
             ("SPAN", (6,0), (7,0)),
             ("SPAN", (8,0), (9,0)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            #("BACKGROUND", (-5,rowQPopMax),(-5,rowQPopMax), (0.7, 1.0, 0.7)),
-            #("BACKGROUND", (-6,rowQAreaMax),(-6,rowQAreaMax), (0.7, 1.0, 0.7)),
         ]
+        # Highlight row matching alert thresholds
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        maskMMI = numpy.ma.masked_values(perfEEW["mmi_threshold"], mmiThreshold).mask
+        maskMag = numpy.ma.masked_values(perfEEW["magnitude_threshold"], magThreshold).mask
+        row = 2 + numpy.argmax(numpy.logical_and(maskMMI, maskMag))
+        style.append(("BACKGROUND", (0,row),(-1,row), (1.0, 1.0, 0.0)))
+                
+        # Highlight all cases with maximum Q-area and Q-pop
         if perfEEW["population_metric"].shape[-1] > 0:
             maxQ = numpy.max(perfEEW["population_metric"])
             rowsMaxQ = 2 + numpy.where(perfEEW["population_metric"] >= maxQ)[0]
@@ -315,6 +322,7 @@ class AnalysisSummary(object):
             rowMaxQ = 2 + numpy.where(perfEEW["area_metric"] >= maxQ)[0]
             for row in rowsMaxQ:
                 style.append(("BACKGROUND", (-5,row),(-5,row), (0.7, 1.0, 0.7)))
+
 
         self.canvas.saveState()
         self.canvas.translate(self.MARGIN+self.MAP_SIZE+self.SPACING, self.PAGE_HEIGHT-self.MARGIN-self.MAP_SIZE)
