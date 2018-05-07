@@ -379,7 +379,7 @@ class SummaryMaps(object):
         figHeightIn = 1.5*4.2
         figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
 
-        figure.subplots_adjust(bottom=0.01, top=0.97, left=0.01, right=0.99)
+        figure.subplots_adjust(bottom=0.01, top=0.96, left=0.01, right=0.99)
         ax = pyplot.axes(projection=tiler.crs)
         ax.set_extent(extent)
 
@@ -426,9 +426,9 @@ class SummaryMaps(object):
         ax = figure.gca()
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
         ot = date2num(eqs["origin_time"].astype(datetime))
-        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=ot, cmap="viridis", transform=crs.Geodetic(), edgecolors="black", alpha=0.8, zorder=4)
+        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=ot, cmap="viridis", transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
 
-        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.13, 0.36], facecolor="black")
+        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.13, 0.36])
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
         colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
         colorbar.set_label("Origin Time")
@@ -445,6 +445,59 @@ class SummaryMaps(object):
         ax.add_feature(feature.ShapelyFeature(geometryDomains, crs.PlateCarree(), facecolor="none", edgecolor="blue"), zorder=3)
                             
         self._save(figure, "events")
+        return
+
+    def performance_metric(self, metric="area_metric"):
+        """Create map with earthquakes colored by performance metric with marker size by magnitude.
+        """
+        COLS = [
+            ("longitude", "float32",),
+            ("latitude", "float32",),
+            ("magnitude", "float32",),
+            ("metric", "float32",),
+            ]
+
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        
+        perfs = None
+        for eqId in self.events:
+            p = self.db.performance_stats(eqId, server, gmpe, fragility)
+            if perfs is None:
+                perfs = p
+            else:
+                perfs = numpy.append(perfs, p)
+
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        mask = numpy.logical_and(numpy.ma.masked_values(perfs["mmi_threshold"], mmiThreshold).mask,
+                                 numpy.ma.masked_values(perfs["magnitude_threshold"], magThreshold).mask)
+        perfs = perfs[mask]
+        
+        eqs = numpy.zeros(len(self.events), dtype=COLS)
+        for i,p in enumerate(perfs):
+            event = self.db.comcat_event(p["comcat_id"])
+            eqs[i] = (event["longitude"], event["latitude"], event["magnitude"], p[metric])
+            
+        extent = [
+            numpy.min(eqs["longitude"])-2.0, numpy.max(eqs["longitude"])+2.0,
+            numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
+        ]
+
+        figure = self._create_figure(extent)
+        ax = figure.gca()
+        ms = 0.05 * 10**(0.75*eqs["magnitude"])
+        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=eqs["metric"], cmap="plasma", vmin=0.0, vmax=1.0, transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
+
+        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.11, 0.36])
+        cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
+        colorbar = pyplot.colorbar(mappable=sc, cax=cbax)
+        label = "Q-area" if metric == "area_metric" else "Q-pop"
+        colorbar.set_label(label)
+        ax.set_title(label)
+        
+        self._save(figure, metric)
         return
 
 # End of file

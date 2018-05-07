@@ -70,7 +70,7 @@ class EventFigures(object):
         
         # Magnitude
         ax = figure.add_axes(rectFactory.rect(row=1, col=1))
-        ax.plot(t, alertsMag, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.8)
+        ax.plot(t, alertsMag, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.67)
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Magnitude (Mw)")
         ax.set_title("Magnitude")
@@ -80,7 +80,7 @@ class EventFigures(object):
         
         # Horizontal location error
         ax = figure.add_axes(rectFactory.rect(row=1, col=2))
-        ax.plot(t, horizDistKmError, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.8)
+        ax.plot(t, horizDistKmError, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.67)
         ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
@@ -89,7 +89,7 @@ class EventFigures(object):
         
         # Depth location error
         ax = figure.add_axes(rectFactory.rect(row=1, col=3))
-        ax.plot(t, self.event["depth_km"]-alertsDepthKm, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.8)
+        ax.plot(t, self.event["depth_km"]-alertsDepthKm, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.67)
         ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Distance (km)")
@@ -132,7 +132,7 @@ class EventFigures(object):
         if mmiObs.shape[0] > 0:
             maxMMI = numpy.maximum(5.0, numpy.maximum(numpy.max(mmiPred), numpy.max(mmiObs)))
         ax = figure.add_axes(rectFactory.rect())
-        ax.plot(mmiPred, mmiObs, marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.8, zorder=1)
+        ax.plot(mmiPred, mmiObs, marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
         ax.plot([1,maxMMI],[1,maxMMI], "--", color="c_ltblue", zorder=2)
         ax.set_xlabel("Predicted MMI")
         ax.xaxis.set_ticks_position("bottom")
@@ -353,8 +353,8 @@ class SummaryFigures(object):
 
         ax = figure.add_axes(rectFactory.rect())
         ms = 5.0e-4 * 10**magnitude
-        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors="c_orange", alpha=0.8, label="Q-area")
-        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors="c_blue", alpha=0.8, label="Q-pop")
+        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors="c_orange", alpha=0.67, label="Q-area")
+        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors="c_blue", alpha=0.67, label="Q-pop")
         ax.set_title("Performance Metric versus Earthquake Origin Time")
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Q")
@@ -390,7 +390,7 @@ class SummaryFigures(object):
         ax = figure.add_axes(rectFactory.rect())
         ms = 5.0e-4 * 10**magnitude
         ot = originTime.astype(datetime)
-        ax.scatter(ot, magnitude, s=ms, edgecolors="white", c=date2num(ot), cmap="viridis", alpha=0.8)
+        ax.scatter(ot, magnitude, s=ms, edgecolors="white", c=date2num(ot), cmap="viridis", alpha=0.67)
         ax.set_title("Magnitude versus Earthquake Origin Time")
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Moment Magnitude")
