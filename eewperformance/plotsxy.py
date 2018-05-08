@@ -307,11 +307,13 @@ class SummaryFigures(object):
         ax.set_xticks(mmiThresholds)
         ax.set_yticks(magThresholds+magOffset)
 
-        self._save(figure, "optimal_threshold.pdf")
+        self._save(figure, "optimal_threshold")
         pyplot.close(figure)
 
         print("Q-area: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(areaMetric, areaOptMag, areaOptMMI))
         print("Q-pop: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(popMetric, popOptMag, popOptMMI))
+
+        print metricAllEqs
         return
     
 
