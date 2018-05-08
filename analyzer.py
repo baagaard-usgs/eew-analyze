@@ -57,8 +57,8 @@ gmice = default
 #magnitude_threshold = 4.45001
 
 # Optimum thresholds
-mmi_threshold = 3.0
-magnitude_threshold = 3.45001
+mmi_threshold = 3.5
+magnitude_threshold = 3.95001
 
 [fragility_curves]
 object = eewperformance.fragility_curves.PublicFearAvoidance
@@ -353,7 +353,7 @@ class EEWAnalyzeApp(object):
             self.show_parameters()
 
         pyplot.style.use("size-presentation")
-        pyplot.style.use(args.matplotlib_style)
+        pyplot.style.use("color-"+args.color_style)
         matplotlib_extras.colors.add_general()
             
         # Event processing
@@ -475,7 +475,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug", default=True)
-        parser.add_argument("--matplotlib-style", action="store", dest="matplotlib_style", default="color-lightbg")
+        parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg")
         return parser.parse_args()
 
 # ======================================================================
