@@ -322,7 +322,7 @@ class SummaryFigures(object):
         """
         COLORS = {
             "Q-area": "c_orange",
-            "Q-pop": "c_blue",
+            "Q-pop": "c_ltblue",
         }
         
         server = self.config.get("shakealert.production", "server")

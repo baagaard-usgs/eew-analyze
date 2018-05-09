@@ -80,8 +80,8 @@ tiler = cartopy_extra_tiles.esri_tiles.ESRI
 tiler_style = streetmap
 tiler_cache_dir = ~/data_scratch/images/tiles
 zoom_level = 8
-width_in = 6.0
-height_in = 6.3
+width_in = 5.0
+height_in = 5.3
 
 [files]
 event_dir = ./data/[EVENTID]/

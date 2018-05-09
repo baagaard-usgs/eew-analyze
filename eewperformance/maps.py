@@ -99,7 +99,7 @@ class EventMaps(object):
 
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
-        ax.set_title("Observed Shaking")
+        ax.set_title("ShakeMap - Observed Shaking")
         legend = pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
 
         self._save(figure, "mmi_obs")
@@ -132,7 +132,7 @@ class EventMaps(object):
                 epicenters[ialert] = (alert["longitude"], alert["latitude"],)
             ax.plot(epicenters["longitude"], epicenters["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
-        ax.set_title("ShakeAlert Predicted Shaking")
+        ax.set_title("ShakeAlert - Predicted Shaking")
         pyplot.legend(handles=self.mmiPatches, title="MMI", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
 
         self._save(figure, "mmi_pred")
@@ -171,7 +171,7 @@ class EventMaps(object):
 
         ax.set_title("MMI Residual")
 
-        matplotlib_extras.axes.add_background_axes(figure, [0.01, 0.31, 0.15, 0.37])
+        matplotlib_extras.axes.add_background_axes(figure, [0.01, 0.31, 0.17, 0.37])
         cbax = figure.add_axes([0.02, 0.33, 0.02, 0.33])
         colorbar = pyplot.colorbar(im, cax=cbax)
         colorbar.set_label("Residual (Obs-Pred)")
@@ -334,8 +334,8 @@ class EventMaps(object):
         figHeightIn = self.config.getfloat("maps", "height_in")
         figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
 
-        figure.subplots_adjust(bottom=0.01, top=0.97, left=0.01, right=0.99)
-        ax = pyplot.axes(projection=tiler.crs)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0, 0, 0), (0, 0, 0.25)))
+        ax = pyplot.axes(rectFactory.rect(), projection=tiler.crs)
         ax.set_extent(self.data["extent"])
 
         ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")
