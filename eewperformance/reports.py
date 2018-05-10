@@ -166,7 +166,7 @@ class AnalysisSummary(object):
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
-        filename = os.path.join(plots_dir, label+"-map_alert_category.jpg")
+        filename = os.path.join(plots_dir, label+"-map_cost_savings.jpg")
         imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
         self._figure_label(x, y+imageHeight, "ShakeAlert")
         
@@ -221,6 +221,7 @@ class AnalysisSummary(object):
         text.textLine("ANSS")
         text.textLine("   {event[magnitude_type]}{event[magnitude]:.1f}".format(event=event))
         text.textLine("   {ot:%Y-%m-%d %H:%M:%S.%f}".format(ot=ot))
+        text.textLine("   {event[depth_km]:.1f} km depth".format(event=event))
         text.textLine("ShakeMap")
         text.textLine("   MMI bias {:6.2f}".format(shakemap["mmi_bias"]))
 
