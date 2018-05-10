@@ -14,6 +14,7 @@ import numpy
 
 import matplotlib.pyplot as pyplot
 import matplotlib.colors as colors
+import matplotlib.colorbar
 import matplotlib.patches as patches
 from osgeo import gdal, osr
 from cartopy import crs
@@ -171,9 +172,9 @@ class EventMaps(object):
 
         ax.set_title("MMI Residual")
 
-        matplotlib_extras.axes.add_background_axes(figure, [0.01, 0.31, 0.17, 0.37])
+        matplotlib_extras.axes.add_background_axes(figure, [0.01, 0.31, 0.16, 0.37])
         cbax = figure.add_axes([0.02, 0.33, 0.02, 0.33])
-        colorbar = pyplot.colorbar(im, cax=cbax)
+        colorbar = pyplot.colorbar(im, cax=cbax, format="%4.1f")
         colorbar.set_label("Residual (Obs-Pred)")
         
         self._save(figure, "mmi_residual")
@@ -248,6 +249,60 @@ class EventMaps(object):
         pyplot.legend(handles=self.alertPatches, title="Alert Classification", handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="lower left")
         
         self._save(figure, "alert_category")
+        return
+
+    def cost_savings(self):
+        """Map of normalized cost savings.
+        """
+        figure = self._create_figure()
+        ax = figure.gca()
+        
+        dataExtent = self.data["extent"]
+        dataCRS = self.data["crs"]
+        wgs84CRS = crs.Geodetic()
+        
+        layers = self.data["layers"]
+
+        popDensity = layers["population_density"]
+        norm = colors.LogNorm(vmin=0.01, vmax=1000)
+        ax.imshow(popDensity, norm=norm, extent=dataExtent, transform=dataCRS, origin="upper", cmap="gray_r", alpha=0.2, zorder=2)
+
+        categoryTN = 0.0
+        categoryFN = 1.0
+        maskTN = numpy.ma.masked_values(layers["alert_category"], categoryTN).mask
+        maskFN = numpy.ma.masked_values(layers["alert_category"], categoryFN).mask
+        maskAlert = layers["alert_category"] > 1.5
+        
+        costSavings = maskAlert*(layers["cost_no_eew"]-layers["cost_eew"]) - maskFN*(layers["cost_no_eew"]-layers["cost_perfect_eew"])
+        cmap = pyplot.cm.get_cmap("PiYG")
+        costSavingsColors = colors.Normalize(-1.0, 1.0)(costSavings)
+        costSavingsColors = cmap(costSavingsColors)
+        alpha = 0.67 * numpy.ones(costSavings.shape)
+        alpha[maskTN] = 0.0
+        costSavingsColors[..., -1] = alpha
+        
+        im = ax.imshow(costSavingsColors, extent=dataExtent, transform=dataCRS, origin="upper", zorder=2)
+        
+        warningTime = self.data["layers"]["warning_time"]
+        tmin = numpy.min(warningTime.ravel())
+        tmax = numpy.max(warningTime.ravel())
+        if tmax > tmin:
+            contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
+            chandle = ax.contour(warningTime, levels=contourLevels, colors="black", origin="upper", extent=dataExtent, transform=dataCRS, linewidth=0.5, zorder=4)
+            ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=6)
+        
+        ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="c_yellow", mec="black", c="white", ms=15, zorder=7)
+
+        ax.set_title("Cost Savings")
+
+        matplotlib_extras.axes.add_background_axes(figure, [0.01, 0.31, 0.16, 0.37])
+        cbax = figure.add_axes([0.02, 0.33, 0.02, 0.33])
+        colorbar = matplotlib.colorbar.ColorbarBase(cbax, cmap=cmap, norm=colors.Normalize(-1.0, 1.0), format="%4.1f")
+        colorbar.set_label("Cost Savings")
+
+
+        
+        self._save(figure, "cost_savings")
         return
 
     def _alert_colormap(self):

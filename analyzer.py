@@ -307,6 +307,7 @@ class Event(object):
             mapPanels.mmi_residual()
         if "alert" in selection or "all" == selection:
             mapPanels.alert_category()
+            mapPanels.cost_savings()
         return
 
     def _plot_figures(self):
