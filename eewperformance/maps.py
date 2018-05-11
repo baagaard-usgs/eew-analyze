@@ -287,7 +287,8 @@ class EventMaps(object):
         tmin = numpy.min(warningTime.ravel())
         tmax = numpy.max(warningTime.ravel())
         if tmax > tmin:
-            contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
+            cstep = self.config.getfloat("maps", "warning_time_contour_interval")
+            contourLevels = numpy.arange(cstep*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, cstep)
             chandle = ax.contour(warningTime, levels=contourLevels, colors="black", origin="upper", extent=dataExtent, transform=dataCRS, linewidth=0.5, zorder=4)
             ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=6)
         

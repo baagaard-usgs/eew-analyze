@@ -83,6 +83,8 @@ zoom_level = 8
 width_in = 5.0
 height_in = 5.3
 
+warning_time_contour_interval = 2.0
+
 [files]
 event_dir = ./data/[EVENTID]/
 analysis_cache_dir = ./data/cache/
