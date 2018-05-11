@@ -351,19 +351,36 @@ class SummaryFigures(object):
             magnitude[i] = event["magnitude"]
 
         figure = pyplot.figure(figsize=(8.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0, 0.3)))
-
-        ax = figure.add_axes(rectFactory.rect())
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0.2, 0.3)))
         ms = 5.0e-4 * 10**magnitude
-        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors="c_orange", alpha=0.67, label="Q-area")
-        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors="c_blue", alpha=0.67, label="Q-pop")
+        perfs["area_metric"][perfs["area_metric"] < 0] = -1
+        perfs["population_metric"][perfs["population_metric"] < 0] = -1
+        
+        # Positive Q
+        ratio = 6
+        ax = figure.add_axes(rectFactory.rect(nrows=ratio/(ratio-1.0), row=1))
+        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors=COLORS["Q-area"], alpha=0.67, label="Q-area")
+        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors=COLORS["Q-pop"], alpha=0.67, label="Q-pop")
         ax.set_title("Performance Metric versus Earthquake Origin Time")
-        ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Q")
-        ax.set_ylim(0, 1.0)
+        ax.set_ylim(-0.02, 1.0)
+        ax.spines['bottom'].set_visible(False)
+        ax.xaxis.tick_top()
+        ax.set_xticklabels([])
 
         legPatches = [patches.Patch(ec="black", fc=COLORS[m], label=m) for m in ["Q-area", "Q-pop"]]
         pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+
+        # Negative Q (all plotted at -1)
+        ax = figure.add_axes(rectFactory.rect(nrows=ratio, row=ratio))
+        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors=COLORS["Q-area"], alpha=0.67, label="Q-area")
+        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors=COLORS["Q-pop"], alpha=0.67, label="Q-pop")
+        ax.set_xlabel("Origin Time (UTC)")
+        ax.set_ylim(-1.2, -0.8)
+        ax.set_yticks([-1.0])
+        ax.set_yticklabels(["Q<0"])
+        ax.spines['top'].set_visible(False)
+        ax.xaxis.tick_bottom()
 
         self._save(figure, "metric_time")
         pyplot.close(figure)
@@ -371,7 +388,7 @@ class SummaryFigures(object):
     
 
     def magnitude_versus_time(self):
-        """Plot magnitude versys time.
+        """Plot magnitude versus time.
         """
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
