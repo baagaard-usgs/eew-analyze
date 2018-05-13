@@ -235,7 +235,7 @@ class AnalysisSummary(object):
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
             vs = self.config.getfloat("shaking_time", "vs_kmps")
             blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt*vs > event["depth_km"] else 0.0
-            text.textLine("   Radius of no-warning zone: {:.0f} km".format(blindDist))
+            text.textLine("   Radius of late alert zone: {:.0f} km".format(blindDist))
 
         # First alert exceeding threshold
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
@@ -253,7 +253,7 @@ class AnalysisSummary(object):
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
             vs = self.config.getfloat("shaking_time", "vs_kmps")
             blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt > 0 else 0.0
-            text.textLine("   Radius of no-warning zone: {:.0f} km".format(blindDist))
+            text.textLine("   Radius of late alert zone: {:.0f} km".format(blindDist))
         self.canvas.drawText(text)
         self.canvas.restoreState()
         return
