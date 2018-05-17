@@ -417,7 +417,7 @@ class AnalysisData(object):
             alerts = op.cursor.fetchall()
         return alerts
 
-    def performance_stats(self, comcatId, server, gmpe, fragility):
+    def performance_stats(self, comcatId, server, gmpe, fragility, magnitudeThreshold=None, mmiThreshold=None):
         """
         """
         conditions = [
@@ -464,6 +464,13 @@ class AnalysisData(object):
         stats = numpy.zeros(nrows, dtype=dtype)
         for iresult, result in enumerate(results):
             stats[iresult] = tuple([result[key] for key in result.keys()])
+
+        if magnitudeThreshold:
+            mask = numpy.ma.masked_values(stats["magnitude_threshold"], magnitudeThreshold).mask
+            stats = stats[mask]
+        if mmiThreshold:
+            mask = numpy.ma.masked_values(stats["mmi_threshold"], mmiThreshold).mask
+            stats = stats[mask]
         return stats
     
     def most_recent_alert(self, server):

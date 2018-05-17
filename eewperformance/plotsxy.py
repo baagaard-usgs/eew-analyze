@@ -56,6 +56,7 @@ class EventFigures(object):
         alertsLon = numpy.array([alert["longitude"] for alert in alerts])
         alertsLat = numpy.array([alert["latitude"] for alert in alerts])
         alertsDepthKm = numpy.array([alert["depth_km"] for alert in alerts])
+        alertsNumStations = numpy.array([alert["num_stations"] for alert in alerts])
         
         horizDistKmError = 1.0e-3*greatcircle.distance(self.event["longitude"], self.event["latitude"], alertsLon, alertsLat)
 
@@ -66,10 +67,10 @@ class EventFigures(object):
         tmax = max(30.0, t[0]+30.0) if len(t) > 0 else 30.0
         
         figure = pyplot.figure(figsize=(10.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=3, margins=((0.6, 1.0, 0.2), (0.50, 0, 0.25)))
         
         # Magnitude
-        ax = figure.add_axes(rectFactory.rect(row=1, col=1))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, ncols=2, margins=((0.7, 0, 5.0), (0.50, 0, 0.25)))
+        ax = figure.add_axes(rectFactory.rect())
         ax.plot(t, alertsMag, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.67)
         ax.set_xlabel("Time after origin time (s)")
         ax.set_ylabel("Magnitude (Mw)")
@@ -77,9 +78,14 @@ class EventFigures(object):
         ax.set_xlim(0, tmax)
         ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_ltblue")
+
+        ax2 = ax.twinx()
+        ax2.semilogy(t, alertsNumStations, lw=0.5, color="c_yellow")
+        ax2.set_ylabel("# Stations")
         
         # Horizontal location error
-        ax = figure.add_axes(rectFactory.rect(row=1, col=2))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, ncols=2, margins=((4.5, 0.8, 0.2), (0.50, 0, 0.25)))
+        ax = figure.add_axes(rectFactory.rect(col=1))
         ax.plot(t, horizDistKmError, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.67)
         ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.set_xlabel("Time after origin time (s)")
@@ -88,7 +94,7 @@ class EventFigures(object):
         ax.set_title("Horiz. Location Error")
         
         # Depth location error
-        ax = figure.add_axes(rectFactory.rect(row=1, col=3))
+        ax = figure.add_axes(rectFactory.rect(col=2))
         ax.plot(t, self.event["depth_km"]-alertsDepthKm, marker="o", mec="c_red", mfc="c_ltred", lw=0, alpha=0.67)
         ax.axhline(0.0, linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.set_xlabel("Time after origin time (s)")
@@ -216,13 +222,7 @@ class SummaryFigures(object):
         thresholdStep = self.config.getfloat("optimize", "magnitude_threshold_step")
         magThresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
-        perfs = None
-        for eqId in self.events:
-            p = self.db.performance_stats(eqId, server, gmpe, fragility)
-            if perfs is None:
-                perfs = p
-            else:
-                perfs = numpy.append(perfs, p)
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility) for eqId in self.events]).ravel()
         
         dtype = [
             ("area_metric", "float32",),
@@ -245,6 +245,7 @@ class SummaryFigures(object):
                 popMetric = savingsEEW / savingsPerfectEEW
 
                 metricAllEqs[iMMI, iMag] = (areaMetric, popMetric,)
+                
 
         figure = pyplot.figure(figsize=(8.0, 3.5))
         rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=((0.1, 0.5, 0.5), (0.5, 0, 0.2)))
@@ -320,29 +321,19 @@ class SummaryFigures(object):
     def metric_versus_time(self):
         """Plot Q-area and Q-pop versus ANSS origin time.
         """
-        COLORS = {
-            "Q-area": "c_orange",
-            "Q-pop": "c_ltblue",
-        }
+        COLORS = (
+            ("area_metric", "Q-area", "c_ltorange", "c_orange",),
+            ("population_metric", "Q-pop", "c_ltblue", "c_blue",),
+        )
         
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
         fragility = self.config.get("fragility_curves", "object").split(".")[-1]
-        
-        perfs = None
-        for eqId in self.events:
-            p = self.db.performance_stats(eqId, server, gmpe, fragility)
-            if perfs is None:
-                perfs = p
-            else:
-                perfs = numpy.append(perfs, p)
-
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
-        mask = numpy.logical_and(numpy.ma.masked_values(perfs["mmi_threshold"], mmiThreshold).mask,
-                                 numpy.ma.masked_values(perfs["magnitude_threshold"], magThreshold).mask)
-
-        perfs = perfs[mask]
+        
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+        
         originTime = numpy.zeros(perfs.shape, dtype="datetime64[s]")
         magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
         for i,p in enumerate(perfs):
@@ -359,8 +350,8 @@ class SummaryFigures(object):
         # Positive Q
         ratio = 6
         ax = figure.add_axes(rectFactory.rect(nrows=ratio/(ratio-1.0), row=1))
-        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors=COLORS["Q-area"], alpha=0.67, label="Q-area")
-        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors=COLORS["Q-pop"], alpha=0.67, label="Q-pop")
+        for key, label, fc, ec in COLORS:
+            ax.scatter(originTime.astype(datetime), perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
         ax.set_title("Performance Metric versus Earthquake Origin Time")
         ax.set_ylabel("Q")
         ax.set_ylim(-0.02, 1.0)
@@ -368,13 +359,13 @@ class SummaryFigures(object):
         ax.xaxis.tick_top()
         ax.set_xticklabels([])
 
-        legPatches = [patches.Patch(ec="black", fc=COLORS[m], label=m) for m in ["Q-area", "Q-pop"]]
+        legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec) in COLORS]
         pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         # Negative Q (all plotted at -1)
         ax = figure.add_axes(rectFactory.rect(nrows=ratio, row=ratio))
-        ax.scatter(originTime.astype(datetime), perfs["area_metric"], s=ms, c="c_ltorange", edgecolors=COLORS["Q-area"], alpha=0.67, label="Q-area")
-        ax.scatter(originTime.astype(datetime), perfs["population_metric"], s=ms, c="c_ltblue", edgecolors=COLORS["Q-pop"], alpha=0.67, label="Q-pop")
+        for key, label, fc, ec in COLORS:
+            ax.scatter(originTime.astype(datetime), perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylim(-1.2, -0.8)
         ax.set_yticks([-1.0])
@@ -383,6 +374,86 @@ class SummaryFigures(object):
         ax.xaxis.tick_bottom()
 
         self._save(figure, "metric_time")
+        pyplot.close(figure)
+        return
+    
+
+    def metric_versus_magnitude(self):
+        """Plot Q-area and Q-pop versus magnitude.
+        """
+        COLORS = (
+            ("area_metric", "Q-area", "c_ltorange", "c_orange",),
+            ("population_metric", "Q-pop", "c_ltblue", "c_blue",),
+        )
+        
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+
+        magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
+        for i,p in enumerate(perfs):
+            event = self.db.comcat_event(p["comcat_id"])
+            magnitude[i] = event["magnitude"]
+
+        figure = pyplot.figure(figsize=(5.0, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.75, 0, 0.15), (0.5, 0.2, 0.3)))
+        ms = 15
+        ax = figure.add_axes(rectFactory.rect())
+        for key, label, fc, ec in COLORS:
+            ax.scatter(magnitude, perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+        ax.set_title("Performance Metric versus Earthquake Magnitude")
+        ax.set_xlabel("Earthquake Magnitude")
+        ax.set_ylabel("Q")
+        ax.set_ylim(-1, 1.0)
+
+        legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec,) in COLORS]
+        pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+
+        self._save(figure, "metric_magnitude")
+        pyplot.close(figure)
+        return
+    
+
+    def metric_versus_depth(self):
+        """Plot Q-area and Q-pop versus ANSS origin depth.
+        """
+        COLORS = (
+            ("area_metric", "Q-area", "c_ltorange", "c_orange",),
+            ("population_metric", "Q-pop", "c_ltblue", "c_blue",),
+        )
+        
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+
+        depthKm = numpy.zeros(perfs.shape, dtype=numpy.float32)
+        for i,p in enumerate(perfs):
+            event = self.db.comcat_event(p["comcat_id"])
+            depthKm[i] = event["depth_km"]
+
+        figure = pyplot.figure(figsize=(5.0, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.75, 0, 0.15), (0.5, 0.2, 0.3)))
+        ms = 15
+        ax = figure.add_axes(rectFactory.rect())
+        for key, label, fc, ec in COLORS:
+            ax.scatter(depthKm, perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+        ax.set_title("Performance Metric versus ANSS Origin Depth")
+        ax.set_xlabel("Depth (km)")
+        ax.set_ylabel("Q")
+        ax.set_ylim(-1, 1)
+
+        legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec) in COLORS]
+        pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+
+        self._save(figure, "metric_depth")
         pyplot.close(figure)
         return
     
