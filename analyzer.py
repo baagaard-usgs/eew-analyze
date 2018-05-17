@@ -324,6 +324,8 @@ class Event(object):
             figures.alert_error(self.alerts)
         if "mmi_correlation" in selection or "all" == selection:
             figures.mmi_correlation()
+        if "warning_time_mmi" in selection or "all" == selection:
+            figures.warning_time_mmi()
         return
 
 
@@ -474,7 +476,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--optimize-events", action="store_true", dest="optimize_events")
         parser.add_argument("--plot-alert-maps", action="store_true", dest="plot_alert_maps")
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
-        parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation"])
+        parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation", "warning_time_mmi"])
         parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events", "performance"])
         parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "metric_depth"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")

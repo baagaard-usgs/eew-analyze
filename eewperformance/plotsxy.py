@@ -182,6 +182,55 @@ class EventFigures(object):
         pyplot.close(figure)
         return
     
+    def warning_time_mmi(self):
+        """Plot warning time versus observed MMI.
+        """
+        cacheDir = self.config.get("files", "analysis_cache_dir")
+        filename = "analysis_" + analysis_utils.analysis_event_label(self.config, self.event["event_id"]) + ".tiff"
+        rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
+
+        layers = {}
+        for iband in range(rasterData.RasterCount):
+            band = rasterData.GetRasterBand(1+iband)
+            description = band.GetDescription()
+            data = numpy.array(band.ReadAsArray())
+            data = numpy.ma.masked_values(data, band.GetNoDataValue())
+            layers[description] = data
+
+        mask = ~layers["warning_time"].ravel().mask
+        mmiObs = layers["mmi_obs"].ravel().data[mask]
+        warningTime = layers["warning_time"].ravel().data[mask]
+
+        figure = pyplot.figure(figsize=(4.5, 3.5))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.60, 0, 0.2), (0.5, 0, 0.1)))
+        
+        ax = figure.add_axes(rectFactory.rect())
+        mask = warningTime >= 0
+        ax.plot(mmiObs[mask], warningTime[mask], marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
+        ax.plot(mmiObs[~mask], warningTime[~mask], marker="o", ms=2, mec="black", mfc="c_ltgray", lw=0, alpha=0.67, zorder=1)
+        ax.set_xlabel("Observed MMI")
+        ax.set_xlim(1, 10)
+        ax.set_ylabel("Warning Time (s)")
+
+        if mmiObs.shape[0] > 0:
+        
+            # Mean and std in bins
+            bwidth = 0.5
+            bins = numpy.arange(1.0-0.5*bwidth, 10.01+0.5*bwidth, bwidth)
+            count, bedges = numpy.histogram(mmiObs, bins=bins)
+            sum1, bedges = numpy.histogram(mmiObs, bins=bins, weights=warningTime)
+            sum2, bedges = numpy.histogram(mmiObs, bins=bins, weights=warningTime**2)
+            wtMean = sum1 / count
+            wtStd = numpy.sqrt(sum2/count - wtMean**2)
+            bcenters = 0.5*(bedges[1:] + bedges[:-1])
+            ax.errorbar(bcenters, wtMean, yerr=wtStd, fmt="none", ecolor="c_ltgreen", elinewidth=2, capthick=1.5, capwidth=6.0, zorder=4)
+            ax.plot(bcenters, wtMean, marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
+        
+        self._save(figure, "warning_time_mmi")
+        pyplot.close(figure)
+        return
+    
+
 
 class SummaryFigures(object):
     """Plots of alert mag/loc error, MMI (obs vs pred), etc.
