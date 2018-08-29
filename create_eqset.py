@@ -39,13 +39,17 @@ debug = False
 
 [blacklist]
 ci11129826 = deleted event
+# Ignore events near Nevada
+nn00642964 = M4.5 15km WNW of Sandy Valley, Nevada, 2018-07-05
 # Ignore events in Mexico
 ci11129914 = M4.7 11km W of Alberto Oviedo Mota, B.C., MX, 2012-07-01
 ci37359304 = M4.3 3km NNW of Delta, B.C., MX, 2015-04-08
 ci15115905 = M4.2 11km WSW of Alberto Oviedo Mota, B.C., MX, 2012-02-29
+ci38230144 = M4.2 32km ENE of Ensenada, B.C., MX, 2018-07-25
 ci11286130 = M4.1 10km W of Alberto Oviedo Mota, B.C., MX, 2013-04-17
 ci11364370 = M4.1 7km NNW of Delta, B.C., MX, 2013-09-14
 ci37359312 = M4.0 8km NW of Delta, B.C., MX, 2015-04-08
+ci38232616 = M4.0 71km ENE of Maneadero, B.C., MX, 2018-07-29
 ci37265488 = M4.0 56km WSW of Rosarito, B.C., MX, 2014-09-07
 ci11248258 = M4.0 66km WSW of Rosarito, B.C., MX, 2013-02-23
 
