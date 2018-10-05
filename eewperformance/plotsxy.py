@@ -56,7 +56,10 @@ class EventFigures(object):
         alertsLon = numpy.array([alert["longitude"] for alert in alerts])
         alertsLat = numpy.array([alert["latitude"] for alert in alerts])
         alertsDepthKm = numpy.array([alert["depth_km"] for alert in alerts])
-        alertsNumStations = numpy.array([alert["num_stations"] for alert in alerts])
+        if "num_stations" in alert.keys():
+            alertsNumStations = numpy.array([alert["num_stations"] for alert in alerts])
+        else:
+            alertsNumStations = None
         
         horizDistKmError = 1.0e-3*greatcircle.distance(self.event["longitude"], self.event["latitude"], alertsLon, alertsLat)
 
@@ -79,9 +82,11 @@ class EventFigures(object):
         ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_ltblue")
 
-        ax2 = ax.twinx()
-        ax2.semilogy(t, alertsNumStations, lw=0.5, color="c_yellow")
-        ax2.set_ylabel("# Stations")
+        if not alertsNumStations is None:
+            ax2 = ax.twinx()
+            ax2.semilogy(t, alertsNumStations, lw=0.5, color="c_green")
+            ax2.set_ylabel("# Stations")
+            ax2.set_xlim(0, tmax)
         
         # Horizontal location error
         rectFactory = matplotlib_extras.axes.RectFactory(figure, ncols=2, margins=((4.5, 0.8, 0.2), (0.50, 0, 0.25)))

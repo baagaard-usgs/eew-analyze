@@ -97,7 +97,7 @@ class OpenQuakeGMPE(object):
         :param event:
             Dictionary with event parameters ["magnitude", "depth_km"]
         """
-        STRESS_DROP = 5.0e+6 # Pa
+        STRESS_DROP = 3.0e+6 # Pa
         seismicMoment = 10**(1.5*(event["magnitude"]+10.7)-7.0)
         radiusKm = 1.0e-3 * (7.0/16.0*seismicMoment/STRESS_DROP)**(1/3.0)
         widthKm = 2.0 * numpy.minimum(event["depth_km"], radiusKm)
@@ -177,28 +177,28 @@ if __name__ == "__main__":
     points["latitude"] = latitude
     points["vs30"] = 540.0
 
-
-    from basemap.Figure import Figure
-    figure = Figure()
-    figure.open(12.0, 5.5)
+    import matplotlib.pyplot as pyplot
+    import matplotlib_extras
+    figure = pyplot.figure(figsize=(12.0, 5.5))
     nrows = 1
     ncols = 2
-
-    axPGA = figure.axes(nrows, ncols, 1, 1)
+    rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows, ncols, margins=((0.7, 1.0, 0.1), (0.50, 0, 0.25)))
+    
+    axPGA = figure.add_axes(rectFactory.rect(col=1))
     axPGA.autoscale(tight=True)
     axPGA.set_xlabel("Joyner-Boore Distance (km)")
     axPGA.set_ylabel("PGA (g)")
 
-    axPGV = figure.axes(nrows, ncols, 1, 2)
+    axPGV = figure.add_axes(rectFactory.rect(col=2))
     axPGV.autoscale(tight=True)
     axPGV.set_xlabel("Joyner-Boore Distance (km)")
     axPGV.set_ylabel("PGV (cm/s)")
 
     gmpes = {
-        "BSSA2014": "c_ltred",
-        "ASK2014": "c_blue",
-        "CB2014": "c_orange",
-        "CY2014": "c_purple",
+        "BSSA2014": "red",
+        "ASK2014": "blue",
+        "CB2014": "orange",
+        "CY2014": "purple",
     }
 
     magnitudes = numpy.arange(4.0, 7.01, 1.0)
