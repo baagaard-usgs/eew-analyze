@@ -22,7 +22,7 @@ from eewperformance import shakemap
 from eewperformance import greatcircle
 from eewperformance import comcat
 
-DEFAULTS = """
+DEFAULTS = u"""
 [events]
 # Example:
 # nc72923380 = Mw 4.6 Paicines, 2017-11-13
@@ -336,10 +336,10 @@ class ShakeMapRegionApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import ConfigParser
+        import configparser
         import io
-        config = ConfigParser.SafeConfigParser()
-        config.readfp(io.BytesIO(DEFAULTS))
+        config = configparser.SafeConfigParser()
+        config.readfp(io.StringIO(DEFAULTS))
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:
