@@ -97,7 +97,7 @@ class OpenQuakeGMPE(object):
         :param event:
             Dictionary with event parameters ["magnitude", "depth_km"]
         """
-        STRESS_DROP = 5.0e+6 # Pa
+        STRESS_DROP = 3.0e+6 # Pa
         seismicMoment = 10**(1.5*(event["magnitude"]+10.7)-7.0)
         radiusKm = 1.0e-3 * (7.0/16.0*seismicMoment/STRESS_DROP)**(1/3.0)
         widthKm = 2.0 * numpy.minimum(event["depth_km"], radiusKm)
