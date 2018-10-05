@@ -148,7 +148,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent, eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rFetching ShakeMaps...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rFetching ShakeMaps...{:d}%".format(((iEvent+1)*100)//numEvents))
                 sys.stdout.flush()
 
             
@@ -311,7 +311,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)//numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -331,7 +331,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)//numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
