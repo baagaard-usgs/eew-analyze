@@ -84,7 +84,7 @@ class DetailEvent(object):
         if not filename.endswith(".gz"):
             suffix = ".gz"
         with gzip.open(filename+suffix, "w") as fh:
-            fh.write(response.text.decode("utf-8"))
+            fh.write(response.text.encode("utf-8"))
         return
 
     def load(self, filename):
@@ -522,7 +522,7 @@ class Product(object):
         if not filename.endswith(".gz"):
             suffix = ".gz"
         with gzip.open(filename+suffix, "w") as fh:
-            fh.write(response.text.decode("utf-8"))
+            fh.write(response.text.encode("utf-8"))
         return
     
     def has_property(self,key):
