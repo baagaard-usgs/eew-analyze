@@ -11,8 +11,8 @@ import logging
 from importlib import import_module
 import numpy
 
-import analysis_utils
-import gdalraster
+from . import analysis_utils
+from . import gdalraster
 
 class CostSavings(object):
     """Cost savings weighted by area and population.
@@ -98,7 +98,7 @@ class CostSavings(object):
         objectPath = self.config.get("fragility_curves", "object").split(".")
         fragilityOptions = dict(self.config.items("fragility_curves"))
         fragilityOptions.pop("object")
-        fragilityOptions = {k: float(v) for k,v in fragilityOptions.iteritems()}
+        fragilityOptions = {k: float(v) for k,v in fragilityOptions.items()}
         fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(**fragilityOptions)
         
         costDamage = fragility.cost_damage(mmiObs)

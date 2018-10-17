@@ -323,8 +323,8 @@ class DMLogASCII(object):
         buffer = "\n".join(lines)
         with open(filename, "w") as fh:
             fh.write(buffer)
-        import StringIO
-        self.data = self._parse(StringIO.StringIO(buffer))
+        import io
+        self.data = self._parse(io.StringIO.StringIO(buffer))
         return
 
     def load(self, filename):

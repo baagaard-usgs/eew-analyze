@@ -16,7 +16,7 @@ import multiprocessing
 import numpy
 
 import matplotlib.pyplot as pyplot
-import matplotlib_extras
+import matplotlib_extras.colors
 
 import h5py # avoid gdal loading incompatible HDF5 library
 from eewperformance import analysisdb

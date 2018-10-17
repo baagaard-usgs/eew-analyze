@@ -22,8 +22,8 @@ from cartopy import crs
 from cartopy_extra_tiles import cached_tiler
 import matplotlib_extras
 
-import gdalraster
-import analysis_utils
+from . import gdalraster
+from . import analysis_utils
 
 gdal.UseExceptions()
 

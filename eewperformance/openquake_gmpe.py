@@ -10,7 +10,7 @@
 import logging
 import numpy
 
-import greatcircle
+from . import greatcircle
 
 import openquake.hazardlib.gsim.base
 import openquake.hazardlib.imt

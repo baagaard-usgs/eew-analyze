@@ -296,7 +296,7 @@ class DetailEvent(object):
                         product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                         products.append(product)
                 else:
-                    raise(AttributeError("No VersionOption defined for %s" % version))
+                    raise AttributeError("No VersionOption defined for %s" % version)
         else: #dataframe only includes one source
             if version == VersionOption.PREFERRED:
                 df.sort(order=["weight","time"])
@@ -321,7 +321,7 @@ class DetailEvent(object):
                     product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                     products.append(product)
             else:
-                raise(AttributeError("No VersionOption defined for %s" % version))
+                raise AttributeError("No VersionOption defined for %s" % version)
 
         return products
 

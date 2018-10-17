@@ -19,8 +19,8 @@ import matplotlib.patches as patches
 from osgeo import gdal, osr
 import matplotlib_extras
 
-import analysis_utils
-import greatcircle
+from . import analysis_utils
+from . import greatcircle
 
 gdal.UseExceptions()
 
@@ -56,7 +56,7 @@ class EventFigures(object):
         alertsLon = numpy.array([alert["longitude"] for alert in alerts])
         alertsLat = numpy.array([alert["latitude"] for alert in alerts])
         alertsDepthKm = numpy.array([alert["depth_km"] for alert in alerts])
-        if "num_stations" in alert.keys():
+        if len(alerts) > 0 and "num_stations" in alerts[0].keys():
             alertsNumStations = numpy.array([alert["num_stations"] for alert in alerts])
         else:
             alertsNumStations = None
@@ -174,7 +174,7 @@ class EventFigures(object):
             residualMean = numpy.mean(residual)
             residualStd = numpy.std(residual)
             axin = inset_axes(ax, width="33%", height="25%", loc=2, borderpad=1.7)
-            axin.hist(residual, bins=bins, normed=True, align="mid", color="c_ltred", ec="c_red")
+            axin.hist(residual, bins=bins, density=True, align="mid", color="c_ltred", ec="c_red")
             axin.set_yticks([])
             axin.xaxis.set_ticks_position("bottom")
             for label in axin.xaxis.get_ticklabels():
@@ -368,7 +368,7 @@ class SummaryFigures(object):
         print("Q-area: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(areaMetric, areaOptMag, areaOptMMI))
         print("Q-pop: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(popMetric, popOptMag, popOptMMI))
 
-        print metricAllEqs
+        print(metricAllEqs)
         return
     
 

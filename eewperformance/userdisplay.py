@@ -8,7 +8,7 @@
 
 import numpy
 
-import greatcircle
+from . import greatcircle
 
 def shaking_time_vs(event, points, options):
     """Get shaking time based on origin time and shear wave speed.

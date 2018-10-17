@@ -333,7 +333,7 @@ class AnalysisData(object):
     def find_match(self, comcatId, server):
         """Find initial alert matching ComCat event.
         """
-        import greatcircle
+        from . import greatcircle
         
         MAX_DISTANCE_DEG = 3.0
         MAX_DISTANCE_KM = 150.0
