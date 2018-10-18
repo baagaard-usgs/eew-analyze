@@ -96,7 +96,7 @@ class EventMaps(object):
 
         contourLevels = numpy.arange(1.0, 10.01, 0.5)
         chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
+        ax.clabel(chandle, inline=True, fmt="%3.1f")
 
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=4)
 
@@ -122,7 +122,7 @@ class EventMaps(object):
 
             contourLevels = numpy.arange(1.0, 10.01, 0.5)
             chandle = ax.contour(mmi, levels=contourLevels, zorder=3, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-            ax.clabel(chandle, inline=True, fmt="%3.1f", zorder=3)
+            ax.clabel(chandle, inline=True, fmt="%3.1f")
 
             cols = [
                 ("longitude", "float32",),
@@ -166,7 +166,7 @@ class EventMaps(object):
 
         contourLevels = numpy.arange(-RESIDUAL_MAX, RESIDUAL_MAX+0.01, 0.5)
         chandle = ax.contour(mmiResidual, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1f", zoerder=4)
+        ax.clabel(chandle, inline=True, fmt="%3.1f")
 
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=5)
 
