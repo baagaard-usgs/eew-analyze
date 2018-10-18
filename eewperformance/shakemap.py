@@ -135,7 +135,8 @@ class ShakeMap(object):
         colNames = "longitude, latitude, mmi, pga, pgv, vs30"
         colFormats = "float32, float32, float32, float32, float32, float32"
 
-        data = numpy.loadtxt(io.StringIO(elRoot.xpath("ns:grid_data", namespaces=namespaces)[0].text), usecols=colIndices)
+        from six import u as unicode
+        data = numpy.loadtxt(io.StringIO(unicode(elRoot.xpath("ns:grid_data", namespaces=namespaces)[0].text)), usecols=colIndices)
         self.data = numpy.core.records.fromarrays(data.transpose(), names=colNames, formats=colFormats)
         if self.gmice:
             self.data["mmi"] = self.gmice(self.data["pga"], self.data["pgv"])
