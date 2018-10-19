@@ -27,14 +27,14 @@ DEFAULTS = u"""
 [shakealert.production]
 login_url = None
 log_url = None
-server = None
+server = eew-bk-prod1
 username = None
 password = None
 
 [shakealert.demonstration]
 login_url = None
 log_url = None
-server = None
+server = eew2demo
 username = None
 password = None
 
