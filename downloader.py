@@ -387,7 +387,7 @@ class DownloaderApp(object):
             logging.getLogger(__name__).info("No DM logs found.")
         for iFile,filename in enumerate(files):
             if self.showProgress:
-                sys.stdout.write("\rProcessing DM logs...{:d}%".format(((iFile+1)*100)/numFiles))
+                sys.stdout.write("\rProcessing DM logs...{:d}%".format(((iFile+1)*100)//numFiles))
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
             self.db.add_alerts(alerts, replace)
