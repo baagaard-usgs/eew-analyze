@@ -33,6 +33,20 @@ DEFAULTS = u"""
 # Example:
 # nc72923380 = Mw 4.6 Paicines, 2017-11-13
 
+[shakealert.production]
+login_url = None
+log_url = None
+server = eew-bk-prod1
+username = None
+password = None
+
+[shakealert.demonstration]
+login_url = None
+log_url = None
+server = eew2demo
+username = None
+password = None
+
 [shakemap]
 projection = EPSG:3311
 
