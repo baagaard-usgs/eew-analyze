@@ -196,13 +196,13 @@ class DMLogXML(object):
         bytes = fh.read()
         fh.close()
         pattern = [
-            "(?P<timestamp>[0-9]{4}-[0-9]+-[0-9]+T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]+Z)[\s]*",
-            "(?P<xml>\<\?xml[\s\S]+?</event_message>)"
+            b"(?P<timestamp>[0-9]{4}-[0-9]+-[0-9]+T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]+Z)[\s]*",
+            b"(?P<xml>\<\?xml[\s\S]+?</event_message>)"
         ]
-        xmlBlocks = re.findall("".join(pattern), bytes)
+        xmlBlocks = re.findall(b"".join(pattern), bytes)
         alerts = []
         for timestamp,xmlBlock in xmlBlocks:
-            elMsg = etree.fromstring(xmlBlock.replace("UTF-16", "utf-8"))
+            elMsg = etree.fromstring(xmlBlock.replace(b"UTF-16", b"utf-8"))
             elCoreInfo = self._getChild(elMsg, "core_info")
             elMag = self._getChild(elCoreInfo, "mag")
 
