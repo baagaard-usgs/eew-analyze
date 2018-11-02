@@ -198,7 +198,7 @@ class EventMaps(object):
         tmax = numpy.max(warningTime.ravel())
         contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
         chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-        ax.clabel(chandle, inline=True, fmt="%3.1fs", color="black", zorder=4)
+        ax.clabel(chandle, inline=True, fmt="%3.1fs")
 
         cols = [
             ("longitude", "float32",),
@@ -240,7 +240,7 @@ class EventMaps(object):
         if tmax > tmin:
             contourLevels = numpy.arange(2.0*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, 2.0)
             chandle = ax.contour(warningTime, levels=contourLevels, zorder=4, colors="black", origin="upper", extent=dataExtent, transform=dataCRS)
-            ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=5)
+            ax.clabel(chandle, inline=True, fmt="%.0f s")
         
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="red", mec="black", c="white", ms=18, zorder=6)
 
@@ -290,7 +290,7 @@ class EventMaps(object):
             cstep = self.config.getfloat("maps", "warning_time_contour_interval")
             contourLevels = numpy.arange(cstep*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, cstep)
             chandle = ax.contour(warningTime, levels=contourLevels, colors="black", origin="upper", extent=dataExtent, transform=dataCRS, linewidth=0.5, zorder=4)
-            ax.clabel(chandle, inline=True, fmt="%.0f s", color="black", zorder=6)
+            ax.clabel(chandle, inline=True, fmt="%.0f s")
         
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="c_yellow", mec="black", c="white", ms=15, zorder=7)
 
