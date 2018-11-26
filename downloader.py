@@ -277,7 +277,8 @@ class DownloaderApp(object):
                     },
                 },
             }
-            with gzip.open(os.path.join(dataDir, "info.json.gz"), "w") as fjson:
+            with gzip.open(os.path.join(dataDir, "info.json.gz"), "wt") as fjson:
+                # python 3 requires txt mode for json string
                 import json
                 json.dump(data, fjson)
         return
