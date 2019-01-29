@@ -12,7 +12,7 @@ import os
 import logging
 
 
-DEFAULTS = """
+DEFAULTS = u"""
 [sanfrancisco]
 longitude = -122.419
 latitude = 37.775
@@ -43,6 +43,7 @@ ci11129826 = deleted event
 nn00642964 = M4.5 15km WNW of Sandy Valley, Nevada, 2018-07-05
 # Ignore events in Mexico
 ci11129914 = M4.7 11km W of Alberto Oviedo Mota, B.C., MX, 2012-07-01
+ci37373442 = M4.4 1km SE of Delta, B.C., MX, 2018-09-29
 ci37359304 = M4.3 3km NNW of Delta, B.C., MX, 2015-04-08
 ci15115905 = M4.2 11km WSW of Alberto Oviedo Mota, B.C., MX, 2012-02-29
 ci38230144 = M4.2 32km ENE of Ensenada, B.C., MX, 2018-07-25
@@ -52,7 +53,6 @@ ci37359312 = M4.0 8km NW of Delta, B.C., MX, 2015-04-08
 ci38232616 = M4.0 71km ENE of Maneadero, B.C., MX, 2018-07-29
 ci37265488 = M4.0 56km WSW of Rosarito, B.C., MX, 2014-09-07
 ci11248258 = M4.0 66km WSW of Rosarito, B.C., MX, 2013-02-23
-
 
 [files]
 filename_template = ./eqsets/[DOMAIN].cfg
@@ -144,10 +144,10 @@ class CreateEqSetApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import ConfigParser
+        import configparser
         import io
-        config = ConfigParser.SafeConfigParser()
-        config.readfp(io.BytesIO(DEFAULTS))
+        config = configparser.SafeConfigParser()
+        config.readfp(io.StringIO(DEFAULTS))
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:

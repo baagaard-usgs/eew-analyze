@@ -15,7 +15,7 @@ from osgeo import ogr, gdal
 
 gdal.UseExceptions()
 
-DEFAULTS = """
+DEFAULTS = u"""
 [census.geometry]
 shapefile = tl_2010_06_tabblock10.shp
 field_block = GEOID10
@@ -71,10 +71,10 @@ class PopulationDensityApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import ConfigParser
+        import configparser
         import io
-        config = ConfigParser.SafeConfigParser()
-        config.readfp(io.BytesIO(DEFAULTS))
+        config = configparser.SafeConfigParser()
+        config.readfp(io.StringIO(DEFAULTS))
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:

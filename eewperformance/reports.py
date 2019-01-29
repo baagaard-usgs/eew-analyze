@@ -19,8 +19,8 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import Table
 from reportlab.lib.utils import ImageReader
 
-from analysisdb import AnalysisData
-from analysis_utils import analysis_event_label, timedelta_to_seconds
+from .analysisdb import AnalysisData
+from .analysis_utils import analysis_event_label, timedelta_to_seconds
 
 class AnalysisSummary(object):
     """Summary of analysis.

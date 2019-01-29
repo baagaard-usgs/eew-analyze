@@ -20,21 +20,21 @@ from eewperformance import comcat
 from eewperformance import shakealert
 from eewperformance import analysisdb
 
-DEFAULTS = """
+DEFAULTS = u"""
 [events]
 # Example: nc72923380 = Mw 4.6 Paicines, 2017-11-13
 
 [shakealert.production]
 login_url = None
 log_url = None
-server = None
+server = eew-bk-prod1
 username = None
 password = None
 
 [shakealert.demonstration]
 login_url = None
 log_url = None
-server = None
+server = eew2demo
 username = None
 password = None
 
@@ -148,7 +148,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent, eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rFetching ShakeMaps...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rFetching ShakeMaps...{:d}%".format(((iEvent+1)*100)//numEvents))
                 sys.stdout.flush()
 
             
@@ -277,7 +277,8 @@ class DownloaderApp(object):
                     },
                 },
             }
-            with gzip.open(os.path.join(dataDir, "info.json.gz"), "w") as fjson:
+            with gzip.open(os.path.join(dataDir, "info.json.gz"), "wt") as fjson:
+                # python 3 requires txt mode for json string
                 import json
                 json.dump(data, fjson)
         return
@@ -311,7 +312,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)//numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -331,7 +332,7 @@ class DownloaderApp(object):
         numEvents = len(events)
         for iEvent,eqId in enumerate(events):
             if self.showProgress:
-                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)/numEvents))
+                sys.stdout.write("\rProcessing ComCat events...{:d}%".format(((iEvent+1)*100)//numEvents))
                 sys.stdout.flush()
 
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
@@ -387,7 +388,7 @@ class DownloaderApp(object):
             logging.getLogger(__name__).info("No DM logs found.")
         for iFile,filename in enumerate(files):
             if self.showProgress:
-                sys.stdout.write("\rProcessing DM logs...{:d}%".format(((iFile+1)*100)/numFiles))
+                sys.stdout.write("\rProcessing DM logs...{:d}%".format(((iFile+1)*100)//numFiles))
                 sys.stdout.flush()
             alerts = dmlog.load(filename)
             self.db.add_alerts(alerts, replace)
@@ -409,10 +410,10 @@ class DownloaderApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import ConfigParser
+        import configparser
         import io
-        config = ConfigParser.SafeConfigParser()
-        config.readfp(io.BytesIO(DEFAULTS))
+        config = configparser.SafeConfigParser()
+        config.readfp(io.StringIO(DEFAULTS))
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:

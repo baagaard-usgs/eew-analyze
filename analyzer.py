@@ -16,7 +16,7 @@ import multiprocessing
 import numpy
 
 import matplotlib.pyplot as pyplot
-import matplotlib_extras
+import matplotlib_extras.colors
 
 import h5py # avoid gdal loading incompatible HDF5 library
 from eewperformance import analysisdb
@@ -28,10 +28,24 @@ from eewperformance import reports
 from eewperformance import analysis_utils
 from eewperformance import gdalraster
 
-DEFAULTS = """
+DEFAULTS = u"""
 [events]
 # Example:
 # nc72923380 = Mw 4.6 Paicines, 2017-11-13
+
+[shakealert.production]
+login_url = None
+log_url = None
+server = eew-bk-prod1
+username = None
+password = None
+
+[shakealert.demonstration]
+login_url = None
+log_url = None
+server = eew2demo
+username = None
+password = None
 
 [shakemap]
 projection = EPSG:3311
@@ -396,10 +410,10 @@ class EEWAnalyzeApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import ConfigParser
+        import configparser
         import io
-        config = ConfigParser.SafeConfigParser()
-        config.readfp(io.BytesIO(DEFAULTS))
+        config = configparser.SafeConfigParser()
+        config.readfp(io.StringIO(DEFAULTS))
         for filename in config_filenames.split(","):
             if self.showProgress:
                 print("Fetching parameters from {}...".format(filename))

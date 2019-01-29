@@ -18,7 +18,10 @@
 import json
 import os
 import requests
-import urllib2
+try:
+    from urllib.parse import urlparse # Python 3
+except ImportError:
+    from urlparse import urlparse # Python 2
 import gzip
 import re
 import logging
@@ -81,7 +84,7 @@ class DetailEvent(object):
         if not filename.endswith(".gz"):
             suffix = ".gz"
         with gzip.open(filename+suffix, "w") as fh:
-            fh.write(response.text.decode("utf-8"))
+            fh.write(response.text.encode("utf-8"))
         return
 
     def load(self, filename):
@@ -293,7 +296,7 @@ class DetailEvent(object):
                         product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                         products.append(product)
                 else:
-                    raise(AttributeError("No VersionOption defined for %s" % version))
+                    raise AttributeError("No VersionOption defined for %s" % version)
         else: #dataframe only includes one source
             if version == VersionOption.PREFERRED:
                 df.sort(order=["weight","time"])
@@ -318,7 +321,7 @@ class DetailEvent(object):
                     product = Product(productName,pversion,self._jdict["properties"]["products"][productName][index])
                     products.append(product)
             else:
-                raise(AttributeError("No VersionOption defined for %s" % version))
+                raise AttributeError("No VersionOption defined for %s" % version)
 
         return products
 
@@ -413,7 +416,7 @@ class Product(object):
             
         for contentkey in self._product["contents"].keys():
             url = self._product["contents"][contentkey]["url"]
-            parts = urllib2.urlparse.urlparse(url)
+            parts = urlparse(url)
             fname = parts.path.split("/")[-1]
             if re.search(regexp+"$",fname):
                 contents.append(fname)
@@ -436,7 +439,7 @@ class Product(object):
             if re.search(regexp+"$",contentkey) is None:
                 continue
             url = content["url"]
-            parts = urllib2.urlparse.urlparse(url)
+            parts = urlparse(url)
             fname = parts.path.split("/")[-1]
             if len(fname) < len(content_name):
                 content_name = fname
@@ -464,7 +467,7 @@ class Product(object):
             if re.search(regexp+"$",contentkey) is None:
                 continue
             url = content["url"]
-            parts = urllib2.urlparse.urlparse(url)
+            parts = urlparse(url)
             fname = parts.path.split("/")[-1]
             if len(fname) < len(content_name):
                 content_name = fname
@@ -492,7 +495,7 @@ class Product(object):
             if re.search(regexp+"$",contentkey) is None:
                 continue
             url = content["url"]
-            parts = urllib2.urlparse.urlparse(url)
+            parts = urlparse(url)
             fname = parts.path.split("/")[-1]
             if len(fname) < len(content_name):
                 content_name = fname
@@ -519,7 +522,7 @@ class Product(object):
         if not filename.endswith(".gz"):
             suffix = ".gz"
         with gzip.open(filename+suffix, "w") as fh:
-            fh.write(response.text.decode("utf-8"))
+            fh.write(response.text.encode("utf-8"))
         return
     
     def has_property(self,key):
