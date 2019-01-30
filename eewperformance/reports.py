@@ -278,16 +278,18 @@ class AnalysisSummary(object):
 
     def _render_event_perf_table(self, perfEEW, perfTheoryMag, perfTheoryMagBias):
         data = [
-            ["Thresholds", "", "Alert", "", "ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. w/Bias"],
-            ["Mag.", "MMI", "Area (km^2)", "Population",] + ["CS-Area", "CS-Pop",]*3,
+            ["Thresholds", "", "Alert Region", "", "Cost Savings", "", "", ""],
+            ["Mw", "MMI", "Area\n(km^2)", "Population", "ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. w/Bias", ""],
+            [""]*4 + ["Area", "Pop",]*3,
         ]
+        numTableHeaderRows = len(data)
         tableCols = (
             ("magnitude_threshold", "{:3.1f}"),
             ("mmi_threshold", "{:3.1f}"),
             ("area_alert", "{:7.1e}"),
             ("population_alert", "{:7.1e}"),
             ("area_costsavings_eew", "{:5.0f}"),
-            ("population_costsavings_eew", "{:5.0f}"),
+            ("population_costsavings_eew", "{:8.2e}"),
         )
         
         for pEEW in perfEEW:
@@ -313,11 +315,16 @@ class AnalysisSummary(object):
             ("BOTTOMPADDING", (0,0), (-1,-1), 2),
             ("TOPPADDING", (0,0), (-1,-1), 2),
             ("GRID", (0,0), (-1,-1), 0.5, (0.5, 0.5, 0.5)),
-            ("SPAN", (0,0), (1,0)),
-            ("SPAN", (2,0), (3,0)),
-            ("SPAN", (4,0), (5,0)),
-            ("SPAN", (6,0), (7,0)),
-            ("SPAN", (8,0), (9,0)),
+            ("SPAN", (0,0), (1,0)), # Thresholds
+            ("SPAN", (2,0), (3,0)), # Alert Region
+            ("SPAN", (4,0), (9,0)), # Cost Savings
+            ("SPAN", (0,1), (0,2)), # Mw
+            ("SPAN", (1,1), (1,2)), # MMI
+            ("SPAN", (2,1), (2,2)), # Area
+            ("SPAN", (3,1), (3,2)), # Population
+            ("SPAN", (4,1), (5,1)),
+            ("SPAN", (6,1), (7,1)),
+            ("SPAN", (8,1), (9,1)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
         ]
         # Highlight row matching alert thresholds
@@ -325,19 +332,19 @@ class AnalysisSummary(object):
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         maskMMI = numpy.ma.masked_values(perfEEW["mmi_threshold"], mmiThreshold).mask
         maskMag = numpy.ma.masked_values(perfEEW["magnitude_threshold"], magThreshold).mask
-        row = 2 + numpy.argmax(numpy.logical_and(maskMMI, maskMag))
+        row = numTableHeaderRows + numpy.argmax(numpy.logical_and(maskMMI, maskMag))
         style.append(("BACKGROUND", (0,row),(-1,row), (1.0, 1.0, 0.0)))
                 
         # Highlight all cases with maximum Q-area and Q-pop
         if perfEEW["population_costsavings_eew"].shape[-1] > 0:
             maxQ = numpy.max(perfEEW["population_costsavings_eew"])
-            rowsMaxQ = 2 + numpy.where(perfEEW["population_costsavings_eew"] >= maxQ)[0]
+            rowsMaxQ = numTableHeaderRows + numpy.where(perfEEW["population_costsavings_eew"] >= maxQ)[0]
             for row in rowsMaxQ:
                 style.append(("BACKGROUND", (-6,row),(-6,row), (0.7, 1.0, 0.7)))
                              
         if perfEEW["area_costsavings_eew"].shape[-1] > 0:
             maxQ = numpy.max(perfEEW["area_costsavings_eew"])
-            rowMaxQ = 2 + numpy.where(perfEEW["area_costsavings_eew"] >= maxQ)[0]
+            rowMaxQ = numTableHeaderRows + numpy.where(perfEEW["area_costsavings_eew"] >= maxQ)[0]
             for row in rowsMaxQ:
                 style.append(("BACKGROUND", (-5,row),(-5,row), (0.7, 1.0, 0.7)))
 
@@ -348,7 +355,16 @@ class AnalysisSummary(object):
         t = Table(data, style=style)
         t.wrapOn(self.canvas, 6.0*inch, 3.25*inch)
         t.drawOn(self.canvas, *self._coord(0.0, 0.0, inch)) #0.0, y-2.0, inch))
+
+        self.canvas.translate(0, -10)
+        text = self.canvas.beginText()
+        text.setFont("Courier", 7)
+        text.textLine("Perfect EEW Cost Savings")
+        text.textLine("    Area: {:.0f}".format(perfEEW["area_costsavings_perfecteew"][-1])) 
+        text.textLine("    Pop: {:8.2e}".format(perfEEW["population_costsavings_perfecteew"][-1])) 
+        self.canvas.drawText(text)
         self.canvas.restoreState()
+        
         return
 
     def _figure_label(self, x, y, label):
