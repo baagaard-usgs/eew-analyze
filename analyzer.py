@@ -443,8 +443,8 @@ class EEWAnalyzeApp(object):
         if "events" in selection or "all" == selection:
             figures.earthquakes()
         if "performance" in selection or "all" == selection:
-            figures.performance_metric("area_metric")
-            figures.performance_metric("population_metric")
+            figures.cost_savings("area_costsavings_eew")
+            figures.cost_savings("population_costsavings_eew")
         return
     
     def plot_summary_figures(self, selection):

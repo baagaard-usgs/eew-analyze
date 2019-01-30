@@ -544,7 +544,7 @@ class SummaryMaps(object):
         figure = self._create_figure(extent)
         ax = figure.gca()
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
-        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=eqs["metric"], cmap="plasma", vmin=0.0, vmax=1.0, transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
+        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=eqs["cost_savings"], cmap="plasma", vmin=0.0, vmax=1.0, transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
 
         matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.11, 0.36])
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
