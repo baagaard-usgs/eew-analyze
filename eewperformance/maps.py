@@ -503,14 +503,14 @@ class SummaryMaps(object):
         self._save(figure, "events")
         return
 
-    def performance_metric(self, metric="area_metric"):
-        """Create map with earthquakes colored by performance metric with marker size by magnitude.
+    def cost_savings(self, metric="area_costsavings_eew"):
+        """Create map with earthquakes colored by cost savings with marker size by magnitude.
         """
         COLS = [
             ("longitude", "float32",),
             ("latitude", "float32",),
             ("magnitude", "float32",),
-            ("metric", "float32",),
+            ("cost_savings", "float32",),
             ]
 
         server = self.config.get("shakealert.production", "server")
@@ -549,7 +549,7 @@ class SummaryMaps(object):
         matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.11, 0.36])
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
         colorbar = pyplot.colorbar(mappable=sc, cax=cbax)
-        label = "Q-area" if metric == "area_metric" else "Q-pop"
+        label = "Cost Savings: Area" if metric == "area_costsavings_eew" else "Cost Savings: Population"
         colorbar.set_label(label)
         ax.set_title(label)
         

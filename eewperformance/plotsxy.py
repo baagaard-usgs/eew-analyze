@@ -14,6 +14,7 @@ import numpy
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import matplotlib
 import matplotlib.pyplot as pyplot
+import matplotlib.ticker as ticker
 import matplotlib.patches as patches
 
 from osgeo import gdal, osr
@@ -145,8 +146,14 @@ class EventFigures(object):
         ax = figure.add_axes(rectFactory.rect())
         ax.plot(mmiPred, mmiObs, marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
         ax.plot([1,maxMMI],[1,maxMMI], "--", color="c_ltblue", zorder=2)
-        ax.set_xlabel("Predicted MMI")
+
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.5))
         ax.xaxis.set_ticks_position("bottom")
+
+        ax.set_xlabel("Predicted MMI")
         ax.set_ylabel("Observed MMI")
         ax.set_xlim(1, maxMMI)
         ax.set_ylim(1, maxMMI)
@@ -217,6 +224,9 @@ class EventFigures(object):
         ax.set_xlim(1, 10)
         ax.set_ylabel("Warning Time (s)")
 
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+        
         if mmiObs.shape[0] > 0:
         
             # Mean and std in bins
@@ -289,15 +299,12 @@ class SummaryFigures(object):
             for iMMI,mmiThreshold in enumerate(mmiThresholds):
                 maskMMI = numpy.ma.masked_values(perfsMag["mmi_threshold"], mmiThreshold).mask
                 perfsMMI = perfsMag[maskMMI]
+                if 0 == len(perfsMMI["area_costsavings_eew"]):
+                    raise ValueError("Missing performance data for MMI threshold {}".format(mmiThreshold))
 
-                savingsEEW = numpy.sum(perfsMMI["area_cost_noeew"]) - numpy.sum(perfsMMI["area_cost_eew"])
-                savingsPerfectEEW = numpy.sum(perfsMMI["area_cost_noeew"]) - numpy.sum(perfsMMI["area_cost_perfecteew"])
-                areaMetric = savingsEEW / savingsPerfectEEW
+                areaMetric = numpy.sum(perfsMMI["area_costsavings_eew"]) / numpy.sum(perfsMMI["area_costsavings_perfecteew"])
+                popMetric = numpy.sum(perfsMMI["population_costsavings_eew"]) / numpy.sum(perfsMMI["population_costsavings_perfecteew"])
                 
-                savingsEEW = numpy.sum(perfsMMI["population_cost_noeew"]) - numpy.sum(perfsMMI["population_cost_eew"])
-                savingsPerfectEEW = numpy.sum(perfsMMI["population_cost_noeew"]) - numpy.sum(perfsMMI["population_cost_perfecteew"])
-                popMetric = savingsEEW / savingsPerfectEEW
-
                 metricAllEqs[iMMI, iMag] = (areaMetric, popMetric,)
                 
 
@@ -372,12 +379,17 @@ class SummaryFigures(object):
         return
     
 
-    def metric_versus_time(self):
-        """Plot Q-area and Q-pop versus ANSS origin time.
+    def costsavings_versus_time(self):
+        """Plot costsavings-area and costsavings-pop versus ANSS origin
+        time. Cost savings is shown with filled circles relative to
+        the ideal case of perfect EEW shown with hollow circles.
+
         """
         COLORS = (
-            ("area_metric", "Q-area", "c_ltorange", "c_orange",),
-            ("population_metric", "Q-pop", "c_ltblue", "c_blue",),
+            ("area_costsavings_eew", "CS-area", "c_ltorange", "c_orange",),
+            ("area_costsavings_perfecteew", "CS-area", "none", "c_ltorange",),
+            ("population_costsavings_eew", "CS-pop", "c_ltblue", "c_blue",),
+            ("population_costsavings_perfecteew", "CS-pop", "none", "c_ltblue",),
         )
         
         server = self.config.get("shakealert.production", "server")
@@ -398,46 +410,34 @@ class SummaryFigures(object):
         figure = pyplot.figure(figsize=(8.0, 3.5))
         rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0.2, 0.3)))
         ms = 5.0e-4 * 10**magnitude
-        perfs["area_metric"][perfs["area_metric"] < 0] = -1
-        perfs["population_metric"][perfs["population_metric"] < 0] = -1
         
         # Positive Q
         ratio = 6
         ax = figure.add_axes(rectFactory.rect(nrows=ratio/(ratio-1.0), row=1))
         for key, label, fc, ec in COLORS:
             ax.scatter(originTime.astype(datetime), perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Performance Metric versus Earthquake Origin Time")
-        ax.set_ylabel("Q")
-        ax.set_ylim(-0.02, 1.0)
-        ax.spines['bottom'].set_visible(False)
-        ax.xaxis.tick_top()
-        ax.set_xticklabels([])
+        ax.set_title("Cost Savings versus Earthquake Origin Time")
+        ax.set_ylabel("Cost Savings")
+        #ax.xaxis.tick_top()
+        #ax.set_xticklabels([])
+        ax.set_xlabel("Origin Time (UTC)")
 
         legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec) in COLORS]
         pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
-        # Negative Q (all plotted at -1)
-        ax = figure.add_axes(rectFactory.rect(nrows=ratio, row=ratio))
-        for key, label, fc, ec in COLORS:
-            ax.scatter(originTime.astype(datetime), perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_xlabel("Origin Time (UTC)")
-        ax.set_ylim(-1.2, -0.8)
-        ax.set_yticks([-1.0])
-        ax.set_yticklabels(["Q<0"])
-        ax.spines['top'].set_visible(False)
-        ax.xaxis.tick_bottom()
-
-        self._save(figure, "metric_time")
+        self._save(figure, "costsavings_time")
         pyplot.close(figure)
         return
     
 
-    def metric_versus_magnitude(self):
+    def costsavings_versus_magnitude(self):
         """Plot Q-area and Q-pop versus magnitude.
         """
         COLORS = (
-            ("area_metric", "Q-area", "c_ltorange", "c_orange",),
-            ("population_metric", "Q-pop", "c_ltblue", "c_blue",),
+            ("area_costsavings_eew", "CS-area", "c_ltorange", "c_orange",),
+            ("area_costsavings_perfecteew", "CS-area", "none", "c_ltorange",),
+            ("population_costsavings_eew", "CS-pop", "c_ltblue", "c_blue",),
+            ("population_costsavings_perfecteew", "CS-pop", "none", "c_ltblue",),
         )
         
         server = self.config.get("shakealert.production", "server")
@@ -459,55 +459,14 @@ class SummaryFigures(object):
         ax = figure.add_axes(rectFactory.rect())
         for key, label, fc, ec in COLORS:
             ax.scatter(magnitude, perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Performance Metric versus Earthquake Magnitude")
+        ax.set_title("Cost Savings versus Earthquake Magnitude")
         ax.set_xlabel("Earthquake Magnitude")
-        ax.set_ylabel("Q")
-        ax.set_ylim(-1, 1.0)
+        ax.set_ylabel("Cost Savings")
 
         legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec,) in COLORS]
         pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
-        self._save(figure, "metric_magnitude")
-        pyplot.close(figure)
-        return
-    
-
-    def metric_versus_depth(self):
-        """Plot Q-area and Q-pop versus ANSS origin depth.
-        """
-        COLORS = (
-            ("area_metric", "Q-area", "c_ltorange", "c_orange",),
-            ("population_metric", "Q-pop", "c_ltblue", "c_blue",),
-        )
-        
-        server = self.config.get("shakealert.production", "server")
-        gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
-        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
-        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
-        
-        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
-
-        depthKm = numpy.zeros(perfs.shape, dtype=numpy.float32)
-        for i,p in enumerate(perfs):
-            event = self.db.comcat_event(p["comcat_id"])
-            depthKm[i] = event["depth_km"]
-
-        figure = pyplot.figure(figsize=(5.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.75, 0, 0.15), (0.5, 0.2, 0.3)))
-        ms = 15
-        ax = figure.add_axes(rectFactory.rect())
-        for key, label, fc, ec in COLORS:
-            ax.scatter(depthKm, perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Performance Metric versus ANSS Origin Depth")
-        ax.set_xlabel("Depth (km)")
-        ax.set_ylabel("Q")
-        ax.set_ylim(-1, 1)
-
-        legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec) in COLORS]
-        pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
-
-        self._save(figure, "metric_depth")
+        self._save(figure, "costsavings_magnitude")
         pyplot.close(figure)
         return
     
