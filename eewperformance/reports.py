@@ -79,14 +79,19 @@ class AnalysisSummary(object):
         self._render_event_header(event)
         self._render_event_info(event, shakemap, alerts)
         self._render_event_perf_table(perfEEW, perfTheoryMag, perfTheoryMagBias)
-        self._render_event_alert_maps(event, server)
         self.canvas.showPage()
 
         # Page 2
         self._render_event_header(event)
         self._render_event_mmi_maps(event)
-        self._render_event_error(event)
+        self._render_event_alert_maps(event, server)
+        self.canvas.showPage()
+
+        # Page 3
+        self._render_event_header(event)
         self._render_event_mmi_correlation(event)
+        self._render_event_mmi_warningtime(event)
+        self._render_event_error(event)
         self.canvas.showPage()
 
         return
@@ -142,19 +147,6 @@ class AnalysisSummary(object):
 
         return
 
-    def _figure_label(self, x, y, label):
-        """
-        """
-        self.canvas.saveState()
-        self.canvas.translate(x, y)
-        text = self.canvas.beginText()
-        text.setFont("Helvetica-Bold", 10)
-        text.textLines(label)
-        self.canvas.drawText(text)
-        self.canvas.restoreState()
-        return
-
-    
     def _render_event_alert_maps(self, event, server):
         """Maps of alert categories w/warning time for EEW and
         theoretical with catalog magnitude and theoretical with catalog
@@ -172,13 +164,15 @@ class AnalysisSummary(object):
         
         x += self.MAP_SIZE + self.SPACING
         filenameMag = filename.replace(server, "catalog-magnitude")
-        imageWidth, imageHeight, self._render_image(filenameMag, x, y, width=self.MAP_SIZE)
-        self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag.")
+        if os.path.isfile(filenameMag):
+            imageWidth, imageHeight, self._render_image(filenameMag, x, y, width=self.MAP_SIZE)
+            self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag.")
 
         x += self.MAP_SIZE + self.SPACING
         filenameMagBias = filename.replace(server, "catalog-magnitude-bias")
-        imageWidth, imageHeight = self._render_image(filenameMagBias, x, y, width=self.MAP_SIZE)
-        self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag. w/Bias")
+        if os.path.isfile(filenameMagBias):
+            imageWidth, imageHeight = self._render_image(filenameMagBias, x, y, width=self.MAP_SIZE)
+            self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag. w/Bias")
         return
 
     def _render_event_error(self, event):
@@ -198,13 +192,27 @@ class AnalysisSummary(object):
         """Figure of MMI correlation (observed vs predicted) with inset
         of residual histogram.
         """
-        x = self.PAGE_WIDTH - 3.5*inch
-        y = self.MARGIN
+        x = self.MARGIN
+        y = 0.5*self.PAGE_HEIGHT
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-mmi_correlation.png")
+        self._render_image(filename, x, y, height=self.MAP_SIZE)
+        return
+
+    def _render_event_mmi_warningtime(self, event):
+        """Figure of MMI correlation (observed vs predicted) with inset
+        of residual histogram.
+        """
+        x = 0.5*self.PAGE_WIDTH
+        y = 0.5*self.PAGE_HEIGHT
+
+        plots_dir = self.config.get("files", "plots_dir")
+        label = analysis_event_label(self.config, event["event_id"])
+
+        filename = os.path.join(plots_dir, label+"-warning_time_mmi.png")
         self._render_image(filename, x, y, height=self.MAP_SIZE)
         return
 
@@ -226,6 +234,9 @@ class AnalysisSummary(object):
         text.textLine("   MMI bias {:6.2f}".format(shakemap["mmi_bias"]))
 
         # First alert
+        vs = self.config.getfloat("shaking_time", "vs_kmps")
+        vp = self.config.getfloat("shaking_time", "vp_kmps")
+        text.textLine("P wave arrival at epicenter: {:.1f}s after OT".format(event["depth_km"]/vp))
         if len(alerts) > 0:
             alert = alerts[0]
             text.textLine("First alert")
@@ -233,7 +244,10 @@ class AnalysisSummary(object):
             at = dateutil.parser.parse(alert["timestamp"])
             dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
-            vs = self.config.getfloat("shaking_time", "vs_kmps")
+            text.textLine("   Alert at epicenter: {:.1f}s after P wave".format(dt-event["depth_km"]/vp))
+            ts = dt - event["depth_km"]/vs
+            tsLabel = "after" if ts > 0 else "before"
+            text.textLine("                       {:.1f}s {} S wave".format(ts, tsLabel))
             blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt*vs > event["depth_km"] else 0.0
             text.textLine("   Radius of late alert zone: {:.0f} km".format(blindDist))
 
@@ -251,25 +265,29 @@ class AnalysisSummary(object):
             at = dateutil.parser.parse(alert["timestamp"])
             dt = timedelta_to_seconds(numpy.timedelta64(at-ot))
             text.textLine("   {at:%Y-%m-%d %H:%M:%S.%f} ({dt:.1f}s after OT)".format(at=at, dt=dt))
-            vs = self.config.getfloat("shaking_time", "vs_kmps")
+            text.textLine("   Time at epicenter: {:.1f}s after P wave".format(dt-event["depth_km"]/vp))
+            ts = dt - event["depth_km"]/vs
+            tsLabel = "after" if ts > 0 else "before"
+            text.textLine("                      {:.1f}s {} S wave".format(ts, tsLabel))
             blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt > 0 else 0.0
             text.textLine("   Radius of late alert zone: {:.0f} km".format(blindDist))
+
         self.canvas.drawText(text)
         self.canvas.restoreState()
         return
 
     def _render_event_perf_table(self, perfEEW, perfTheoryMag, perfTheoryMagBias):
         data = [
-            ["Magnitude\nThreshold", "MMI\nThreshold", "Alert", "", "EEW", "", "Catalog Mag.", "", "Catalog Mag. w/Bias"],
-            ["", "", "Area (km^2)", "Population", "Q-Area", "Q-Pop", "Q-Area", "Q-Pop", "Q-Area", "Q-Pop"],
+            ["Thresholds", "", "Alert", "", "ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. w/Bias"],
+            ["Mag.", "MMI", "Area (km^2)", "Population",] + ["CS-Area", "CS-Pop",]*3,
         ]
         tableCols = (
             ("magnitude_threshold", "{:3.1f}"),
             ("mmi_threshold", "{:3.1f}"),
             ("area_alert", "{:7.1e}"),
             ("population_alert", "{:7.1e}"),
-            ("area_metric", "{:5.2f}"),
-            ("population_metric", "{:5.2f}"),
+            ("area_costsavings_eew", "{:5.0f}"),
+            ("population_costsavings_eew", "{:5.0f}"),
         )
         
         for pEEW in perfEEW:
@@ -295,8 +313,7 @@ class AnalysisSummary(object):
             ("BOTTOMPADDING", (0,0), (-1,-1), 2),
             ("TOPPADDING", (0,0), (-1,-1), 2),
             ("GRID", (0,0), (-1,-1), 0.5, (0.5, 0.5, 0.5)),
-            ("SPAN", (0,0), (0,1)),
-            ("SPAN", (1,0), (1,1)),
+            ("SPAN", (0,0), (1,0)),
             ("SPAN", (2,0), (3,0)),
             ("SPAN", (4,0), (5,0)),
             ("SPAN", (6,0), (7,0)),
@@ -312,15 +329,15 @@ class AnalysisSummary(object):
         style.append(("BACKGROUND", (0,row),(-1,row), (1.0, 1.0, 0.0)))
                 
         # Highlight all cases with maximum Q-area and Q-pop
-        if perfEEW["population_metric"].shape[-1] > 0:
-            maxQ = numpy.max(perfEEW["population_metric"])
-            rowsMaxQ = 2 + numpy.where(perfEEW["population_metric"] >= maxQ)[0]
+        if perfEEW["population_costsavings_eew"].shape[-1] > 0:
+            maxQ = numpy.max(perfEEW["population_costsavings_eew"])
+            rowsMaxQ = 2 + numpy.where(perfEEW["population_costsavings_eew"] >= maxQ)[0]
             for row in rowsMaxQ:
                 style.append(("BACKGROUND", (-6,row),(-6,row), (0.7, 1.0, 0.7)))
                              
-        if perfEEW["area_metric"].shape[-1] > 0:
-            maxQ = numpy.max(perfEEW["area_metric"])
-            rowMaxQ = 2 + numpy.where(perfEEW["area_metric"] >= maxQ)[0]
+        if perfEEW["area_costsavings_eew"].shape[-1] > 0:
+            maxQ = numpy.max(perfEEW["area_costsavings_eew"])
+            rowMaxQ = 2 + numpy.where(perfEEW["area_costsavings_eew"] >= maxQ)[0]
             for row in rowsMaxQ:
                 style.append(("BACKGROUND", (-5,row),(-5,row), (0.7, 1.0, 0.7)))
 
@@ -334,6 +351,19 @@ class AnalysisSummary(object):
         self.canvas.restoreState()
         return
 
+    def _figure_label(self, x, y, label):
+        """
+        """
+        self.canvas.saveState()
+        self.canvas.translate(x, y)
+        text = self.canvas.beginText()
+        text.setFont("Helvetica-Bold", 10)
+        text.textLines(label)
+        self.canvas.drawText(text)
+        self.canvas.restoreState()
+        return
+
+    
     def _render_image(self, filename, x, y, width=None, height=None):
         image = Image.open(filename)
         if width is None and height is None:
