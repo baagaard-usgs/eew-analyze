@@ -52,9 +52,8 @@ projection = EPSG:3311
 
 [shaking_time]
 function = eewperformance.userdisplay.shaking_time_vs
-#vs_kmps = 3.55 ; User display
-#vs_kmps = 3.4 ; From NC record section
-vs_kmps = 3.5 ; Avg NC/SC
+vs_kmps = 3.5
+vp_kmps = 6.1
 
 [mmi_predicted]
 function = eewperformance.shakemap.mmi_via_gmpe_gmice
@@ -106,7 +105,7 @@ plots_dir = ./data/plots/
 report = report.pdf
 
 analysis_db = ./data/analysisdb.sqlite
-population_density = ~/data/gis/populationdensity.tiff
+population_density = ~/data/gis/census/populationdensity.tiff
 """
 
 # ----------------------------------------------------------------------
@@ -415,6 +414,8 @@ class EEWAnalyzeApp(object):
         config = configparser.SafeConfigParser()
         config.readfp(io.StringIO(DEFAULTS))
         for filename in config_filenames.split(","):
+            if not os.path.isfile(filename):
+                raise IOError("Could not find configuration file '{}'.".format(filename))
             if self.showProgress:
                 print("Fetching parameters from {}...".format(filename))
             config.read(filename)
@@ -461,11 +462,9 @@ class EEWAnalyzeApp(object):
         if "optimum_thresholds" in selection or "all" == selection:
             figures.optimal_mmithresholds()
         if "metric_time" in selection or "all" == selection:
-            figures.metric_versus_time()
+            figures.costsavings_versus_time()
         if "metric_magnitude" in selection or "all" == selection:
-            figures.metric_versus_magnitude()
-        if "metric_depth" in selection or "all" == selection:
-            figures.metric_versus_depth()
+            figures.costsavings_versus_magnitude()
         return
     
     def generate_report(self):
@@ -492,7 +491,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation", "warning_time_mmi"])
         parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events", "performance"])
-        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "metric_depth"])
+        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")
