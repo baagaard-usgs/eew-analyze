@@ -48,14 +48,7 @@ class AnalysisSummary(object):
             bottomup=1,
         )
 
-        # Title page with damage/action figure
-
         self._render_summary(eqIds)
-        # Table of Q-area and Q-pop cost savings for earthquake set.
-        # id, mag, OT, description, Alert area, Alert population, Q-area, Q-pop (ShakeAlert, Catalog Mag, Catalog Mag + bias)
-        
-        # 
-
         for eqId in eqIds:
             self._render_event(eqId)
 
@@ -390,21 +383,22 @@ class AnalysisSummary(object):
         perfTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility) for eqId in eqIds]).ravel()
 
         # Page 1
-        self._render_summary_header()
-        self._render_events_map()
-        self._render_events_timeline()
-        self.canvas.showPage()
+        # Damage/action "fragility" curves
 
         # Page 2
         self._render_summary_header()
-        #self._render_summary_perf_table(perfEEW, perfTheoryMag, perfTheoryMagBias)
+        self._render_events_map(x=self.MARGIN, y=0.5*self.PAGE_HEIGHT)
+        self._render_events_timeline(x=0.5*self.PAGE_WIDTH, y=0.5*self.PAGE_HEIGHT)
         self.canvas.showPage()
 
         # Page 3
         self._render_summary_header()
-        #self._render_performance_map()
-        #self._render_performance_timeline()
-        #self._render_performance_magnitude()
+        self._render_summary_performance_figures()
+        self.canvas.showPage()
+
+        # Page 4+
+        self._render_summary_header()
+        #self._render_summary_perf_table(perfEEW, perfTheoryMag, perfTheoryMagBias)
         self.canvas.showPage()
 
         return
@@ -437,32 +431,60 @@ class AnalysisSummary(object):
         self.canvas.restoreState()
         return
 
-    def _render_events_map(self):
+    def _render_events_map(self, x, y):
         """Map of events in earthquake set."""
-        x = self.MARGIN
-        y = self.MARGIN
-
         plotsDir = self.config.get("files", "plots_dir")
         
         filename = os.path.join(plotsDir, "eqset-map_events.jpg")
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
+        imageWidth, imageHeight = self._render_image(filename, x, y, height=self.MAP_SIZE)
         self._figure_label(x, y+imageHeight, "Earthquake Locations")
         
         return
 
-    def _render_events_timeline(self):
+    def _render_events_timeline(self, x, y):
         """Map of earthquakes versus origin time.
         """
-        x = 0.5*self.PAGE_WIDTH
-        y = self.MARGIN
-
         plotsDir = self.config.get("files", "plots_dir")
         label = analysis_label(self.config)
         
         filename = os.path.join(plotsDir, "eqset_magnitude_time.png")
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN)
         self._figure_label(x, y+imageHeight, "Earthquake Origin Times")
         
+        return
+
+
+    def _render_summary_performance_figures(self):
+        """ComCat versus ShakeAlert magnitude.
+        """
+        plotsDir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config)
+
+        x = self.MARGIN
+        mapH = 0.5 * (self.PAGE_HEIGHT - 2.0*self.MARGIN - self.SPACING)
+        yArea = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-mapH
+        yPop = self.MARGIN
+        
+        # Maps of Q-area and Q-pop
+        filename = os.path.join(plotsDir, "eqset_{}-map_area_costsavings_eew.jpg".format(label))
+        imageWidth, imageHeight = self._render_image(filename, x, yArea, height=mapH)
+        self._figure_label(x, yArea+imageHeight, "")
+        
+        filename = os.path.join(plotsDir, "eqset_{}-map_population_costsavings_eew.jpg".format(label))
+        imageWidth, imageHeight = self._render_image(filename, x, yPop, height=mapH)
+        self._figure_label(x, yPop+imageHeight, "")
+
+        # Plot of Q-area and Q-pop versus time
+        x += imageWidth + self.SPACING
+        plotW = self.PAGE_WIDTH-self.MARGIN-x
+        filename = os.path.join(plotsDir, "eqset_{}_costsavings_time.png".format(label))
+        imageWidth, imageHeight = self._render_image(filename, x, yArea, width=plotW)
+        self._figure_label(x, yArea+imageHeight, "")
+        
+        # Plot of Q-area and Q-pop versus earthquake magnitude
+        filename = os.path.join(plotsDir, "eqset_{}_costsavings_magnitude.png".format(label))
+        imageWidth, imageHeight = self._render_image(filename, x, yPop, width=plotW)
+        self._figure_label(x, yPop+imageHeight, "")
         return
 
 
