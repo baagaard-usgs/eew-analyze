@@ -443,14 +443,16 @@ class SummaryMaps(object):
         ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")
         return figure
 
-    def _save(self, figure, label):
+    def _save(self, figure, label, analysis=True):
         """
         """
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = "eqset_" + analysis_utils.analysis_label(self.config)
-        filename += "-map_{}.jpg".format(label)
+        if analysis:
+            filename = "eqset_{}-map_{}.jpg".format(analysis_utils.analysis_label(self.config), label)
+        else:
+            filename = "eqset-map_{}.jpg".format(label)
         figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         pyplot.close(figure)
         return
@@ -501,7 +503,7 @@ class SummaryMaps(object):
         geometryDomains = [geometry.Polygon(circleSF), geometry.Polygon(circleLA)]
         ax.add_feature(feature.ShapelyFeature(geometryDomains, crs.PlateCarree(), facecolor="none", edgecolor="blue"), zorder=3)
                             
-        self._save(figure, "events")
+        self._save(figure, "events", analysis=False)
         return
 
     def cost_savings(self, metric="area_costsavings_eew"):

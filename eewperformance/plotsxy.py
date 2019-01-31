@@ -265,7 +265,7 @@ class SummaryFigures(object):
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = "eqset_" + analysis_utils.analysis_label(self.config)
-        filename += "_{}.pdf".format(label)
+        filename += "_{}.png".format(label)
         figure.savefig(os.path.join(plotsDir, filename))
         return
     
@@ -540,7 +540,7 @@ class SummaryFigures(object):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = "eqset_magnitude_time.pdf"
+        filename = "eqset_magnitude_time.png"
         figure.savefig(os.path.join(plotsDir, filename))
         pyplot.close(figure)
         

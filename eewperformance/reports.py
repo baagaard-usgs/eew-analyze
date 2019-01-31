@@ -20,7 +20,7 @@ from reportlab.platypus import Table
 from reportlab.lib.utils import ImageReader
 
 from .analysisdb import AnalysisData
-from .analysis_utils import analysis_event_label, timedelta_to_seconds
+from .analysis_utils import analysis_event_label, analysis_label, timedelta_to_seconds
 
 class AnalysisSummary(object):
     """Summary of analysis.
@@ -49,6 +49,12 @@ class AnalysisSummary(object):
         )
 
         # Title page with damage/action figure
+
+        self._render_summary(eqIds)
+        # Table of Q-area and Q-pop cost savings for earthquake set.
+        # id, mag, OT, description, Alert area, Alert population, Q-area, Q-pop (ShakeAlert, Catalog Mag, Catalog Mag + bias)
+        
+        # 
 
         for eqId in eqIds:
             self._render_event(eqId)
@@ -368,6 +374,97 @@ class AnalysisSummary(object):
         t.drawOn(self.canvas, *self._coord(0.0, 0.0, inch)) #0.0, y-2.0, inch))
 
         return
+
+    def _render_summary(self, eqIds):
+        """Generate summary for event set.
+        """
+        db = AnalysisData(self.config.get("files", "analysis_db"))
+        
+        # Get performance information
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        server = self.config.get("shakealert.production", "server")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility) for eqId in eqIds]).ravel()
+
+        perfTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility) for eqId in eqIds]).ravel()
+        perfTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility) for eqId in eqIds]).ravel()
+
+        # Page 1
+        self._render_summary_header()
+        self._render_events_map()
+        self._render_events_timeline()
+        self.canvas.showPage()
+
+        # Page 2
+        self._render_summary_header()
+        #self._render_summary_perf_table(perfEEW, perfTheoryMag, perfTheoryMagBias)
+        self.canvas.showPage()
+
+        # Page 3
+        self._render_summary_header()
+        #self._render_performance_map()
+        #self._render_performance_timeline()
+        #self._render_performance_magnitude()
+        self.canvas.showPage()
+
+        return
+
+    def _render_summary_header(self):
+        fragilityFn = self.config.get("fragility_curves", "object").split(".")[-1]
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        header = (
+            "Performance Summary",
+            "Damage/Action: {fn}, Alert thresholds: M{mag:.1f}, MMI {mmi:.1f}".format(fn=fragilityFn, mag=magThreshold, mmi=mmiThreshold),
+        )
+        self.canvas.saveState()
+        self.canvas.translate(self.MARGIN, self.PAGE_HEIGHT-self.MARGIN)
+        text = self.canvas.beginText()
+        text.setFont("Helvetica-Bold", 12)
+        text.textLines("\n".join(header))
+        self.canvas.drawText(text)
+        self.canvas.restoreState()
+
+        header = (
+            "Brad Aagaard",
+            "Version " + datetime.datetime.now().strftime("%Y-%m-%d %I:%M%p"),
+        )
+        self.canvas.saveState()
+        self.canvas.translate(self.PAGE_WIDTH-self.MARGIN, self.PAGE_HEIGHT-self.MARGIN)
+        self.canvas.setFont("Helvetica", 8)
+        self.canvas.drawRightString(0, 0, header[0])
+        self.canvas.drawRightString(0, -10, header[1])
+        self.canvas.restoreState()
+        return
+
+    def _render_events_map(self):
+        """Map of events in earthquake set."""
+        x = self.MARGIN
+        y = self.MARGIN
+
+        plotsDir = self.config.get("files", "plots_dir")
+        
+        filename = os.path.join(plotsDir, "eqset-map_events.jpg")
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+imageHeight, "Earthquake Locations")
+        
+        return
+
+    def _render_events_timeline(self):
+        """Map of earthquakes versus origin time.
+        """
+        x = 0.5*self.PAGE_WIDTH
+        y = self.MARGIN
+
+        plotsDir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config)
+        
+        filename = os.path.join(plotsDir, "eqset_magnitude_time.png")
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._figure_label(x, y+imageHeight, "Earthquake Origin Times")
+        
+        return
+
 
     def _figure_label(self, x, y, label):
         """
