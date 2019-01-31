@@ -371,17 +371,7 @@ class AnalysisSummary(object):
     def _render_summary(self, eqIds):
         """Generate summary for event set.
         """
-        db = AnalysisData(self.config.get("files", "analysis_db"))
         
-        # Get performance information
-        gmpe = self.config.get("mmi_predicted", "gmpe")
-        server = self.config.get("shakealert.production", "server")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
-        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility) for eqId in eqIds]).ravel()
-
-        perfTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility) for eqId in eqIds]).ravel()
-        perfTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility) for eqId in eqIds]).ravel()
-
         # Page 1
         # Damage/action "fragility" curves
 
@@ -398,7 +388,7 @@ class AnalysisSummary(object):
 
         # Page 4+
         self._render_summary_header()
-        #self._render_summary_perf_table(perfEEW, perfTheoryMag, perfTheoryMagBias)
+        self._render_summary_perf_table(eqIds)
         self.canvas.showPage()
 
         return
@@ -487,6 +477,124 @@ class AnalysisSummary(object):
         self._figure_label(x, yPop+imageHeight, "")
         return
 
+    def _render_summary_perf_table(self, eqIds):
+        """Table of performance for all earthquakes in set.
+        """
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        server = self.config.get("shakealert.production", "server")
+        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+
+        db = AnalysisData(self.config.get("files", "analysis_db"))
+        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+
+        perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+
+        theader = [
+            [
+                "Earthquake\nId",
+                "Mw",
+                "Origin Time\n(UTC)",
+                "Description",
+                "Alert Region", "",
+                "Cost Savings", "", "", "", "", "", "", "",
+            ],
+            [""]*4 + ["Area\n(km^2)", "Population"] + ["ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. + Bias", "", "Perfect EEW", ""],
+            [""]*6 + ["Area", "Pop"]*4,
+        ]
+
+        eventCols = (
+            "{event[event_id]:s}",
+            "{event[magnitude]:4.2f}",
+            "{ot:%Y-%m-%d %H:%M:%S}",
+            "{event[description]:s}",
+        )
+        perfCols = (
+            ("area_alert", "{:7.1e}"),
+            ("population_alert", "{:7.1e}"),
+            ("area_costsavings_eew", "{:5.0f}"),
+            ("population_costsavings_eew", "{:8.2e}"),
+        )
+        perfTheoryCols = (
+            ("area_costsavings_eew", "{:5.0f}"),
+            ("population_costsavings_eew", "{:8.2e}"),
+        )
+        perfPerfectCols = (
+            ("area_costsavings_perfecteew", "{:5.0f}"),
+            ("population_costsavings_perfecteew", "{:8.2e}"),
+        )
+        
+        tdata = []
+        for (perf, perfMag, perfMagBias) in zip(perfs, perfsTheoryMag, perfsTheoryMagBias):
+            event = db.comcat_event(perf["comcat_id"])
+            ot = dateutil.parser.parse(event["origin_time"])
+            row = [s.format(ot=ot, event=event) for s in eventCols]
+            row += [s.format(perf[v]) for v,s in perfCols]
+            row += [s.format(perfMag[v]) for v,s in perfTheoryCols]
+            row += [s.format(perfMagBias[v]) for v,s in perfTheoryCols]
+            row += [s.format(perf[v]) for v,s in perfPerfectCols]
+            tdata.append(row)
+
+        tfooter = []
+        row = ["Total"] + [""]*5
+        for p in perfs, perfsTheoryMag, perfsTheoryMagBias:
+            row += [
+                "{:8.2e}".format(numpy.sum(p["area_costsavings_eew"])),
+                "{:8.2e}".format(numpy.sum(p["population_costsavings_eew"])),
+            ]
+        row += [
+                "{:8.2e}".format(numpy.sum(perfs["area_costsavings_perfecteew"])),
+                "{:8.2e}".format(numpy.sum(perfs["population_costsavings_perfecteew"])),
+        ]
+        tfooter.append(row)
+
+        row = ["Q"] + [""]*5
+        for p in perfs, perfsTheoryMag, perfsTheoryMagBias:
+            areaQ = numpy.sum(p["area_costsavings_eew"]) / numpy.sum(p["area_costsavings_perfecteew"])
+            popQ = numpy.sum(p["population_costsavings_eew"]) / numpy.sum(p["population_costsavings_perfecteew"])
+            row += [
+                "{:4.2f}".format(areaQ),
+                "{:4.2f}".format(popQ),
+            ]
+        row += [""]*2
+        tfooter.append(row)
+
+        style = [
+            ("FONT", (0,0), (-1,-1), "Courier", 7),
+            ("LEFTPADDING", (0,0), (-1,-1), 2),
+            ("RIGHTPADDING", (0,0), (-1,-1), 2),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 2),
+            ("TOPPADDING", (0,0), (-1,-1), 2),
+            ("GRID", (0,0), (-1,-1), 0.5, (0.5, 0.5, 0.5)),
+            ("SPAN", (4,0), (5,0)), # Alert Region
+            ("SPAN", (6,0), (13,0)), # Cost Savings
+            ("SPAN", (0,0), (0,2)), # Id
+            ("SPAN", (1,0), (1,2)), # Mw
+            ("SPAN", (2,0), (2,2)), # Origin time
+            ("SPAN", (3,0), (3,2)), # Description
+            ("SPAN", (4,1), (4,2)), # Area
+            ("SPAN", (5,1), (5,2)), # Population
+            ("SPAN", (6,1), (7,1)), # ShakeAlert
+            ("SPAN", (8,1), (9,1)), # Catalog Mag.
+            ("SPAN", (10,1), (11,1)), # Catalog Mag. + Bias
+            ("SPAN", (12,1), (13,1)), # Perfect EEW
+            ("SPAN", (0,-2), (5,-2)), # Total
+            ("SPAN", (0,-1), (5,-1)), # Q
+            ("SPAN", (-2,-1), (-1,-1)), # Q perfect
+            ("BACKGROUND", (-2,-1), (-1,-1), (0.7, 0.7, 0.7)),
+            ("LINEABOVE", (0,-2), (-1,-2), 1.0, (0,0,0)),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("ALIGN", (0,-2), (5,-1), "RIGHT"),
+        ]
+
+        table = Table(theader + tdata + tfooter, style=style)
+        table.wrapOn(self.canvas, self.PAGE_WIDTH-2*self.MARGIN, self.PAGE_HEIGHT-2*self.MARGIN-self.HEADER)
+        table.drawOn(self.canvas, self.MARGIN, self.MARGIN)
+        
+        return
+    
 
     def _figure_label(self, x, y, label):
         """
