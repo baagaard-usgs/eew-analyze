@@ -385,7 +385,7 @@ class SummaryFigures(object):
         the ideal case of perfect EEW shown with hollow circles.
 
         """
-        FIG_SIZE = (8.0, 5.0)
+        FIG_SIZE = (8.0, 4.5)
         MARGINS = ((1.1, 0, 0.1), (0.5, 0.7, 0.3)) 
         COLORS = {
             "area_costsavings_eew": ("c_ltorange", "c_orange",),
@@ -423,10 +423,12 @@ class SummaryFigures(object):
         for metric, label in zip(metrics, labels):
             fc, ec = COLORS[metric]
             ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Q-area Cost Savings", weight="bold")
+        ax.set_title("Q-area vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
-        ax.yaxis.set_label_text("Cost Savings")
+        ax.yaxis.set_label_text("Q-area Cost Savings")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         # Q-pop
@@ -435,11 +437,13 @@ class SummaryFigures(object):
         for metric, label in zip(metrics, labels):
             fc, ec = COLORS[metric]
             ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Q-pop Cost Savings", weight="bold")
+        ax.set_title("Q-pop vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
-        ax.yaxis.set_label_text("Cost Savings")
+        ax.yaxis.set_label_text("Q-pop Cost Savings")
         ax.xaxis.set_label_text("Origin Time (UTC)")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_time")
@@ -450,7 +454,7 @@ class SummaryFigures(object):
     def costsavings_versus_magnitude(self):
         """Plot Q-area and Q-pop versus magnitude.
         """
-        FIG_SIZE = (8.0, 5.0)
+        FIG_SIZE = (8.0, 4.5)
         MARGINS = ((1.1, 0, 0.1), (0.5, 0.7, 0.3)) 
         COLORS = {
             "area_costsavings_eew": ("c_ltorange", "c_orange",),
@@ -486,10 +490,15 @@ class SummaryFigures(object):
         for metric, label in zip(metrics, labels):
             fc, ec = COLORS[metric]
             ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Q-area Cost Savings", weight="bold")
+        ax.set_title("Q-area vs. Earthquake Magnitude", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
-        ax.yaxis.set_label_text("Cost Savings")
+        ax.yaxis.set_label_text("Q-area Cost Savings")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1e"))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.2))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         # Q-pop
@@ -498,11 +507,16 @@ class SummaryFigures(object):
         for metric, label in zip(metrics, labels):
             fc, ec = COLORS[metric]
             ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Q-pop Cost Savings", weight="bold")
+        ax.set_title("Q-pop vs. Earthquake Magnitude", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
-        ax.yaxis.set_label_text("Cost Savings")
+        ax.yaxis.set_label_text("Q-pop Cost Savings")
         ax.xaxis.set_label_text("Earthquake Magnitude (Mw)")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1e"))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.2))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
@@ -513,6 +527,8 @@ class SummaryFigures(object):
     def magnitude_versus_time(self):
         """Plot magnitude versus time.
         """
+        FIG_SIZE = (8.0, 3.5)
+        MARGINS = ((0.6, 0, 0.1), (0.5, 0, 0.3))
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
         fragility = self.config.get("fragility_curves", "object").split(".")[-1]
@@ -526,16 +542,21 @@ class SummaryFigures(object):
             magnitude[i] = event["magnitude"]
 
         from matplotlib.dates import YearLocator,date2num,DateFormatter
-        figure = pyplot.figure(figsize=(8.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0, 0.3)))
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=MARGINS)
         
         ax = figure.add_axes(rectFactory.rect())
         ms = 5.0e-4 * 10**magnitude
         ot = originTime.astype(datetime)
-        ax.scatter(ot, magnitude, s=ms, edgecolors="white", c=date2num(ot), cmap="viridis", alpha=0.67)
+        ax.scatter(ot, magnitude, s=ms, edgecolors="black", c=date2num(ot), cmap="viridis", alpha=0.67)
         ax.set_title("Magnitude versus Earthquake Origin Time")
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Moment Magnitude")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.2))
 
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
