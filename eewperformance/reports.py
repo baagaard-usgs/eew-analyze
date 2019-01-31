@@ -232,7 +232,8 @@ class AnalysisSummary(object):
         text.textLine("   {event[depth_km]:.1f} km depth".format(event=event))
         text.textLine("ShakeMap")
         text.textLine("   MMI bias {:6.2f}".format(shakemap["mmi_bias"]))
-
+        text.textLine("")
+        
         # First alert
         vs = self.config.getfloat("shaking_time", "vs_kmps")
         vp = self.config.getfloat("shaking_time", "vp_kmps")
@@ -307,6 +308,12 @@ class AnalysisSummary(object):
             else:
                 row += [""]*2
             data.append(row)
+
+        # Perfect EEW in last row
+        areaText = "{:5.0f}".format(perfEEW["area_costsavings_perfecteew"][-1])
+        popText = "{:8.2e}".format(perfEEW["population_costsavings_perfecteew"][-1])
+        row = ["Perfect EEW"] + [""]*3 + [areaText, popText]*3
+        data.append(row)
             
         style = [
             ("FONT", (0,0), (-1,-1), "Courier", 7),
@@ -325,6 +332,9 @@ class AnalysisSummary(object):
             ("SPAN", (4,1), (5,1)),
             ("SPAN", (6,1), (7,1)),
             ("SPAN", (8,1), (9,1)),
+            ("SPAN", (0,-1), (3,-1)),
+            ("LINEABOVE", (0,-1), (-1,-1), 1.0, (0,0,0)),
+            ("BACKGROUND", (4,-1), (-1,-1), (0.7, 1.0, 1.0)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
         ]
         # Highlight row matching alert thresholds
@@ -349,22 +359,14 @@ class AnalysisSummary(object):
                 style.append(("BACKGROUND", (-5,row),(-5,row), (0.7, 1.0, 0.7)))
 
 
-        self.canvas.saveState()
-        self.canvas.translate(self.MARGIN+self.MAP_SIZE+self.SPACING, self.PAGE_HEIGHT-self.MARGIN-self.MAP_SIZE)
 
         t = Table(data, style=style)
-        t.wrapOn(self.canvas, 6.0*inch, 3.25*inch)
+        w, h = t.wrap(0.5*self.PAGE_WIDTH, self.PAGE_HEIGHT-2.0*self.MARGIN)
+
+        self.canvas.saveState()
+        self.canvas.translate(0.5*self.PAGE_WIDTH, self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-h)
         t.drawOn(self.canvas, *self._coord(0.0, 0.0, inch)) #0.0, y-2.0, inch))
 
-        self.canvas.translate(0, -10)
-        text = self.canvas.beginText()
-        text.setFont("Courier", 7)
-        text.textLine("Perfect EEW Cost Savings")
-        text.textLine("    Area: {:.0f}".format(perfEEW["area_costsavings_perfecteew"][-1])) 
-        text.textLine("    Pop: {:8.2e}".format(perfEEW["population_costsavings_perfecteew"][-1])) 
-        self.canvas.drawText(text)
-        self.canvas.restoreState()
-        
         return
 
     def _figure_label(self, x, y, label):
