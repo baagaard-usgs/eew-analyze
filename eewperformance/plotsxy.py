@@ -385,12 +385,19 @@ class SummaryFigures(object):
         the ideal case of perfect EEW shown with hollow circles.
 
         """
-        COLORS = (
-            ("area_costsavings_eew", "CS-area", "c_ltorange", "c_orange",),
-            ("area_costsavings_perfecteew", "CS-area", "none", "c_ltorange",),
-            ("population_costsavings_eew", "CS-pop", "c_ltblue", "c_blue",),
-            ("population_costsavings_perfecteew", "CS-pop", "none", "c_ltblue",),
-        )
+        FIG_SIZE = (8.0, 5.0)
+        MARGINS = ((1.1, 0, 0.1), (0.5, 0.7, 0.3)) 
+        COLORS = {
+            "area_costsavings_eew": ("c_ltorange", "c_orange",),
+            "area_costsavings_perfecteew": ("none", "c_ltorange",),
+            "population_costsavings_eew": ("c_ltblue", "c_blue",),
+            "population_costsavings_perfecteew": ("none", "c_ltblue",),
+        }
+        nrows = 2
+        ncols = 1
+
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=nrows, ncols=ncols, margins=MARGINS)
         
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
@@ -407,23 +414,33 @@ class SummaryFigures(object):
             originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             magnitude[i] = event["magnitude"]
 
-        figure = pyplot.figure(figsize=(8.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.6, 0, 0.1), (0.5, 0.2, 0.3)))
         ms = 5.0e-4 * 10**magnitude
-        
-        # Positive Q
-        ratio = 6
-        ax = figure.add_axes(rectFactory.rect(nrows=ratio/(ratio-1.0), row=1))
-        for key, label, fc, ec in COLORS:
-            ax.scatter(originTime.astype(datetime), perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Cost Savings versus Earthquake Origin Time")
-        ax.set_ylabel("Cost Savings")
-        #ax.xaxis.tick_top()
-        #ax.set_xticklabels([])
-        ax.set_xlabel("Origin Time (UTC)")
 
-        legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec) in COLORS]
-        pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(row=1))
+        metrics = ["area_costsavings_eew", "area_costsavings_perfecteew"]
+        labels = ["ShakeAlert", "Perfect EEW"]
+        for metric, label in zip(metrics, labels):
+            fc, ec = COLORS[metric]
+            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+        ax.set_title("Q-area Cost Savings", weight="bold")
+        ax.set_ylim(0.0, ax.get_ylim()[1])
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
+        ax.yaxis.set_label_text("Cost Savings")
+        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+
+        # Q-pop
+        ax = figure.add_axes(rectFactory.rect(row=2))
+        metrics = ["population_costsavings_eew", "population_costsavings_perfecteew"]
+        for metric, label in zip(metrics, labels):
+            fc, ec = COLORS[metric]
+            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+        ax.set_title("Q-pop Cost Savings", weight="bold")
+        ax.set_ylim(0.0, ax.get_ylim()[1])
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
+        ax.yaxis.set_label_text("Cost Savings")
+        ax.xaxis.set_label_text("Origin Time (UTC)")
+        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_time")
         pyplot.close(figure)
@@ -433,12 +450,19 @@ class SummaryFigures(object):
     def costsavings_versus_magnitude(self):
         """Plot Q-area and Q-pop versus magnitude.
         """
-        COLORS = (
-            ("area_costsavings_eew", "CS-area", "c_ltorange", "c_orange",),
-            ("area_costsavings_perfecteew", "CS-area", "none", "c_ltorange",),
-            ("population_costsavings_eew", "CS-pop", "c_ltblue", "c_blue",),
-            ("population_costsavings_perfecteew", "CS-pop", "none", "c_ltblue",),
-        )
+        FIG_SIZE = (8.0, 5.0)
+        MARGINS = ((1.1, 0, 0.1), (0.5, 0.7, 0.3)) 
+        COLORS = {
+            "area_costsavings_eew": ("c_ltorange", "c_orange",),
+            "area_costsavings_perfecteew": ("none", "c_ltorange",),
+            "population_costsavings_eew": ("c_ltblue", "c_blue",),
+            "population_costsavings_perfecteew": ("none", "c_ltblue",),
+        }
+        nrows = 2
+        ncols = 1
+
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=nrows, ncols=ncols, margins=MARGINS)
         
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
@@ -453,18 +477,33 @@ class SummaryFigures(object):
             event = self.db.comcat_event(p["comcat_id"])
             magnitude[i] = event["magnitude"]
 
-        figure = pyplot.figure(figsize=(5.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.75, 0, 0.15), (0.5, 0.2, 0.3)))
-        ms = 15
-        ax = figure.add_axes(rectFactory.rect())
-        for key, label, fc, ec in COLORS:
-            ax.scatter(magnitude, perfs[key], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
-        ax.set_title("Cost Savings versus Earthquake Magnitude")
-        ax.set_xlabel("Earthquake Magnitude")
-        ax.set_ylabel("Cost Savings")
+        ms = 5.0e-4 * 10**magnitude
 
-        legPatches = [patches.Patch(ec=ec, fc=fc, label=label) for (key, label, fc, ec,) in COLORS]
-        pyplot.legend(handles=legPatches, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(row=1))
+        metrics = ["area_costsavings_eew", "area_costsavings_perfecteew"]
+        labels = ["ShakeAlert", "Perfect EEW"]
+        for metric, label in zip(metrics, labels):
+            fc, ec = COLORS[metric]
+            ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+        ax.set_title("Q-area Cost Savings", weight="bold")
+        ax.set_ylim(0.0, ax.get_ylim()[1])
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
+        ax.yaxis.set_label_text("Cost Savings")
+        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+
+        # Q-pop
+        ax = figure.add_axes(rectFactory.rect(row=2))
+        metrics = ["population_costsavings_eew", "population_costsavings_perfecteew"]
+        for metric, label in zip(metrics, labels):
+            fc, ec = COLORS[metric]
+            ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+        ax.set_title("Q-pop Cost Savings", weight="bold")
+        ax.set_ylim(0.0, ax.get_ylim()[1])
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
+        ax.yaxis.set_label_text("Cost Savings")
+        ax.xaxis.set_label_text("Earthquake Magnitude (Mw)")
+        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
         pyplot.close(figure)
