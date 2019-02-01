@@ -30,6 +30,9 @@ class AnalysisSummary(object):
     PAGE_WIDTH, PAGE_HEIGHT = landscape(letter)
     MAP_SIZE = 3.25*inch
     SPACING = 0.125*inch
+    YTOP = PAGE_HEIGHT - MARGIN - HEADER
+    YBOT = MARGIN
+    XLEFT = MARGIN
     
     def __init__(self, config):
         """Constructor.
@@ -127,8 +130,8 @@ class AnalysisSummary(object):
     def _render_event_mmi_maps(self, event):
         """Maps of MMI observed, predicted, and residual (observed-predicted).
         """
-        x = self.MARGIN
-        y = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-self.MAP_SIZE
+        x = self.XLEFT
+        y = self.YTOP - self.MAP_SIZE
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
@@ -151,8 +154,8 @@ class AnalysisSummary(object):
         theoretical with catalog magnitude and theoretical with catalog
         magnitude with event bias.
         """
-        x = self.MARGIN
-        y = self.MARGIN
+        x = self.XLEFT
+        y = self.YBOT
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
@@ -177,8 +180,8 @@ class AnalysisSummary(object):
     def _render_event_error(self, event):
         """Figure of magnitude and location error.
         """
-        x = self.MARGIN
-        y = self.MARGIN
+        x = self.XLEFT
+        y = self.YBOT
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
@@ -191,8 +194,8 @@ class AnalysisSummary(object):
         """Figure of MMI correlation (observed vs predicted) with inset
         of residual histogram.
         """
-        x = self.MARGIN
-        y = 0.5*self.PAGE_HEIGHT
+        x = self.XLEFT
+        y = self.YTOP - self.MAP_SIZE
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
@@ -206,7 +209,7 @@ class AnalysisSummary(object):
         of residual histogram.
         """
         x = 0.5*self.PAGE_WIDTH
-        y = 0.5*self.PAGE_HEIGHT
+        y = self.YTOP - self.MAP_SIZE
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
@@ -216,9 +219,9 @@ class AnalysisSummary(object):
         return
 
     def _render_event_info(self, event, shakemap, alerts):
-        x = self.MARGIN
-        y = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)
-
+        x = self.XLEFT
+        y = self.YTOP
+        
         self.canvas.saveState()
         self.canvas.translate(x, y)
         
@@ -247,7 +250,7 @@ class AnalysisSummary(object):
             text.textLine("   Alert at epicenter: {:.1f}s after P wave".format(dt-event["depth_km"]/vp))
             ts = dt - event["depth_km"]/vs
             tsLabel = "after" if ts > 0 else "before"
-            text.textLine("                       {:.1f}s {} S wave".format(ts, tsLabel))
+            text.textLine("                       {:.1f}s {} S wave".format(numpy.abs(ts), tsLabel))
             blindDist = ((dt*vs)**2 - event["depth_km"]**2)**0.5 if dt*vs > event["depth_km"] else 0.0
             text.textLine("   Radius of late alert zone: {:.0f} km".format(blindDist))
 
@@ -377,8 +380,8 @@ class AnalysisSummary(object):
 
         # Page 2
         self._render_summary_header()
-        self._render_events_map(x=self.MARGIN, y=0.5*self.PAGE_HEIGHT)
-        self._render_events_timeline(x=0.5*self.PAGE_WIDTH, y=0.5*self.PAGE_HEIGHT)
+        self._render_events_map(x=self.XLEFT, y=0.5*(self.YBOT + self.YTOP))
+        self._render_events_timeline(x=0.5*self.PAGE_WIDTH, y=0.5*(self.YBOT + self.YTOP))
         self.canvas.showPage()
 
         # Page 3
@@ -451,7 +454,7 @@ class AnalysisSummary(object):
         label = analysis_label(self.config)
 
         x = self.MARGIN
-        mapH = 0.5 * (self.PAGE_HEIGHT - 2.0*self.MARGIN - self.SPACING)
+        mapH = 0.5 * (self.PAGE_HEIGHT - 2.0*self.MARGIN - self.HEADER - self.SPACING)
         yArea = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-mapH
         yPop = self.MARGIN
         
@@ -485,12 +488,16 @@ class AnalysisSummary(object):
         fragility = self.config.get("fragility_curves", "object").split(".")[-1]
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
-
+        
+        # Sort eqIds by origin time
         db = AnalysisData(self.config.get("files", "analysis_db"))
-        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        origin_time = numpy.array([dateutil.parser.parse(db.comcat_event(eqId)["origin_time"]) for eqId in eqIds])
+        eqIdsSorted = numpy.array(eqIds)[numpy.argsort(origin_time)]
+        
+        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIdsSorted]).ravel()
 
-        perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
-        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIdsSorted]).ravel()
+        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIdsSorted]).ravel()
 
         theader = [
             [
@@ -527,19 +534,30 @@ class AnalysisSummary(object):
         )
         
         tdata = []
-        for (perf, perfMag, perfMagBias) in zip(perfs, perfsTheoryMag, perfsTheoryMagBias):
+        for iperf, perf in enumerate(perfs):
             event = db.comcat_event(perf["comcat_id"])
             ot = dateutil.parser.parse(event["origin_time"])
             row = [s.format(ot=ot, event=event) for s in eventCols]
             row += [s.format(perf[v]) for v,s in perfCols]
-            row += [s.format(perfMag[v]) for v,s in perfTheoryCols]
-            row += [s.format(perfMagBias[v]) for v,s in perfTheoryCols]
+
+            if len(perfsTheoryMag) > 0:
+                assert(perfsTheoryMag["comcat_id"] == perf["comcat_id"])
+                row += [s.format(perfMag[v]) for v,s in perfTheoryCols]
+            else:
+                row += [""]*len(perfTheoryCols)
+
+            if len(perfsTheoryMagBias) > 0:
+                assert(perfsTheoryMagBias["comcat_id"] == perf["comcat_id"])
+                row += [s.format(perfMagBias[v]) for v,s in perfTheoryCols]
+            else:
+                row += [""]*len(perfTheoryCols)
+
             row += [s.format(perf[v]) for v,s in perfPerfectCols]
             tdata.append(row)
 
         tfooter = []
         row = ["Total"] + [""]*5
-        for p in perfs, perfsTheoryMag, perfsTheoryMagBias:
+        for p in [perfs, perfsTheoryMag, perfsTheoryMagBias]:
             row += [
                 "{:8.2e}".format(numpy.sum(p["area_costsavings_eew"])),
                 "{:8.2e}".format(numpy.sum(p["population_costsavings_eew"])),
@@ -551,7 +569,7 @@ class AnalysisSummary(object):
         tfooter.append(row)
 
         row = ["Q"] + [""]*5
-        for p in perfs, perfsTheoryMag, perfsTheoryMagBias:
+        for p in [perfs, perfsTheoryMag, perfsTheoryMagBias]:
             areaQ = numpy.sum(p["area_costsavings_eew"]) / numpy.sum(p["area_costsavings_perfecteew"])
             popQ = numpy.sum(p["population_costsavings_eew"]) / numpy.sum(p["population_costsavings_perfecteew"])
             row += [
