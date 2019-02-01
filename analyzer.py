@@ -27,6 +27,7 @@ from eewperformance import plotsxy
 from eewperformance import reports
 from eewperformance import analysis_utils
 from eewperformance import gdalraster
+from eewperformance import local_color
 
 DEFAULTS = u"""
 [events]
@@ -373,6 +374,10 @@ class EEWAnalyzeApp(object):
         pyplot.style.use("size-presentation")
         pyplot.style.use("color-"+args.color_style)
         matplotlib_extras.colors.add_general()
+        if args.color_style == "lightbg":
+            local_color.lightbg()
+        else:
+            local_color.darkbg()
             
         # Event processing
         if args.process_events or args.optimize_events or args.plot_event_maps or args.plot_event_figures or args.all:

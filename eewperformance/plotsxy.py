@@ -250,6 +250,13 @@ class EventFigures(object):
 class SummaryFigures(object):
     """Plots of alert mag/loc error, MMI (obs vs pred), etc.
     """
+    COLORS = {
+        "area_costsavings_eew": ("local:qarea_fc", "local:qarea_ec",),
+        "area_costsavings_perfecteew": ("none", "local:qarea_ec",),
+        "population_costsavings_eew": ("local:qpop_fc", "local:qpop_ec",),
+        "population_costsavings_perfecteew": ("none", "local:qpop_ec",),
+    }
+
     def __init__(self, config, events, db):
         """
         :type config: ConfigParser
@@ -387,12 +394,6 @@ class SummaryFigures(object):
         """
         FIG_SIZE = (8.0, 4.5)
         MARGINS = ((1.1, 0, 0.1), (0.5, 0.7, 0.3)) 
-        COLORS = {
-            "area_costsavings_eew": ("c_ltorange", "c_orange",),
-            "area_costsavings_perfecteew": ("none", "c_ltorange",),
-            "population_costsavings_eew": ("c_ltblue", "c_blue",),
-            "population_costsavings_perfecteew": ("none", "c_ltblue",),
-        }
         nrows = 2
         ncols = 1
 
@@ -421,7 +422,7 @@ class SummaryFigures(object):
         metrics = ["area_costsavings_eew", "area_costsavings_perfecteew"]
         labels = ["ShakeAlert", "Perfect EEW"]
         for metric, label in zip(metrics, labels):
-            fc, ec = COLORS[metric]
+            fc, ec = self.COLORS[metric]
             ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
         ax.set_title("Q-area vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
@@ -435,7 +436,7 @@ class SummaryFigures(object):
         ax = figure.add_axes(rectFactory.rect(row=2))
         metrics = ["population_costsavings_eew", "population_costsavings_perfecteew"]
         for metric, label in zip(metrics, labels):
-            fc, ec = COLORS[metric]
+            fc, ec = self.COLORS[metric]
             ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
         ax.set_title("Q-pop vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
@@ -456,12 +457,6 @@ class SummaryFigures(object):
         """
         FIG_SIZE = (8.0, 4.5)
         MARGINS = ((1.1, 0, 0.1), (0.5, 0.7, 0.3)) 
-        COLORS = {
-            "area_costsavings_eew": ("c_ltorange", "c_orange",),
-            "area_costsavings_perfecteew": ("none", "c_ltorange",),
-            "population_costsavings_eew": ("c_ltblue", "c_blue",),
-            "population_costsavings_perfecteew": ("none", "c_ltblue",),
-        }
         nrows = 2
         ncols = 1
 
@@ -488,7 +483,7 @@ class SummaryFigures(object):
         metrics = ["area_costsavings_eew", "area_costsavings_perfecteew"]
         labels = ["ShakeAlert", "Perfect EEW"]
         for metric, label in zip(metrics, labels):
-            fc, ec = COLORS[metric]
+            fc, ec = self.COLORS[metric]
             ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
         ax.set_title("Q-area vs. Earthquake Magnitude", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
@@ -505,7 +500,7 @@ class SummaryFigures(object):
         ax = figure.add_axes(rectFactory.rect(row=2))
         metrics = ["population_costsavings_eew", "population_costsavings_perfecteew"]
         for metric, label in zip(metrics, labels):
-            fc, ec = COLORS[metric]
+            fc, ec = self.COLORS[metric]
             ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
         ax.set_title("Q-pop vs. Earthquake Magnitude", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
