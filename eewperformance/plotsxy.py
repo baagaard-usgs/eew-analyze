@@ -497,7 +497,7 @@ class SummaryFigures(object):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
-        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1e"))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.2))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
@@ -515,7 +515,7 @@ class SummaryFigures(object):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
-        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1e"))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.2))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
