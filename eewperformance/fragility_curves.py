@@ -75,6 +75,45 @@ class LinearRamp(object):
         return cost
 
 
+class Sigmoid(object):
+    """Sigmoid function that is y_low at x=-infinity, 0.5*(y_low+y_high) at x=x_middle, and
+    y_high at x=+infinity.
+
+    """
+
+    def __init__(self, x_middle=0.4, y_low=0.0, y_high=1.0, slope=2.0):
+        """Constructor.
+
+        :type x_middle: float
+        :param x_middle: x value at middle value between y_low and y_high.
+
+        :type y_low: float
+        :param y_low: y value at x=-infinity.
+
+        :type y_high: float
+        :param y_high: y value at x=+infinity.
+
+        :type slope: float
+        :param slope: Slope at x=x_middle
+        """
+        self.x_middle = x_middle
+        self.y_low = y_low
+        self.y_high = y_high
+        self.slope = slope
+        return
+
+    def cost(self, x):
+        """Compute cost.
+
+        :type x: float
+        :param x: Predictor variable.
+
+        :returns: Cost at points given by x.
+        """
+        cost = 1.0 / (1.0+numpy.exp(-self.slope*(x-self.x_middle)))
+        return cost
+
+
 class CostActionDamage(object):
     """Abstract base class for computing cost of action and damage.
     """
@@ -202,6 +241,29 @@ class StepDamage(CostActionDamage):
 
         self.action = Constant(cost_action)
         self.damage = LinearRamp(damage_mmi - EPSILON, damage_mmi + EPSILON, 0.0, 1.0)
+        return
+
+
+class SigmoidDamage(CostActionDamage):
+    """Damage with uniform cost of action and sigmoid function for cost of
+    damage.
+    """
+
+    def __init__(self, cost_action=0.1, damage_middle_mmi=3.5, slope=2.0):
+        """Constructor.
+
+        :type cost_action: float
+        :param cost_action: Cost of action relative to maximum cost of damage.
+
+        :type damage_mmi: float
+        :param damage_mmi: MMI associated with 50% damage.
+        """
+        EPSILON = 1.0e-4
+
+        CostActionDamage.__init__(self)
+
+        self.action = Constant(cost_action)
+        self.damage = Sigmoid(x_middle=damage_middle_mmi, slope=slope)
         return
 
 
