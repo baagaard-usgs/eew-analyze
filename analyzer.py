@@ -414,9 +414,14 @@ class EEWAnalyzeApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import configparser
         import io
-        config = configparser.SafeConfigParser()
+        import six
+        if six.PY2:
+            import ConfigParser
+            config = ConfigParser.SafeConfigParser()
+        else:    
+            import configparser
+            config = configparser.SafeConfigParser()
         config.readfp(io.StringIO(DEFAULTS))
         for filename in config_filenames.split(","):
             if not os.path.isfile(filename):
