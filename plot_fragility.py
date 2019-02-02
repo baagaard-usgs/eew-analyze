@@ -30,19 +30,25 @@ def pgaMMI(pga):
 pga = numpy.logspace(-1.5, 2.0, 500, base=10.0)
 mmi = pgaMMI(pga)
 
-fragilityLowStep = fragility_curves.StepDamage(damage_mmi=3.5)
-fragilityLowLinear = fragility_curves.PublicFearAvoidance(damage_low_mmi=2.5, damage_high_mmi=4.5)
-fragilityLowSigmoid = fragility_curves.SigmoidDamage(damage_middle_mmi=3.5, slope=3.0)
-ipga = numpy.where(mmi >= 3.5)[0][0]
-print(mmi[ipga], pga[ipga])
-fragilityLowSigmoidPGA = fragility_curves.SigmoidDamage(damage_middle_mmi=pga[ipga], slope=2.0)
+MMI_MIDDLE_LOW = 3.5
+MMI_MIDDLE_HIGH = 5.5
+SIGMOID_SLOPE_LOW = 3.0
+SIGMOID_SLOPE_HIGH = 1.5
+LINEAR_WIDTH_LOW = 2.0
+LINEAR_WIDTH_HIGH = 4.0
 
-fragilityHighStep = fragility_curves.StepDamage(damage_mmi=5.5)
-fragilityHighLinear = fragility_curves.PublicInjury(damage_low_mmi=3.5, damage_high_mmi=7.5)
-fragilityHighSigmoid = fragility_curves.SigmoidDamage(damage_middle_mmi=5.5, slope=2)
-ipga = numpy.where(mmi >= 5.5)[0][0]
-print(mmi[ipga], pga[ipga])
-fragilityHighSigmoidPGA = fragility_curves.SigmoidDamage(damage_middle_mmi=pga[ipga], slope=2)
+fragilityLowStep = fragility_curves.StepDamage(damage_mmi=MMI_MIDDLE_LOW)
+fragilityLowLinear = fragility_curves.PublicFearAvoidance(
+    damage_low_mmi=MMI_MIDDLE_LOW-0.5*LINEAR_WIDTH_LOW,
+    damage_high_mmi=MMI_MIDDLE_LOW+0.5*LINEAR_WIDTH_LOW)
+fragilityLowSigmoid = fragility_curves.SigmoidDamage(damage_middle_mmi=MMI_MIDDLE_LOW, slope=SIGMOID_SLOPE_LOW)
+
+fragilityHighStep = fragility_curves.StepDamage(damage_mmi=MMI_MIDDLE_HIGH)
+fragilityHighLinear = fragility_curves.PublicInjury(
+    damage_low_mmi=MMI_MIDDLE_HIGH-0.5*LINEAR_WIDTH_HIGH,
+    damage_high_mmi=MMI_MIDDLE_HIGH+0.5*LINEAR_WIDTH_HIGH)
+fragilityHighSigmoid = fragility_curves.SigmoidDamage(damage_middle_mmi=MMI_MIDDLE_HIGH, slope=SIGMOID_SLOPE_LOW)
+fragilityHighSigmoidB = fragility_curves.SigmoidDamage(damage_middle_mmi=MMI_MIDDLE_HIGH, slope=SIGMOID_SLOPE_HIGH)
 
 
 pyplot.style.use("size-presentation")
@@ -55,20 +61,18 @@ ax = figure.add_axes(ax_factory.rect(row=1))
 ax.plot(mmi, fragilityLowStep.cost_damage(mmi), label="Step")
 ax.plot(mmi, fragilityLowLinear.cost_damage(mmi), label="Linear")
 ax.plot(mmi, fragilityLowSigmoid.cost_damage(mmi), label="Sigmoid")
-ax.plot(mmi, fragilityLowSigmoidPGA.cost_damage(pga), label="SigmoidPGA")
 ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
 ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
 ax.set_ylabel("Relative Damage Cost")
 ax.set_title("Low Damage Threshold (e.g., fear)")
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
-ax.legend(loc="lower right")
 
 ax = figure.add_axes(ax_factory.rect(row=2))
 ax.plot(mmi, fragilityHighStep.cost_damage(mmi), label="Step")
 ax.plot(mmi, fragilityHighLinear.cost_damage(mmi), label="Linear")
-ax.plot(mmi, fragilityHighSigmoid.cost_damage(mmi), label="Sigmoid")
-ax.plot(mmi, fragilityHighSigmoidPGA.cost_damage(pga), label="SigmoidPGA")
+ax.plot(mmi, fragilityHighSigmoid.cost_damage(mmi), label="Sigmoid k={:3.1f}".format(SIGMOID_SLOPE_LOW))
+ax.plot(mmi, fragilityHighSigmoidB.cost_damage(mmi), label="Sigmoid k={:3.1f}".format(SIGMOID_SLOPE_HIGH))
 ax.set_xlabel("MMI")
 ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
 ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
@@ -76,6 +80,7 @@ ax.set_ylabel("Relative Damage Cost")
 ax.set_title("High Damage Threshold (e.g., injuries)")
 ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
+ax.legend(loc="upper left")
 
 figure.savefig("damage_functions.pdf")
 pyplot.close(figure)
