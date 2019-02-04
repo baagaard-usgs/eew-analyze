@@ -8,6 +8,7 @@
 
 import os
 import dateutil.parser
+from importlib import import_module
 from datetime import datetime
 import numpy
 
@@ -46,6 +47,7 @@ class EventFigures(object):
         outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
         filename += "-{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
+        pyplot.close(figure)
         return
     
     def alert_error(self, alerts, mmi_bias):
@@ -112,7 +114,6 @@ class EventFigures(object):
         ax.set_title("Depth Error (Obs-Pred)")
 
         self._save(figure, "alert_error")
-        pyplot.close(figure)
         return
 
     def mmi_correlation(self):
@@ -194,7 +195,6 @@ class EventFigures(object):
             axin.set_title("Residual (Obs-Pred)", fontsize=fontsize)
 
         self._save(figure, "mmi_correlation")
-        pyplot.close(figure)
         return
     
     def warning_time_mmi(self):
@@ -246,7 +246,6 @@ class EventFigures(object):
             ax.plot(bcenters, wtMean, marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
         
         self._save(figure, "warning_time_mmi")
-        pyplot.close(figure)
         return
     
 
@@ -279,6 +278,7 @@ class SummaryFigures(object):
         outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
         filename += "_{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
+        pyplot.close(figure)
         return
     
     def optimal_mmithresholds(self):
@@ -382,7 +382,6 @@ class SummaryFigures(object):
         ax.set_yticks(magThresholds+magOffset)
 
         self._save(figure, "optimal_threshold")
-        pyplot.close(figure)
 
         print("Q-area: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(areaMetric, areaOptMag, areaOptMMI))
         print("Q-pop: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(popMetric, popOptMag, popOptMMI))
@@ -453,7 +452,6 @@ class SummaryFigures(object):
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_time")
-        pyplot.close(figure)
         return
     
 
@@ -520,7 +518,6 @@ class SummaryFigures(object):
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
-        pyplot.close(figure)
         return
     
 
@@ -564,8 +561,52 @@ class SummaryFigures(object):
         outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
         filename = "eqset_magnitude_time.{}".format(outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
-        pyplot.close(figure)
         
+        return
+    
+    def cost_functions(self):
+        """Plot damage and action cost functions.
+        """
+        FIG_SIZE = (8.0, 3.5)
+        MARGINS = ((0.6, 0, 0.15), (0.5, 0, 0.3))
+        
+        objectPath = self.config.get("fragility_curves", "object").split(".")
+        fragilityOptions = dict(self.config.items("fragility_curves"))
+        fragilityOptions.pop("object")
+        fragilityOptions.pop("label")
+        fragilityOptions = {k: float(v) for k,v in fragilityOptions.items()}
+        fragilityFn = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(**fragilityOptions)
+        fragilityLabel = self.config.get("fragility_curves", "label")
+
+        mmi = numpy.arange(1.0, 9.01, 0.05)
+        costDamage = fragilityFn.cost_damage(mmi)
+        costAction = fragilityFn.cost_action(mmi)
+        
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=MARGINS)
+        
+        ax = figure.add_axes(rectFactory.rect())
+        ax.plot(mmi, costDamage, label="Damage")
+        ax.plot(mmi, costAction, label="Action")
+        ax.set_title("Cost of Damage and Action versus Shaking Intensity")
+        ax.legend(loc="upper left")
+        ax.set_ylim(0.0, 1.02)
+        ax.set_xlim(1.0, 9.0)
+        
+        ax.set_xlabel("MMI")
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+
+        ax.set_ylabel("Relative Cost")
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        self._save(figure, "cost_functions")
         return
     
 # End of file

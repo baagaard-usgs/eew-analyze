@@ -29,7 +29,7 @@ class Constant(object):
 
         :returns: Cost at points given by x.
         """
-        return self.y
+        return self.y*numpy.ones(x.shape)
 
 
 class LinearRamp(object):

@@ -480,6 +480,8 @@ class EEWAnalyzeApp(object):
             figures.costsavings_versus_time()
         if "metric_magnitude" in selection or "all" == selection:
             figures.costsavings_versus_magnitude()
+        if "cost_functions" in selection or "all" == selection:
+            figures.cost_functions()
         return
     
     def generate_report(self):
@@ -506,7 +508,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation", "warning_time_mmi"])
         parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events", "performance"])
-        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude"])
+        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "cost_functions"])
         parser.add_argument("--generate-report", action="store_true", dest="generate_report")
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")
