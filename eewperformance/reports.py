@@ -376,20 +376,18 @@ class AnalysisSummary(object):
         """
         
         # Page 1
-        # Damage/action "fragility" curves
-
-        # Page 2
         self._render_summary_header()
         self._render_events_map(x=self.XLEFT, y=0.5*(self.YBOT + self.YTOP))
         self._render_events_timeline(x=0.5*self.PAGE_WIDTH, y=0.5*(self.YBOT + self.YTOP))
+        self._render_cost_functions(x=self.XLEFT, y=self.YBOT)
         self.canvas.showPage()
 
-        # Page 3
+        # Page 2
         self._render_summary_header()
         self._render_summary_performance_figures()
         self.canvas.showPage()
 
-        # Page 4+
+        # Page 3+
         self._render_summary_header()
         self._render_summary_perf_table(eqIds)
         self.canvas.showPage()
@@ -430,20 +428,28 @@ class AnalysisSummary(object):
         
         filename = os.path.join(plotsDir, "eqset-map_events.jpg")
         imageWidth, imageHeight = self._render_image(filename, x, y, height=self.MAP_SIZE)
-        self._figure_label(x, y+imageHeight, "Earthquake Locations")
-        
+        self._figure_label(x, y+imageHeight, "Earthquake Set")
         return
 
     def _render_events_timeline(self, x, y):
         """Map of earthquakes versus origin time.
         """
         plotsDir = self.config.get("files", "plots_dir")
-        label = analysis_label(self.config)
         
         filename = os.path.join(plotsDir, "eqset_magnitude_time.png")
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN)
-        self._figure_label(x, y+imageHeight, "Earthquake Origin Times")
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN-self.SPACING)
+        return
+
+
+    def _render_cost_functions(self, x, y):
+        """Plot of cost functions.
+        """
+        plotsDir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config)
         
+        filename = os.path.join(plotsDir, "eqset_{}_cost_functions.png".format(label))
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN-self.SPACING)
+        self._figure_label(x, y+imageHeight, "Cost Functions")
         return
 
 
@@ -508,7 +514,7 @@ class AnalysisSummary(object):
                 "Alert Region", "",
                 "Cost Savings", "", "", "", "", "", "", "",
             ],
-            [""]*4 + ["Area\n(km^2)", "Population"] + ["ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. + Bias", "", "Perfect EEW", ""],
+            [""]*4 + ["Area\n(km^2)", "Population"] + ["ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. w/Bias", "", "Perfect EEW", ""],
             [""]*6 + ["Area", "Pop"]*4,
         ]
 
