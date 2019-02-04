@@ -100,6 +100,9 @@ height_in = 5.3
 
 warning_time_contour_interval = 2.0
 
+[plots]
+raster = true
+
 [files]
 event_dir = ./data/[EVENTID]/
 analysis_cache_dir = ./data/cache/
@@ -336,7 +339,8 @@ class Event(object):
         selection = self.steps.plot_event_figures or "all"
         figures = plotsxy.EventFigures(self.config, self.event)
         if "alert_error" in selection or "all" == selection:
-            figures.alert_error(self.alerts)
+            mmi_bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"]
+            figures.alert_error(self.alerts, mmi_bias)
         if "mmi_correlation" in selection or "all" == selection:
             figures.mmi_correlation()
         if "warning_time_mmi" in selection or "all" == selection:

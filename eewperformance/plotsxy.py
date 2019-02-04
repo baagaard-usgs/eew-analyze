@@ -43,11 +43,12 @@ class EventFigures(object):
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
-        filename += "-{}.png".format(label)
+        outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
+        filename += "-{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
         return
     
-    def alert_error(self, alerts):
+    def alert_error(self, alerts, mmi_bias):
         """Create map with observed MMI with contours.
         """
         originTime = numpy.datetime64(self.event["origin_time"])
@@ -82,6 +83,8 @@ class EventFigures(object):
         ax.set_xlim(0, tmax)
         ax.axhline(self.event["magnitude"], linestyle="--", linewidth=1.0, color="c_ltblue")
         ax.text(ax.get_xlim()[1], self.event["magnitude"], "ANSS", ha="right", va="bottom", color="c_ltblue")
+        ax.axhline(self.event["magnitude"]+mmi_bias, linestyle="--", linewidth=1.0, color="c_ltpurple")
+        ax.text(ax.get_xlim()[1], self.event["magnitude"]+mmi_bias, "ANSS+bias", ha="right", va="bottom", color="c_ltpurple")
 
         if not alertsNumStations is None:
             ax2 = ax.twinx()
@@ -214,18 +217,19 @@ class EventFigures(object):
         warningTime = layers["warning_time"].ravel().data[mask]
 
         figure = pyplot.figure(figsize=(4.5, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.60, 0, 0.2), (0.5, 0, 0.1)))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.7, 0, 0.2), (0.5, 0, 0.1)))
         
         ax = figure.add_axes(rectFactory.rect())
         mask = warningTime >= 0
         ax.plot(mmiObs[mask], warningTime[mask], marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
         ax.plot(mmiObs[~mask], warningTime[~mask], marker="o", ms=2, mec="black", mfc="c_ltgray", lw=0, alpha=0.67, zorder=1)
         ax.set_xlabel("Observed MMI")
-        ax.set_xlim(1, 10)
-        ax.set_ylabel("Warning Time (s)")
-
         ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
+        ax.set_xlim(1, 10)
+        ax.set_ylabel("Warning Time (s)")
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(5.0))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(1.0))
         
         if mmiObs.shape[0] > 0:
         
@@ -272,7 +276,8 @@ class SummaryFigures(object):
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = "eqset_" + analysis_utils.analysis_label(self.config)
-        filename += "_{}.png".format(label)
+        outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
+        filename += "_{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
         return
     
@@ -551,12 +556,13 @@ class SummaryFigures(object):
         ax.spines["right"].set_visible(False)
         ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0))
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.2))
+        ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
 
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = "eqset_magnitude_time.png"
+        outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
+        filename = "eqset_magnitude_time.{}".format(outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
         pyplot.close(figure)
         
