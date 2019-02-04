@@ -8,6 +8,13 @@ import matplotlib_extras
 
 import eewperformance.fragility_curves as fragility_curves
 
+MMI_MIDDLE_LOW = 3.5
+MMI_MIDDLE_HIGH = 5.5
+SIGMOID_SLOPE_LOW = 3.0
+SIGMOID_SLOPE_HIGH = 1.5
+LINEAR_WIDTH_LOW = 2.0
+LINEAR_WIDTH_HIGH = 4.0
+
 def pgaMMI(pga):
     """Use Wald et al. (1999) to convert PGA to MMI.
     
@@ -29,13 +36,6 @@ def pgaMMI(pga):
 
 pga = numpy.logspace(-1.5, 2.0, 500, base=10.0)
 mmi = pgaMMI(pga)
-
-MMI_MIDDLE_LOW = 3.5
-MMI_MIDDLE_HIGH = 5.5
-SIGMOID_SLOPE_LOW = 3.0
-SIGMOID_SLOPE_HIGH = 1.5
-LINEAR_WIDTH_LOW = 2.0
-LINEAR_WIDTH_HIGH = 4.0
 
 fragilityLowStep = fragility_curves.StepDamage(damage_mmi=MMI_MIDDLE_LOW)
 fragilityLowLinear = fragility_curves.PublicFearAvoidance(
