@@ -98,6 +98,7 @@ class CostSavings(object):
         objectPath = self.config.get("fragility_curves", "object").split(".")
         fragilityOptions = dict(self.config.items("fragility_curves"))
         fragilityOptions.pop("object")
+        fragilityOptions.pop("label")
         fragilityOptions = {k: float(v) for k,v in fragilityOptions.items()}
         fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(**fragilityOptions)
         

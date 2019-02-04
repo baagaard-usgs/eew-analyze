@@ -72,7 +72,7 @@ class AnalysisSummary(object):
         # Get performance information
         #comcat_id, eew_server, gmpe, fragility, magnitude_threshold
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         perfEEW = numpy.array(db.performance_stats(eqId, server, gmpe, fragility))
         perfTheoryMag = numpy.array(db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility))
         perfTheoryMagBias = numpy.array(db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility))
@@ -100,7 +100,7 @@ class AnalysisSummary(object):
 
     def _render_event_header(self, event):
         ot = dateutil.parser.parse(event["origin_time"])
-        fragilityFn = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragilityFn = self.config.get("fragility_curves", "label")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         header = (
@@ -397,7 +397,7 @@ class AnalysisSummary(object):
         return
 
     def _render_summary_header(self):
-        fragilityFn = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragilityFn = self.config.get("fragility_curves", "label")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         header = (
@@ -485,7 +485,7 @@ class AnalysisSummary(object):
         """
         gmpe = self.config.get("mmi_predicted", "gmpe")
         server = self.config.get("shakealert.production", "server")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         

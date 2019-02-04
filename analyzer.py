@@ -75,10 +75,11 @@ mmi_threshold = 3.5
 magnitude_threshold = 3.95001
 
 [fragility_curves]
-object = eewperformance.fragility_curves.PublicFearAvoidance
+object = eewperformance.fragility_curves.LinearDamage
+label = FearAvoidanceLinear
 cost_action = 0.1
 damage_low_mmi = 2.5
-damage_high_mmi = 5.5
+damage_high_mmi = 4.5
 
 [optimize]
 mmi_threshold_min = 2.0
@@ -260,7 +261,7 @@ class Event(object):
             "dm_id": self.alerts[0]["event_id"] if len(self.alerts) > 0 else -1,
             "dm_timestamp": self.alerts[0]["timestamp"] if len(self.alerts) > 0 else "",
             "gmpe": self.config.get("mmi_predicted", "gmpe"),
-            "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
+            "fragility": self.config.get("fragility_curves", "label"),
             "magnitude_threshold": magAlertThreshold,
             "mmi_threshold": mmiAlertThreshold,
             })
@@ -291,7 +292,7 @@ class Event(object):
             "dm_id": self.alerts[0]["event_id"] if len(self.alerts) > 0 else -1,
             "dm_timestamp": self.alerts[0]["timestamp"] if len(self.alerts) > 0 else "",
             "gmpe": self.config.get("mmi_predicted", "gmpe"),
-            "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
+            "fragility": self.config.get("fragility_curves", "label"),
             }
         
         costSavings = perfmetrics.CostSavings(self.config)

@@ -281,7 +281,7 @@ class SummaryFigures(object):
         """
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         
         thresholdStart = self.config.getfloat("optimize", "mmi_threshold_min")
         thresholdStop = self.config.getfloat("optimize", "mmi_threshold_max")
@@ -402,7 +402,7 @@ class SummaryFigures(object):
         
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         
@@ -465,7 +465,7 @@ class SummaryFigures(object):
         
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         
@@ -526,7 +526,7 @@ class SummaryFigures(object):
         MARGINS = ((0.6, 0, 0.1), (0.5, 0, 0.3))
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
 
         numEvents = len(self.events)
         originTime = numpy.zeros(numEvents, dtype="datetime64[s]")

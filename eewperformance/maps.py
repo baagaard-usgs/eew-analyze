@@ -518,7 +518,7 @@ class SummaryMaps(object):
 
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         
         perfs = None
         for eqId in self.events:
