@@ -51,6 +51,8 @@ class AnalysisSummary(object):
             bottomup=1,
         )
 
+        eqIds = self._sort_eqs(eqIds)
+
         self._render_summary(eqIds)
         for eqId in eqIds:
             self._render_event(eqId)
@@ -348,20 +350,17 @@ class AnalysisSummary(object):
         style.append(("BACKGROUND", (0,row),(-1,row), (1.0, 1.0, 0.0)))
                 
         # Highlight all cases with maximum Q-area and Q-pop
+        if perfEEW["area_costsavings_eew"].shape[-1] > 0:
+            maxQ = numpy.max(perfEEW["area_costsavings_eew"])
+            rowsMaxQ = numTableHeaderRows + numpy.where(perfEEW["area_costsavings_eew"] >= maxQ)[0]
+            for row in rowsMaxQ:
+                style.append(("BACKGROUND", (4,row),(4,row), (0.7, 1.0, 0.7)))
         if perfEEW["population_costsavings_eew"].shape[-1] > 0:
             maxQ = numpy.max(perfEEW["population_costsavings_eew"])
             rowsMaxQ = numTableHeaderRows + numpy.where(perfEEW["population_costsavings_eew"] >= maxQ)[0]
             for row in rowsMaxQ:
-                style.append(("BACKGROUND", (-6,row),(-6,row), (0.7, 1.0, 0.7)))
+                style.append(("BACKGROUND", (5,row),(5,row), (0.7, 1.0, 0.7)))
                              
-        if perfEEW["area_costsavings_eew"].shape[-1] > 0:
-            maxQ = numpy.max(perfEEW["area_costsavings_eew"])
-            rowMaxQ = numTableHeaderRows + numpy.where(perfEEW["area_costsavings_eew"] >= maxQ)[0]
-            for row in rowsMaxQ:
-                style.append(("BACKGROUND", (-5,row),(-5,row), (0.7, 1.0, 0.7)))
-
-
-
         t = Table(data, style=style)
         w, h = t.wrap(0.5*self.PAGE_WIDTH, self.PAGE_HEIGHT-2.0*self.MARGIN)
 
@@ -377,8 +376,8 @@ class AnalysisSummary(object):
         
         # Page 1
         self._render_summary_header()
-        self._render_events_map(x=self.XLEFT, y=0.5*(self.YBOT + self.YTOP))
-        self._render_events_timeline(x=0.5*self.PAGE_WIDTH, y=0.5*(self.YBOT + self.YTOP))
+        mapWidth, mapHeight = self._render_events_map(x=self.XLEFT, y=0.5*(self.YBOT + self.YTOP))
+        self._render_events_timeline(x=self.XLEFT+mapWidth+self.SPACING, y=0.5*(self.YBOT + self.YTOP))
         self._render_cost_functions(x=self.XLEFT, y=self.YBOT)
         self.canvas.showPage()
 
@@ -429,7 +428,7 @@ class AnalysisSummary(object):
         filename = os.path.join(plotsDir, "eqset-map_events.jpg")
         imageWidth, imageHeight = self._render_image(filename, x, y, height=self.MAP_SIZE)
         self._figure_label(x, y+imageHeight, "Earthquake Set")
-        return
+        return (imageWidth, imageHeight)
 
     def _render_events_timeline(self, x, y):
         """Map of earthquakes versus origin time.
@@ -437,8 +436,8 @@ class AnalysisSummary(object):
         plotsDir = self.config.get("files", "plots_dir")
         
         filename = os.path.join(plotsDir, "eqset_magnitude_time.png")
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN-self.SPACING)
-        return
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.PAGE_WIDTH-self.MARGIN-x)
+        return (imageWidth, imageHeight)
 
 
     def _render_cost_functions(self, x, y):
@@ -450,7 +449,7 @@ class AnalysisSummary(object):
         filename = os.path.join(plotsDir, "eqset_{}_cost_functions.png".format(label))
         imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN-self.SPACING)
         self._figure_label(x, y+imageHeight, "Cost Functions")
-        return
+        return (imageWidth, imageHeight)
 
 
     def _render_summary_performance_figures(self):
@@ -495,15 +494,11 @@ class AnalysisSummary(object):
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         
-        # Sort eqIds by origin time
         db = AnalysisData(self.config.get("files", "analysis_db"))
-        origin_time = numpy.array([dateutil.parser.parse(db.comcat_event(eqId)["origin_time"]) for eqId in eqIds])
-        eqIdsSorted = numpy.array(eqIds)[numpy.argsort(origin_time)]
-        
-        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIdsSorted]).ravel()
+        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
-        perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIdsSorted]).ravel()
-        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIdsSorted]).ravel()
+        perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
         theader = [
             [
@@ -547,14 +542,14 @@ class AnalysisSummary(object):
             row += [s.format(perf[v]) for v,s in perfCols]
 
             if len(perfsTheoryMag) > 0:
-                assert(perfsTheoryMag["comcat_id"] == perf["comcat_id"])
-                row += [s.format(perfMag[v]) for v,s in perfTheoryCols]
+                assert(perfsTheoryMag[iperf]["comcat_id"] == perf["comcat_id"])
+                row += [s.format(perfsTheoryMag[iperf][v]) for v,s in perfTheoryCols]
             else:
                 row += [""]*len(perfTheoryCols)
 
             if len(perfsTheoryMagBias) > 0:
-                assert(perfsTheoryMagBias["comcat_id"] == perf["comcat_id"])
-                row += [s.format(perfMagBias[v]) for v,s in perfTheoryCols]
+                assert(perfsTheoryMagBias[iperf]["comcat_id"] == perf["comcat_id"])
+                row += [s.format(perfsTheoryMagBias[iperf][v]) for v,s in perfTheoryCols]
             else:
                 row += [""]*len(perfTheoryCols)
 
@@ -611,14 +606,12 @@ class AnalysisSummary(object):
             ("LINEABOVE", (0,-2), (-1,-2), 1.0, (0,0,0)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("ALIGN", (0,-2), (5,-1), "RIGHT"),
+            ("BACKGROUND", (6,-1),(7,-1), (0.7, 1.0, 0.7)),
         ]
 
-        table = Table(theader + tdata + tfooter, style=style)
-        table.wrapOn(self.canvas, self.PAGE_WIDTH-2*self.MARGIN, self.PAGE_HEIGHT-2*self.MARGIN-self.HEADER)
-        table.drawOn(self.canvas, self.MARGIN, self.MARGIN)
-        
+        table = Table(theader + tdata + tfooter, style=style, repeatRows=len(theader))
+        self._render_multipage(table, width=self.PAGE_WIDTH-2*self.MARGIN, height=self.PAGE_HEIGHT-2*self.MARGIN-self.HEADER)
         return
-    
 
     def _figure_label(self, x, y, label):
         """
@@ -632,7 +625,6 @@ class AnalysisSummary(object):
         self.canvas.restoreState()
         return
 
-    
     def _render_image(self, filename, x, y, width=None, height=None):
         image = Image.open(filename)
         if width is None and height is None:
@@ -643,9 +635,25 @@ class AnalysisSummary(object):
 
         self.canvas.drawImage(ImageReader(image), x, y, width=w, height=h)
         return (w,h)
-    
+
     def _coord(self, x, y, unit=1):
         return x * unit, y * unit
 
-        
+    def _render_multipage(self, flowable, width, height):
+        flowables = flowable.split(width, height)
+        flowable = flowables[0]
+        w, h = flowable.wrap(width, height)
+        flowable.drawOn(self.canvas, self.XLEFT, self.YBOT+(height-h))
+        if len(flowables) > 1:
+            self.canvas.showPage()
+            self._render_summary_header()
+            self._render_multipage(flowables[1], width, height)
+        return
+
+    def _sort_eqs(self, eqIds, key="origin_time"):
+        db = AnalysisData(self.config.get("files", "analysis_db"))
+        values = numpy.array([dateutil.parser.parse(db.comcat_event(eqId)[key]) for eqId in eqIds])
+        return numpy.array(eqIds)[numpy.argsort(values)]
+
+
 # End of file
