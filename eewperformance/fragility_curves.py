@@ -199,7 +199,7 @@ class SigmoidDamage(CostActionDamage):
         CostActionDamage.__init__(self)
 
         self.action = Constant(cost_action)
-        self.damage = Sigmoid(x_middle=damage_middle_mmi, slope=slope)
+        self.damage = Sigmoid(x_middle=damage_middle_mmi, slope=damage_slope)
         return
 
 
