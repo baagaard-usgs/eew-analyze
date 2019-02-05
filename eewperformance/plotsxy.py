@@ -512,9 +512,9 @@ class SummaryFigures(object):
         ax.xaxis.set_label_text("Earthquake Magnitude (Mw)")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
         ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.2))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.1))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
@@ -551,7 +551,7 @@ class SummaryFigures(object):
         ax.set_ylabel("Moment Magnitude")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.5))
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
         ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
 
