@@ -28,17 +28,17 @@ class AnalysisSummary(object):
     HEADER = 0.5*inch
     MARGIN = 0.5*inch
     PAGE_WIDTH, PAGE_HEIGHT = landscape(letter)
-    MAP_SIZE = 3.25*inch
     SPACING = 0.125*inch
     YTOP = PAGE_HEIGHT - MARGIN - HEADER
     YBOT = MARGIN
     XLEFT = MARGIN
     
-    def __init__(self, config):
+    def __init__(self, config, summary_only=True):
         """Constructor.
         """
         self.config = config
         self.canvas = None
+        self.summary_only = summary_only
         return
 
     def generate(self, eqIds):
@@ -54,8 +54,10 @@ class AnalysisSummary(object):
         eqIds = self._sort_eqs(eqIds)
 
         self._render_summary(eqIds)
-        for eqId in eqIds:
-            self._render_event(eqId)
+
+        if not self.summary_only:
+            for eqId in eqIds:
+                self._render_event(eqId)
 
         self.canvas.save()
         return
@@ -132,22 +134,24 @@ class AnalysisSummary(object):
     def _render_event_mmi_maps(self, event):
         """Maps of MMI observed, predicted, and residual (observed-predicted).
         """
-        x = self.XLEFT
-        y = self.YTOP - self.MAP_SIZE
-
+        nrows = 2
+        ncols = 3
+        row = 1
+        
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
+        (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=1)
         filename = os.path.join(plots_dir, label+"-map_mmi_obs.jpg")
-        self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._render_image(filename, x, y, width=mapW)
     
-        x += self.MAP_SIZE + self.SPACING
+        (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=2)
         filename = os.path.join(plots_dir, label+"-map_mmi_pred.jpg")
-        self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._render_image(filename, x, y, width=mapW)
 
-        x += self.MAP_SIZE + self.SPACING
+        (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=3)
         filename = os.path.join(plots_dir, label+"-map_mmi_residual.jpg")
-        self._render_image(filename, x, y, width=self.MAP_SIZE)
+        self._render_image(filename, x, y, width=mapW)
 
         return
 
@@ -156,68 +160,67 @@ class AnalysisSummary(object):
         theoretical with catalog magnitude and theoretical with catalog
         magnitude with event bias.
         """
-        x = self.XLEFT
-        y = self.YBOT
+        nrows = 2
+        ncols = 3
+        row = 2
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
+        (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=1)
         filename = os.path.join(plots_dir, label+"-map_cost_savings.jpg")
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.MAP_SIZE)
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=mapW)
         self._figure_label(x, y+imageHeight, "ShakeAlert")
         
-        x += self.MAP_SIZE + self.SPACING
+        (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=2)
         filenameMag = filename.replace(server, "catalog-magnitude")
         if os.path.isfile(filenameMag):
-            imageWidth, imageHeight, self._render_image(filenameMag, x, y, width=self.MAP_SIZE)
+            imageWidth, imageHeight, self._render_image(filenameMag, x, y, width=mapW)
             self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag.")
 
-        x += self.MAP_SIZE + self.SPACING
+        (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=3)
         filenameMagBias = filename.replace(server, "catalog-magnitude-bias")
         if os.path.isfile(filenameMagBias):
-            imageWidth, imageHeight = self._render_image(filenameMagBias, x, y, width=self.MAP_SIZE)
+            imageWidth, imageHeight = self._render_image(filenameMagBias, x, y, width=mapW)
             self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag. w/Bias")
         return
 
     def _render_event_error(self, event):
         """Figure of magnitude and location error.
         """
-        x = self.XLEFT
-        y = self.YBOT
+        (x, y, figW, figH) = self._calc_figure_size(nrows=2, ncols=1.3, row=2, col=1)
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-alert_error.png")
-        self._render_image(filename, x, y, width=2.0*self.MAP_SIZE)
+        self._render_image(filename, x, y, width=figW)
         return
 
     def _render_event_mmi_correlation(self, event):
         """Figure of MMI correlation (observed vs predicted) with inset
         of residual histogram.
         """
-        x = self.XLEFT
-        y = self.YTOP - self.MAP_SIZE
+        (x, y, figW, figH) = self._calc_figure_size(nrows=2, ncols=2, row=1, col=1)
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-mmi_correlation.png")
-        self._render_image(filename, x, y, height=self.MAP_SIZE)
+        self._render_image(filename, x, y, height=figH)
         return
 
     def _render_event_mmi_warningtime(self, event):
         """Figure of MMI correlation (observed vs predicted) with inset
         of residual histogram.
         """
-        x = 0.5*self.PAGE_WIDTH
-        y = self.YTOP - self.MAP_SIZE
+        (x, y, figW, figH) = self._calc_figure_size(nrows=2, ncols=2, row=1, col=2)
 
         plots_dir = self.config.get("files", "plots_dir")
         label = analysis_event_label(self.config, event["event_id"])
 
         filename = os.path.join(plots_dir, label+"-warning_time_mmi.png")
-        self._render_image(filename, x, y, height=self.MAP_SIZE)
+        self._render_image(filename, x, y, height=figH)
         return
 
     def _render_event_info(self, event, shakemap, alerts):
@@ -376,17 +379,29 @@ class AnalysisSummary(object):
         
         # Page 1
         self._render_summary_header()
-        mapWidth, mapHeight = self._render_events_map(x=self.XLEFT, y=0.5*(self.YBOT + self.YTOP))
-        self._render_events_timeline(x=self.XLEFT+mapWidth+self.SPACING, y=0.5*(self.YBOT + self.YTOP))
-        self._render_cost_functions(x=self.XLEFT, y=self.YBOT)
+
+        (x, y1, mapW, mapH) = self._calc_figure_size(nrows=2, ncols=2, row=1, col=1)
+        
+        mapWidth, mapHeight = self._render_events_map(x, y1, mapW, mapH)
+
+        figW = self.PAGE_WIDTH - 2*self.MARGIN - mapWidth - self.SPACING
+        figH = self.PAGE_HEIGHT - 2*self.MARGIN - mapHeight - self.SPACING
+        x = self.XLEFT + mapWidth + self.SPACING
+        self._render_events_timeline(x, y1, figW, figH)
+
+        (x, y, figW, figH) = self._calc_figure_size(nrows=2, ncols=2, row=2, col=1)
+        self._render_cost_functions(x, y, figW, figH)
+
+        (x, y, figW, figH) = self._calc_figure_size(nrows=2, ncols=2, row=2, col=2)
+        self._render_summary_thresholds(x, y, figW, figH)
         self.canvas.showPage()
 
         # Page 2
         self._render_summary_header()
         self._render_summary_performance_figures()
         self.canvas.showPage()
-
-        # Page 3+
+        
+        # Page 4+
         self._render_summary_header()
         self._render_summary_perf_table(eqIds)
         self.canvas.showPage()
@@ -421,36 +436,48 @@ class AnalysisSummary(object):
         self.canvas.restoreState()
         return
 
-    def _render_events_map(self, x, y):
+    def _render_events_map(self, x, y, figW, figH):
         """Map of events in earthquake set."""
         plotsDir = self.config.get("files", "plots_dir")
-        
+
         filename = os.path.join(plotsDir, "eqset-map_events.jpg")
-        imageWidth, imageHeight = self._render_image(filename, x, y, height=self.MAP_SIZE)
+        imageWidth, imageHeight = self._render_image(filename, x, y, height=figH)
         self._figure_label(x, y+imageHeight, "Earthquake Set")
         return (imageWidth, imageHeight)
 
-    def _render_events_timeline(self, x, y):
+    def _render_events_timeline(self, x, y, figW, figH):
         """Map of earthquakes versus origin time.
         """
         plotsDir = self.config.get("files", "plots_dir")
         
         filename = os.path.join(plotsDir, "eqset_magnitude_time.png")
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=self.PAGE_WIDTH-self.MARGIN-x)
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=figW)
         return (imageWidth, imageHeight)
 
 
-    def _render_cost_functions(self, x, y):
+    def _render_cost_functions(self, x, y, figW, figH):
         """Plot of cost functions.
         """
         plotsDir = self.config.get("files", "plots_dir")
         label = analysis_label(self.config)
         
         filename = os.path.join(plotsDir, "eqset_{}_cost_functions.png".format(label))
-        imageWidth, imageHeight = self._render_image(filename, x, y, width=0.5*self.PAGE_WIDTH-self.MARGIN-self.SPACING)
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=figW)
         self._figure_label(x, y+imageHeight, "Cost Functions")
         return (imageWidth, imageHeight)
 
+
+    def _render_summary_thresholds(self, x, y, figW, figH):
+        """Optimum thresholds.
+        """
+        plotsDir = self.config.get("files", "plots_dir")
+        label = analysis_label(self.config)
+
+        # Figure with optimal thresholds
+        filename = os.path.join(plotsDir, "eqset_{}_optimal_threshold.png".format(label))
+        imageWidth, imageHeight = self._render_image(filename, x, y, width=figW)
+        
+        return
 
     def _render_summary_performance_figures(self):
         """ComCat versus ShakeAlert magnitude.
@@ -458,31 +485,24 @@ class AnalysisSummary(object):
         plotsDir = self.config.get("files", "plots_dir")
         label = analysis_label(self.config)
 
-        x = self.MARGIN
-        mapH = 0.5 * (self.PAGE_HEIGHT - 2.0*self.MARGIN - self.HEADER - self.SPACING)
-        yArea = self.PAGE_HEIGHT-(self.MARGIN+self.HEADER)-mapH
-        yPop = self.MARGIN
-        
         # Maps of Q-area and Q-pop
+        (x, yArea, figW, figH) = self._calc_figure_size(nrows=2, ncols=2, row=1, col=1)
         filename = os.path.join(plotsDir, "eqset_{}-map_area_costsavings_eew.jpg".format(label))
-        imageWidth, imageHeight = self._render_image(filename, x, yArea, height=mapH)
-        self._figure_label(x, yArea+imageHeight, "")
+        imageWidth, imageHeight = self._render_image(filename, x, yArea, height=figH)
         
+        (x, yPop, figW, figH) = self._calc_figure_size(nrows=2, ncols=2, row=2, col=1)
         filename = os.path.join(plotsDir, "eqset_{}-map_population_costsavings_eew.jpg".format(label))
-        imageWidth, imageHeight = self._render_image(filename, x, yPop, height=mapH)
-        self._figure_label(x, yPop+imageHeight, "")
+        imageWidth, imageHeight = self._render_image(filename, x, yPop, height=figH)
 
         # Plot of Q-area and Q-pop versus time
         x += imageWidth + self.SPACING
         plotW = self.PAGE_WIDTH-self.MARGIN-x
         filename = os.path.join(plotsDir, "eqset_{}_costsavings_time.png".format(label))
         imageWidth, imageHeight = self._render_image(filename, x, yArea, width=plotW)
-        self._figure_label(x, yArea+imageHeight, "")
         
         # Plot of Q-area and Q-pop versus earthquake magnitude
         filename = os.path.join(plotsDir, "eqset_{}_costsavings_magnitude.png".format(label))
         imageWidth, imageHeight = self._render_image(filename, x, yPop, width=plotW)
-        self._figure_label(x, yPop+imageHeight, "")
         return
 
     def _render_summary_perf_table(self, eqIds):
@@ -655,5 +675,11 @@ class AnalysisSummary(object):
         values = numpy.array([dateutil.parser.parse(db.comcat_event(eqId)[key]) for eqId in eqIds])
         return numpy.array(eqIds)[numpy.argsort(values)]
 
+    def _calc_figure_size(self, nrows=1, ncols=1, row=1, col=1):
+        figW = (self.PAGE_WIDTH - 2*self.MARGIN - (ncols-1)*self.SPACING) / ncols
+        figH = (self.PAGE_HEIGHT - 2*self.MARGIN - self.HEADER - (nrows-1)*self.SPACING) / nrows
+        xLeft = self.XLEFT + (col-1)*(figW + self.SPACING)
+        yBot = self.YBOT + (nrows-row)*(figH + self.SPACING)
+        return (xLeft, yBot, figW, figH)
 
 # End of file

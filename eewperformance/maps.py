@@ -550,7 +550,7 @@ class SummaryMaps(object):
         vmax = 10**(0.1*numpy.ceil(10*numpy.log10(numpy.max(eqs["cost_savings"]))))
         sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=eqs["cost_savings"], cmap="plasma", vmin=0, vmax=vmax, transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
 
-        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.02, 0.17, 0.36])
+        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.02, 0.17, 0.37])
         cbax = figure.add_axes([0.03, 0.04, 0.02, 0.33])
         colorbar = pyplot.colorbar(mappable=sc, cax=cbax, format=ticker.FormatStrFormatter("%7.1e"))
         label = "Q-area Cost Savings" if metric == "area_costsavings_eew" else "Q-pop Cost Savings"

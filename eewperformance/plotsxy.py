@@ -228,8 +228,11 @@ class EventFigures(object):
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
         ax.set_xlim(1, 10)
         ax.set_ylabel("Warning Time (s)")
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(5.0))
-        ax.yaxis.set_minor_locator(ticker.MultipleLocator(1.0))
+        if numpy.max(numpy.abs(warningTime) > 5.0):
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(5.0))
+            ax.yaxis.set_minor_locator(ticker.MultipleLocator(1.0))
+        else:
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(1.0))
         
         if mmiObs.shape[0] > 0:
         
@@ -321,7 +324,7 @@ class SummaryFigures(object):
                 
 
         figure = pyplot.figure(figsize=(8.0, 3.5))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=((0.1, 0.5, 0.5), (0.5, 0, 0.2)))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=((0.1, 0.5, 0.5), (0.8, 0, 0.1)))
         magOffset = 0.05
         barW = 0.5
 
@@ -339,9 +342,9 @@ class SummaryFigures(object):
         
         # Q-area
         metric = "area_metric"
-        metricMasked = numpy.ma.masked_less(metricAllEqs[metric], 0.0)
         c[metricAllEqs[metric] > 0.0] = "c_ltred"
         c[metricAllEqs[metric] <= 0.0] = "c_mdgray"
+        metricMasked = numpy.clip(metricAllEqs[metric], 0.0, 1.0)
 
         iMax = numpy.argmax(metricAllEqs[metric].ravel())
         areaMetric = metricAllEqs[metric][indicesMMI[iMax], indicesMag[iMax]]
@@ -353,17 +356,22 @@ class SummaryFigures(object):
         ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, metricMasked.ravel("F"), color=c.ravel("F"), zsort="max")
         ax.set_title("Optimal Thresholds for Q-area")
         ax.set_xlabel("MMI Threshold")
-        ax.set_ylabel("Magnitude Threshold")
+        ax.set_ylabel("Mw Threshold")
         ax.set_zlabel("Q-area")
         ax.set_zlim(0, 1)
         ax.set_xticks(mmiThresholds)
         ax.set_yticks(magThresholds+magOffset)
+
+        ax.text2D(0.25, 0.02,
+                  "Max. Q-area: {:.2f}, MMI: {:.1f}, Mw: {:.1f}".format(areaMetric, areaOptMMI, areaOptMag),
+                  transform=figure.transFigure, ha="center")
+
         
         # Q-pop
         metric = "population_metric"
-        metricMasked = numpy.ma.masked_less(metricAllEqs[metric], 0.0)
         c[metricAllEqs[metric] > 0.0] = "c_ltred"
         c[metricAllEqs[metric] <= 0.0] = "c_mdgray"
+        metricMasked = numpy.clip(metricAllEqs[metric], 0.0, 1.0)
 
         iMax = numpy.argmax(metricAllEqs[metric].ravel())
         popMetric = metricAllEqs[metric][indicesMMI[iMax], indicesMag[iMax]]
@@ -375,18 +383,19 @@ class SummaryFigures(object):
         ax.bar3d(x.ravel(), y.ravel(), z.ravel(), dx, dy, metricMasked.ravel("F"), color=c.ravel("F"), zsort="max")
         ax.set_title("Optimal Thresholds for Q-pop")
         ax.set_xlabel("MMI Threshold")
-        ax.set_ylabel("Magnitude Threshold")
+        ax.set_ylabel("Mw Threshold")
         ax.set_zlabel("Q-pop")
         ax.set_zlim(0, 1)
         ax.set_xticks(mmiThresholds)
         ax.set_yticks(magThresholds+magOffset)
 
+        ax.text2D(0.75, 0.02,
+                  "Max. Q-pop: {:.2f}, MMI: {:.1f}, Mw: {:.1f}".format(popMetric, popOptMMI, popOptMag),
+                  transform=figure.transFigure, ha="center")
+
         self._save(figure, "optimal_threshold")
 
-        print("Q-area: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(areaMetric, areaOptMag, areaOptMMI))
-        print("Q-pop: {:.2f}, Magnitude threshold: {:.1f}, MMI threshold: {:.1f}".format(popMetric, popOptMag, popOptMMI))
-
-        print(metricAllEqs)
+        #print(metricAllEqs)
         return
     
 
@@ -423,8 +432,8 @@ class SummaryFigures(object):
 
         # Q-area
         ax = figure.add_axes(rectFactory.rect(row=1))
-        metrics = ["area_costsavings_eew", "area_costsavings_perfecteew"]
-        labels = ["ShakeAlert", "Perfect EEW"]
+        metrics = ["area_costsavings_perfecteew", "area_costsavings_eew"]
+        labels = ["Perfect EEW", "ShakeAlert"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
             ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
@@ -438,7 +447,7 @@ class SummaryFigures(object):
 
         # Q-pop
         ax = figure.add_axes(rectFactory.rect(row=2))
-        metrics = ["population_costsavings_eew", "population_costsavings_perfecteew"]
+        metrics = ["population_costsavings_perfecteew", "population_costsavings_eew"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
             ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
@@ -483,8 +492,8 @@ class SummaryFigures(object):
 
         # Q-area
         ax = figure.add_axes(rectFactory.rect(row=1))
-        metrics = ["area_costsavings_eew", "area_costsavings_perfecteew"]
-        labels = ["ShakeAlert", "Perfect EEW"]
+        metrics = ["area_costsavings_perfecteew", "area_costsavings_eew"]
+        labels = ["Perfect EEW", "ShakeAlert"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
             ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
@@ -501,7 +510,7 @@ class SummaryFigures(object):
 
         # Q-pop
         ax = figure.add_axes(rectFactory.rect(row=2))
-        metrics = ["population_costsavings_eew", "population_costsavings_perfecteew"]
+        metrics = ["population_costsavings_perfecteew", "population_costsavings_eew"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
             ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
