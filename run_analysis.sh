@@ -1,28 +1,23 @@
 #!/bin/bash
 
-# FearAvoidance
-# SF
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/sanfrancisco.cfg --num-threads=16 --optimize-events --plot-maps=all --plot-figures=all
-./analyzer.py --config=catalog_magnitude.cfg,eqsets/sanfrancisco.cfg --num-threads=16--optimize-events --plot-maps=alert
-./analyzer.py --config=catalog_magnitude_bias.cfg,eqsets/sanfrancisco.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/sanfrancisco.cfg --generate-report && mv report.pdf report_SF-AvoidFear.pdf
+eqset="eqsets/sanfrancisco.cfg,eqsets/losangeles.cfg"
 
-# LA
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/losangeles.cfg --num-threads=16 --optimize-events --plot-maps=all --plot-figures=all
-./analyzer.py --config=catalog_magnitude.cfg,eqsets/losangeles.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=catalog_magnitude_bias.cfg,eqsets/losangeles.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/losangeles.cfg --generate-report && mv report.pdf report_LA-AvoidFear.pdf
+# FearAvoidanceLinear
+./analyzer.py --config=${eqset} --num-threads=16 --optimize-events --plot-event-maps=all --plot-event-figures=all
+./analyzer.py --config=${eqset},catalog_magnitude.cfg --num-threads=16--optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},catalog_magnitude_bias.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset} --plot-summary-figures=all --plot-summary-maps=all --generate-report && mv report.pdf report_LA+SF-FearAvoidanceLinear.pdf
 
+# FearAvoidanceStep
+costfns=fragility_fearavoidance_step.cfg
+./analyzer.py --config=${eqset},${costfns} --num-threads=16 --optimize-events --plot-event-maps=all --plot-event-figures=all
+./analyzer.py --config=${eqset},${costfns},catalog_magnitude.cfg --num-threads=16--optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},${costfns},catalog_magnitude_bias.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},${costfns} --plot-summary-figures=all --plot-summary-maps=all --generate-report && mv report.pdf report_LA+SF-FearAvoidanceStep.pdf
 
-# Injuries
-# SF
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/sanfrancisco.cfg,fragility_injury.cfg --num-threads=16 --optimize-events --plot-maps=all --plot-figures=all
-./analyzer.py --config=catalog_magnitude.cfg,eqsets/sanfrancisco.cfg,fragility_injury.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=catalog_magnitude_bias.cfg,eqsets/sanfrancisco.cfg,fragility_injury.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/sanfrancisco.cfg,fragility_injury.cfg --generate-report && mv report.pdf report_SF-AvoidInjury.pdf
-
-# LA
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/losangeles.cfg,fragility_injury.cfg --num-threads=16 --optimize-events --plot-maps=all --plot-figures=all
-./analyzer.py --config=catalog_magnitude.cfg,eqsets/losangeles.cfg,fragility_injury.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=catalog_magnitude_bias.cfg,eqsets/losangeles.cfg,fragility_injury.cfg --num-threads=16 --optimize-events --plot-maps=alert
-./analyzer.py --config=security/shakealert_login.cfg,eqsets/losangeles.cfg,fragility_injury.cfg --generate-report && mv report.pdf report_SF-AvoidInjury.pdf
+# FearAvoidanceSigmoid
+costfns=fragility_fearavoidance_sigmoid.cfg
+./analyzer.py --config=${eqset},${costfns} --num-threads=16 --optimize-events --plot-event-maps=all --plot-event-figures=all
+./analyzer.py --config=${eqset},${costfns},catalog_magnitude.cfg --num-threads=16--optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},${costfns},catalog_magnitude_bias.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},${costfns} --plot-summary-figures=all --plot-summary-maps=all --generate-report && mv report.pdf report_LA+SF-FearAvoidanceSigmoid.pdf
