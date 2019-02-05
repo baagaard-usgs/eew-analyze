@@ -77,9 +77,6 @@ magnitude_threshold = 3.95001
 [fragility_curves]
 object = eewperformance.fragility_curves.LinearDamage
 label = FearAvoidanceLinear
-cost_action = 0.1
-damage_low_mmi = 2.5
-damage_high_mmi = 4.5
 
 [optimize]
 mmi_threshold_min = 2.0

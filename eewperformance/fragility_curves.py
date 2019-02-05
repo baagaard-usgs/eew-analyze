@@ -174,7 +174,7 @@ class LinearDamage(CostActionDamage):
     damage over some finite interval.
     """
 
-    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
+    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=4.5):
         CostActionDamage.__init__(self)
 
         self.action = Constant(cost_action)
