@@ -228,7 +228,7 @@ class EventFigures(object):
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
         ax.set_xlim(1, 10)
         ax.set_ylabel("Warning Time (s)")
-        if numpy.max(numpy.abs(warningTime) > 5.0):
+        if len(warningTime) > 0 and numpy.max(numpy.abs(warningTime) > 5.0):
             ax.yaxis.set_major_locator(ticker.MultipleLocator(5.0))
             ax.yaxis.set_minor_locator(ticker.MultipleLocator(1.0))
         else:
@@ -301,7 +301,7 @@ class SummaryFigures(object):
         thresholdStep = self.config.getfloat("optimize", "magnitude_threshold_step")
         magThresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
-        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility) for eqId in self.events]).ravel()
+        perfs = numpy.concatenate([self.db.performance_stats(eqId, server, gmpe, fragility) for eqId in self.events])
         
         dtype = [
             ("area_metric", "float32",),
@@ -503,9 +503,12 @@ class SummaryFigures(object):
         ax.yaxis.set_label_text("Q-area Cost Savings")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
+        if numpy.max(magnitude) - numpy.min(magnitude) > 1.0:
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
+            ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.1))
+        else:
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
         ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.2))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         # Q-pop
@@ -521,9 +524,12 @@ class SummaryFigures(object):
         ax.xaxis.set_label_text("Earthquake Magnitude (Mw)")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
+        if numpy.max(magnitude) - numpy.min(magnitude) > 1.0:
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
+            ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.1))
+        else:
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
         ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.1))
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
@@ -560,9 +566,12 @@ class SummaryFigures(object):
         ax.set_ylabel("Moment Magnitude")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.5))
-        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
+        if numpy.max(magnitude)-numpy.min(magnitude) > 1.0:
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(0.5))
+            ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+            ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
+        else:
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
 
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):

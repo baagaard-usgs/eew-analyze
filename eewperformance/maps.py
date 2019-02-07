@@ -479,7 +479,7 @@ class SummaryMaps(object):
             numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
         ]
 
-        from matplotlib.dates import YearLocator,date2num,DateFormatter
+        from matplotlib.dates import YearLocator,MonthLocator,DayLocator,date2num,DateFormatter
             
         figure = self._create_figure(extent)
         ax = figure.gca()
@@ -489,7 +489,10 @@ class SummaryMaps(object):
 
         matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.13, 0.36])
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
-        colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
+        if numpy.max(ot) - numpy.min(ot) > 365:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
+        else:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=MonthLocator(), format=DateFormatter('%Y-%m'))
         colorbar.set_label("Origin Time")
         
         # domains (manual)
