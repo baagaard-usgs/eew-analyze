@@ -491,8 +491,10 @@ class SummaryMaps(object):
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
         if numpy.max(ot) - numpy.min(ot) > 365:
             colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
-        else:
+        elif numpy.max(ot) - numpy.min(ot) > 1:
             colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=MonthLocator(), format=DateFormatter('%Y-%m'))
+        else:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax)
         colorbar.set_label("Origin Time")
         
         # domains (manual)
