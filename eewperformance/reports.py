@@ -517,6 +517,11 @@ class AnalysisSummary(object):
         db = AnalysisData(self.config.get("files", "analysis_db"))
         perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
+        from numpy.lib.recfunctions import append_fields
+        area_metric = numpy.where(perfs["area_costsavings_perfecteew"] > 0.0, perfs["area_costsavings_eew"] / perfs["area_costsavings_perfecteew"], numpy.nan)
+        population_metric = numpy.where(perfs["population_costsavings_perfecteew"] > 0.0, perfs["population_costsavings_eew"] / perfs["population_costsavings_perfecteew"], numpy.nan)
+        perfs = append_fields(perfs, ("area_metric_eew", "population_metric_eew"), (area_metric, population_metric), dtypes=("float32", "float32"), usemask=False)
+
         perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
         perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
@@ -527,10 +532,10 @@ class AnalysisSummary(object):
                 "Origin Time\n(UTC)",
                 "Description",
                 "Alert Region", "",
-                "Cost Savings", "", "", "", "", "", "", "",
+                "Cost Savings", "", "", "", "", "", "", "", "", "",
             ],
-            [""]*4 + ["Area\n(km^2)", "Population"] + ["ShakeAlert", "", "Catalog Mag.", "", "Catalog Mag. w/Bias", "", "Perfect EEW", ""],
-            [""]*6 + ["Area", "Pop"]*4,
+            [""]*4 + ["Area\n(sq. km)", "Population"] + ["ShakeAlert", "", "", "", "Catalog Mag.", "", "Catalog Mag. w/Bias", "", "Perfect EEW", ""],
+            [""]*6 + ["Area", "Q-area", "Pop", "Q-pop"] + ["Area", "Pop"]*3,
         ]
 
         eventCols = (
@@ -543,7 +548,9 @@ class AnalysisSummary(object):
             ("area_alert", "{:7.1e}"),
             ("population_alert", "{:7.1e}"),
             ("area_costsavings_eew", "{:5.0f}"),
+            ("area_metric_eew", "{:5.2f}"),
             ("population_costsavings_eew", "{:8.2e}"),
+            ("population_metric_eew", "{:5.2f}"),
         )
         perfTheoryCols = (
             ("area_costsavings_eew", "{:5.0f}"),
@@ -553,12 +560,13 @@ class AnalysisSummary(object):
             ("area_costsavings_perfecteew", "{:5.0f}"),
             ("population_costsavings_perfecteew", "{:8.2e}"),
         )
-        
+
         tdata = []
         for iperf, perf in enumerate(perfs):
             event = db.comcat_event(perf["comcat_id"])
             ot = dateutil.parser.parse(event["origin_time"])
             row = [s.format(ot=ot, event=event) for s in eventCols]
+
             row += [s.format(perf[v]) for v,s in perfCols]
 
             if len(perfsTheoryMag) > 0:
@@ -583,6 +591,8 @@ class AnalysisSummary(object):
                 "{:8.2e}".format(numpy.sum(p["area_costsavings_eew"])),
                 "{:8.2e}".format(numpy.sum(p["population_costsavings_eew"])),
             ]
+        row.insert(7, "")
+        row.insert(9, "")
         row += [
                 "{:8.2e}".format(numpy.sum(perfs["area_costsavings_perfecteew"])),
                 "{:8.2e}".format(numpy.sum(perfs["population_costsavings_perfecteew"])),
@@ -597,36 +607,41 @@ class AnalysisSummary(object):
                 "{:4.2f}".format(areaQ),
                 "{:4.2f}".format(popQ),
             ]
+        row.insert(7, "")
+        row.insert(9, "")
         row += [""]*2
         tfooter.append(row)
 
         style = [
-            ("FONT", (0,0), (-1,-1), "Courier", 7),
+            ("FONT", (0,0), (-1,-1), "Courier", 6.5),
             ("LEFTPADDING", (0,0), (-1,-1), 2),
             ("RIGHTPADDING", (0,0), (-1,-1), 2),
             ("BOTTOMPADDING", (0,0), (-1,-1), 2),
             ("TOPPADDING", (0,0), (-1,-1), 2),
             ("GRID", (0,0), (-1,-1), 0.5, (0.5, 0.5, 0.5)),
             ("SPAN", (4,0), (5,0)), # Alert Region
-            ("SPAN", (6,0), (13,0)), # Cost Savings
+            ("SPAN", (6,0), (15,0)), # Cost Savings
             ("SPAN", (0,0), (0,2)), # Id
             ("SPAN", (1,0), (1,2)), # Mw
             ("SPAN", (2,0), (2,2)), # Origin time
             ("SPAN", (3,0), (3,2)), # Description
             ("SPAN", (4,1), (4,2)), # Area
             ("SPAN", (5,1), (5,2)), # Population
-            ("SPAN", (6,1), (7,1)), # ShakeAlert
-            ("SPAN", (8,1), (9,1)), # Catalog Mag.
-            ("SPAN", (10,1), (11,1)), # Catalog Mag. + Bias
-            ("SPAN", (12,1), (13,1)), # Perfect EEW
+            ("SPAN", (6,1), (9,1)), # ShakeAlert
+            ("SPAN", (10,1), (11,1)), # Catalog Mag.
+            ("SPAN", (12,1), (13,1)), # Catalog Mag. + Bias
+            ("SPAN", (14,1), (15,1)), # Perfect EEW
             ("SPAN", (0,-2), (5,-2)), # Total
             ("SPAN", (0,-1), (5,-1)), # Q
             ("SPAN", (-2,-1), (-1,-1)), # Q perfect
-            ("BACKGROUND", (-2,-1), (-1,-1), (0.7, 0.7, 0.7)),
+            ("BACKGROUND", (-2,-1), (-1,-1), (0.9, 0.9, 0.9)),
             ("LINEABOVE", (0,-2), (-1,-2), 1.0, (0,0,0)),
             ("ALIGN", (0,0), (-1,-1), "CENTER"),
             ("ALIGN", (0,-2), (5,-1), "RIGHT"),
-            ("BACKGROUND", (6,-1),(7,-1), (0.7, 1.0, 0.7)),
+            ("BACKGROUND", (6,-1),(6,-1), (0.7, 1.0, 0.7)),
+            ("BACKGROUND", (7,-2), (7,-1), (0.9, 0.9, 0.9)),
+            ("BACKGROUND", (8,-1),(8,-1), (0.7, 1.0, 0.7)),
+            ("BACKGROUND", (9,-2), (9,-1), (0.9, 0.9, 0.9)),
         ]
 
         table = Table(theader + tdata + tfooter, style=style, repeatRows=len(theader))
