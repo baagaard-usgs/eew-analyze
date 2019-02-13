@@ -3,13 +3,18 @@
 ./downloader.py --db-init=performance
 rm -f analyzer.log
 
+# pass kwargs to main
+# if None, call _parse_command_line(), otherwise args = argparse.Namespace(*kwargs)
+
+
 eqset="eqsets/sanfrancisco.cfg,eqsets/losangeles.cfg"
 
 # FearAvoidanceLinear
-./analyzer.py --config=${eqset} --num-threads=16 --optimize-events --plot-event-maps=all --plot-event-figures=all
-./analyzer.py --config=${eqset},catalog_magnitude.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
-./analyzer.py --config=${eqset},catalog_magnitude_bias.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
-./analyzer.py --config=${eqset} --plot-summary-figures=all --plot-summary-maps=all --generate-report=full && mv -f report.pdf report_LA+SF-FearAvoidanceLinear.pdf
+costfns="fragility_fearavoidance.cfg"
+./analyzer.py --config=${eqset},${costfns} --num-threads=16 --optimize-events --plot-event-maps=all --plot-event-figures=all
+./analyzer.py --config=${eqset},${costfns},catalog_magnitude.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},${costfns},catalog_magnitude_bias.cfg --num-threads=16 --optimize-events --plot-event-maps=alert
+./analyzer.py --config=${eqset},${costfns} --plot-summary-figures=all --plot-summary-maps=all --generate-report=full && mv -f report.pdf report_LA+SF-FearAvoidanceLinear.pdf
 
 # FearAvoidanceStep
 costfns="fragility_fearavoidance_step.cfg"
