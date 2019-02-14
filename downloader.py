@@ -14,6 +14,7 @@ import logging
 import datetime
 import dateutil.parser
 import gzip
+import argparse
 from lxml import etree
 
 from eewperformance import comcat
@@ -56,11 +57,11 @@ class DownloaderApp(object):
         self.config = None
         return
 
-    def main(self):
+    def main(self, **kwargs):
         """Main entry point
         """
         # Initialization
-        args = self._parseCommandLine()
+        args = argparse.Namespace(**kwargs) if kwargs else self._parseCommandLine()
         logLevel = logging.DEBUG if args.debug else logging.INFO
         logging.basicConfig(level=logLevel, filename="downloader.log")
         if args.show_progress:
@@ -433,8 +434,6 @@ class DownloaderApp(object):
     def _parseCommandLine(self):
         """Parse command line arguments.
         """
-        import argparse
-
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", action="store", dest="config")
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")

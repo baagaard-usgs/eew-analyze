@@ -358,11 +358,11 @@ class EEWAnalyzeApp(object):
         self.showProgress = False
         return
 
-    def main(self):
+    def main(self, **kwargs):
         """Main entry point
         """
         # Initialization
-        args = self._parse_command_line()
+        args = argparse.Namespace(**kwargs) if kwargs else self._parseCommandLine()
         logLevel = logging.DEBUG if args.debug else logging.INFO
         logging.basicConfig(level=logLevel, filename="analyzer.log")
         if args.show_progress:
