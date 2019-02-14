@@ -78,11 +78,14 @@ for category in ["Fear", "Injury"]:
         ax.set_ylim(0.0, 1.02)
         ax.set_ylabel("Relative Cost")
 
+        if row == 1 and col == 1:
+            ax.legend(loc="center right")
+        
         row += 1
 
-    ax.text(0.25+0.5*(col-1), 0.98, "{} Avoidance".format(category),
+    ax.text(0.25+0.5*(col-1), 0.98, "{} Reduction".format(category),
             transform=figure.transFigure, ha="center", weight="bold")
     col += 1
         
-figure.savefig("damage_functions.pdf")
+figure.savefig("costfns.pdf")
 pyplot.close(figure)
