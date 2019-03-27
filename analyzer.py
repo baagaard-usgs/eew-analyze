@@ -98,7 +98,7 @@ height_in = 5.3
 warning_time_contour_interval = 2.0
 
 [plots]
-raster = true
+raster = false
 
 [files]
 event_dir = ./data/[EVENTID]/
@@ -362,7 +362,7 @@ class EEWAnalyzeApp(object):
         """Main entry point
         """
         # Initialization
-        args = argparse.Namespace(**kwargs) if kwargs else self._parseCommandLine()
+        args = argparse.Namespace(**kwargs) if kwargs else self._parse_command_line()
         logLevel = logging.DEBUG if args.debug else logging.INFO
         logging.basicConfig(level=logLevel, filename="analyzer.log")
         if args.show_progress:
@@ -479,6 +479,10 @@ class EEWAnalyzeApp(object):
             figures.costsavings_versus_magnitude()
         if "cost_functions" in selection or "all" == selection:
             figures.cost_functions()
+        if "metric_cost_functions" in selection or "all" == selection:
+            figures.metric_cost_functions()
+        if "metric_theoretical" in selection or "all" == selection:
+            figures.metric_theoretical()
         return
     
     def generate_report(self, summary_only=True):
@@ -505,13 +509,13 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation", "warning_time_mmi"])
         parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events", "performance"])
-        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "cost_functions"])
+        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "cost_functions", "metric_cost_functions", "metric_theoretical"])
         parser.add_argument("--generate-report", action="store", dest="generate_report", default=None, choices=[None,"summary", "full"])
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug", default=True)
-        parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg")
+        parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg", choices=["darkbg", "lightbg"])
         return parser.parse_args()
 
 # ======================================================================

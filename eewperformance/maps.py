@@ -452,7 +452,7 @@ class SummaryMaps(object):
         if analysis:
             filename = "eqset_{}-map_{}.jpg".format(analysis_utils.analysis_label(self.config), label)
         else:
-            filename = "eqset-map_{}.jpg".format(label)
+            filename = "eqset_map_{}.jpg".format(label)
         figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         pyplot.close(figure)
         return

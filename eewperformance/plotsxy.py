@@ -220,9 +220,10 @@ class EventFigures(object):
         rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.7, 0, 0.2), (0.5, 0, 0.1)))
         
         ax = figure.add_axes(rectFactory.rect())
+        fg = pyplot.rcParams["axes.edgecolor"]        
         mask = warningTime >= 0
         ax.plot(mmiObs[mask], warningTime[mask], marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
-        ax.plot(mmiObs[~mask], warningTime[~mask], marker="o", ms=2, mec="black", mfc="c_ltgray", lw=0, alpha=0.67, zorder=1)
+        ax.plot(mmiObs[~mask], warningTime[~mask], marker="o", ms=2, mec=fg, mfc="c_ltgray", lw=0, alpha=0.67, zorder=1)
         ax.set_xlabel("Observed MMI")
         ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
         ax.xaxis.set_minor_locator(ticker.MultipleLocator(0.5))
@@ -282,6 +283,127 @@ class SummaryFigures(object):
         filename += "_{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
         pyplot.close(figure)
+        return
+
+    def metric_cost_functions(self):
+        FIG_SIZE = (8.0, 3.5)
+        MARGINS = ((0.7, 0.7, 0.2), (0.6, 0, 0.3))
+        FRAGILITIES = [
+            ("FearAvoidanceStep", "Step"),
+            ("FearAvoidanceLinear", "Linear"),
+            ("FearAvoidanceSigmoid", "Sigmoid"),
+        ]
+
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+
+        areaMetric = []
+        popMetric = []
+        for fragility, label in FRAGILITIES:
+            perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+
+            areaMetric.append(numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"]))
+            popMetric.append(numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"]))
+
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=MARGINS)
+
+        xticks = numpy.arange(1.0, len(FRAGILITIES)+0.01, 1.0)
+        xlabels = [label for fn,label in FRAGILITIES]
+        
+        # Q-area
+        fc, ec = self.COLORS["area_costsavings_eew"]
+        ax = figure.add_axes(rectFactory.rect(row=1, col=1))
+        ax.bar(xticks, areaMetric, fc=fc, ec=ec)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xlabels)
+        ax.set_title("Q-area", weight="bold")
+        ax.set_xlabel("Cost Function")
+        ax.set_ylabel("Q-area")
+        ax.set_ylim((0.0, 1.0))
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        
+        # Q-pop
+        fc, ec = self.COLORS["population_costsavings_eew"]
+        ax = figure.add_axes(rectFactory.rect(row=1, col=2))
+        ax.bar(xticks, popMetric, fc=fc, ec=ec)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xlabels)
+        ax.set_title("Q-pop", weight="bold")
+        ax.set_xlabel("Cost Function")
+        ax.set_ylabel("Q-pop")
+        ax.set_ylim((0.0, 1.0))
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        
+        self._save(figure, "costfns_metric")
+        return
+
+    def metric_theoretical(self):
+        FIG_SIZE = (8.0, 3.5)
+        MARGINS = ((0.7, 0.7, 0.2), (0.6, 0, 0.3))
+        servers = [
+            (self.config.get("shakealert.production", "server"), "ShakeAlert"),
+            ("catalog-magnitude", "ANSS Mw"),
+            ("catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ]
+
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        fragility = self.config.get("fragility_curves", "label")
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+
+        areaMetric = []
+        popMetric = []
+        for server, label in servers:
+            perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+
+            areaMetric.append(numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"]))
+            popMetric.append(numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"]))
+
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=MARGINS)
+
+        xticks = numpy.arange(1.0, len(servers)+0.01, 1.0)
+        xlabels = [label for fn,label in servers]
+        
+        # Q-area
+        fc, ec = self.COLORS["area_costsavings_eew"]
+        ax = figure.add_axes(rectFactory.rect(row=1, col=1))
+        ax.bar(xticks, areaMetric, fc=fc, ec=ec)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xlabels, fontsize="smaller")
+        ax.set_title("Q-area", weight="bold")
+        ax.set_xlabel("Theoretical Improvements")
+        ax.set_ylabel("Q-area")
+        ax.set_ylim((0.0, 1.0))
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.text(1.5, 0.5*(areaMetric[0]+areaMetric[1]+0.2), "No latency\nANSS Mw",
+                ha="center", va="center", rotation=45,
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
+        ax.text(2.5, 0.5*(areaMetric[1]+areaMetric[2]+0.2), "Add event\nbias",
+                ha="center", va="center", rotation=45,
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
+        
+        # Q-pop
+        fc, ec = self.COLORS["population_costsavings_eew"]
+        ax = figure.add_axes(rectFactory.rect(row=1, col=2))
+        ax.bar(xticks, popMetric, fc=fc, ec=ec)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xlabels, fontsize="smaller")
+        ax.set_title("Q-pop", weight="bold")
+        ax.set_xlabel("Theoretical Improvements")
+        ax.set_ylabel("Q-pop")
+        ax.set_ylim((0.0, 1.0))
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        
+        self._save(figure, "theoretical_metric")
         return
     
     def optimal_mmithresholds(self):
@@ -436,7 +558,10 @@ class SummaryFigures(object):
         labels = ["Perfect EEW", "ShakeAlert"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
-            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
+        connectors_ot = [ot.astype(datetime) for ot in originTime]
+        connectors_perf = numpy.array([[perfPerfect, perfEEW] for perfPerfect, perfEEW in zip(perfs[metrics[0]], perfs[metrics[1]])])
+        ax.vlines(connectors_ot, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
         ax.set_title("Q-area vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
@@ -450,7 +575,10 @@ class SummaryFigures(object):
         metrics = ["population_costsavings_perfecteew", "population_costsavings_eew"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
-            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
+        connectors_ot = [ot.astype(datetime) for ot in originTime]
+        connectors_perf = numpy.array([[perfPerfect, perfEEW] for perfPerfect, perfEEW in zip(perfs[metrics[0]], perfs[metrics[1]])])
+        ax.vlines(connectors_ot, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
         ax.set_title("Q-pop vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
@@ -496,7 +624,9 @@ class SummaryFigures(object):
         labels = ["Perfect EEW", "ShakeAlert"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
-            ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+            ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
+        connectors_perf = numpy.array([[perfPerfect, perfEEW] for perfPerfect, perfEEW in zip(perfs[metrics[0]], perfs[metrics[1]])])
+        ax.vlines(magnitude, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
         ax.set_title("Q-area vs. Earthquake Magnitude", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
@@ -516,7 +646,9 @@ class SummaryFigures(object):
         metrics = ["population_costsavings_perfecteew", "population_costsavings_eew"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
-            ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, label=label)
+            ax.scatter(magnitude, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
+        connectors_perf = numpy.array([[perfPerfect, perfEEW] for perfPerfect, perfEEW in zip(perfs[metrics[0]], perfs[metrics[1]])])
+        ax.vlines(magnitude, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
         ax.set_title("Q-pop vs. Earthquake Magnitude", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
@@ -560,7 +692,8 @@ class SummaryFigures(object):
         ax = figure.add_axes(rectFactory.rect())
         ms = 5.0e-4 * 10**magnitude
         ot = originTime.astype(datetime)
-        ax.scatter(ot, magnitude, s=ms, edgecolors="black", c=date2num(ot), cmap="viridis", alpha=0.67)
+        fg = pyplot.rcParams["axes.edgecolor"]
+        ax.scatter(ot, magnitude, s=ms, edgecolors=fg, c=date2num(ot), cmap="viridis", alpha=0.67)
         ax.set_title("Magnitude versus Earthquake Origin Time")
         ax.set_xlabel("Origin Time (UTC)")
         ax.set_ylabel("Moment Magnitude")
