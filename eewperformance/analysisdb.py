@@ -73,16 +73,12 @@ TABLES = [
         "mmi_threshold REAL NOT NULL",
         "area_damage REAL NOT NULL",
         "area_alert REAL NOT NULL",
-        "area_cost_eew REAL NOT NULL",
-        "area_cost_noeew REAL NOT NULL",
-        "area_cost_perfecteew REAL NOT NULL",
-        "area_metric REAL NOT NULL",
+        "area_costsavings_eew REAL NOT NULL",
+        "area_costsavings_perfecteew REAL NOT NULL",
         "population_damage REAL NOT NULL",
         "population_alert REAL NOT NULL",
-        "population_cost_eew REAL NOT NULL",
-        "population_cost_noeew REAL NOT NULL",
-        "population_cost_perfecteew REAL NOT NULL",
-        "population_metric REAL NOT NULL",
+        "population_costsavings_eew REAL NOT NULL",
+        "population_costsavings_perfecteew REAL NOT NULL",
         "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
     ]),
 ]
@@ -300,16 +296,12 @@ class AnalysisData(object):
             "mmi_threshold",
             "area_damage",
             "area_alert",
-            "area_cost_eew",
-            "area_cost_noeew",
-            "area_cost_perfecteew",
-            "area_metric",
+            "area_costsavings_eew",
+            "area_costsavings_perfecteew",
             "population_damage",
             "population_alert",
-            "population_cost_eew",
-            "population_cost_noeew",
-            "population_cost_perfecteew",
-            "population_metric",
+            "population_costsavings_eew",
+            "population_costsavings_perfecteew",
             )
         NTRIES = 50
         
@@ -447,16 +439,12 @@ class AnalysisData(object):
                 ("mmi_threshold", "float32"),
                 ("area_damage", "float32"),
                 ("area_alert", "float32"),
-                ("area_cost_eew", "float32"),
-                ("area_cost_noeew", "float32"),
-                ("area_cost_perfecteew", "float32"),
-                ("area_metric", "float32"),
+                ("area_costsavings_eew", "float32"),
+                ("area_costsavings_perfecteew", "float32"),
                 ("population_damage", "float32"),
                 ("population_alert", "float32"),
-                ("population_cost_eew", "float32"),
-                ("population_cost_noeew", "float32"),
-                ("population_cost_perfecteew", "float32"),
-                ("population_metric", "float32"),
+                ("population_costsavings_eew", "float32"),
+                ("population_costsavings_perfecteew", "float32"),
             ]
             results = op.cursor.fetchall()
 
@@ -557,7 +545,7 @@ class AnalysisData(object):
             rows = op.cursor.fetchall()
             for row in rows:
                 event = self.comcat_event(row["comcat_id"])
-                sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_metric]:6.2f} {row[population_metric]:6.2f} {event[description]}\n".format(row=row, event=event)
+                sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_costsavings_eew]:6.2f} {row[area_costsavings_perfecteew]:6.2f} {row[population_costsavings_eew]:6.2f} {row[population_costsavings_perfecteew]:6.2f} {event[description]}\n".format(row=row, event=event)
         return sout
 
     def show_matches(self, server):

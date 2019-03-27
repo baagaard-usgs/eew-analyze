@@ -15,6 +15,7 @@ import numpy
 import matplotlib.pyplot as pyplot
 import matplotlib.colors as colors
 import matplotlib.colorbar
+import matplotlib.ticker as ticker
 import matplotlib.patches as patches
 from osgeo import gdal, osr
 from cartopy import crs
@@ -442,14 +443,16 @@ class SummaryMaps(object):
         ax.add_image(tiler, tilerZoom, zorder=0, cmap="gray")
         return figure
 
-    def _save(self, figure, label):
+    def _save(self, figure, label, analysis=True):
         """
         """
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
-        filename = "eqset_" + analysis_utils.analysis_label(self.config)
-        filename += "-map_{}.jpg".format(label)
+        if analysis:
+            filename = "eqset_{}-map_{}.jpg".format(analysis_utils.analysis_label(self.config), label)
+        else:
+            filename = "eqset_map_{}.jpg".format(label)
         figure.savefig(os.path.join(plotsDir, filename), pad_inches=0.02)
         pyplot.close(figure)
         return
@@ -476,7 +479,7 @@ class SummaryMaps(object):
             numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
         ]
 
-        from matplotlib.dates import YearLocator,date2num,DateFormatter
+        from matplotlib.dates import YearLocator,MonthLocator,DayLocator,date2num,DateFormatter
             
         figure = self._create_figure(extent)
         ax = figure.gca()
@@ -486,7 +489,12 @@ class SummaryMaps(object):
 
         matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.13, 0.36])
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
-        colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
+        if numpy.max(ot) - numpy.min(ot) > 365:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
+        elif numpy.max(ot) - numpy.min(ot) > 1:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=MonthLocator(), format=DateFormatter('%Y-%m'))
+        else:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax)
         colorbar.set_label("Origin Time")
         
         # domains (manual)
@@ -500,22 +508,22 @@ class SummaryMaps(object):
         geometryDomains = [geometry.Polygon(circleSF), geometry.Polygon(circleLA)]
         ax.add_feature(feature.ShapelyFeature(geometryDomains, crs.PlateCarree(), facecolor="none", edgecolor="blue"), zorder=3)
                             
-        self._save(figure, "events")
+        self._save(figure, "events", analysis=False)
         return
 
-    def performance_metric(self, metric="area_metric"):
-        """Create map with earthquakes colored by performance metric with marker size by magnitude.
+    def cost_savings(self, metric="area_costsavings_eew"):
+        """Create map with earthquakes colored by cost savings with marker size by magnitude.
         """
         COLS = [
             ("longitude", "float32",),
             ("latitude", "float32",),
             ("magnitude", "float32",),
-            ("metric", "float32",),
+            ("cost_savings", "float32",),
             ]
 
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
-        fragility = self.config.get("fragility_curves", "object").split(".")[-1]
+        fragility = self.config.get("fragility_curves", "label")
         
         perfs = None
         for eqId in self.events:
@@ -544,12 +552,13 @@ class SummaryMaps(object):
         figure = self._create_figure(extent)
         ax = figure.gca()
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
-        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=eqs["metric"], cmap="plasma", vmin=0.0, vmax=1.0, transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
+        vmax = 10**(0.1*numpy.ceil(10*numpy.log10(numpy.max(eqs["cost_savings"]))))
+        sc = ax.scatter(eqs["longitude"], eqs["latitude"], s=ms, c=eqs["cost_savings"], cmap="plasma", vmin=0, vmax=vmax, transform=crs.Geodetic(), edgecolors="black", alpha=0.67, zorder=4)
 
-        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.015, 0.11, 0.36])
-        cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
-        colorbar = pyplot.colorbar(mappable=sc, cax=cbax)
-        label = "Q-area" if metric == "area_metric" else "Q-pop"
+        matplotlib_extras.axes.add_background_axes(figure, [0.025, 0.02, 0.17, 0.37])
+        cbax = figure.add_axes([0.03, 0.04, 0.02, 0.33])
+        colorbar = pyplot.colorbar(mappable=sc, cax=cbax, format=ticker.FormatStrFormatter("%7.1e"))
+        label = "Q-area Cost Savings" if metric == "area_costsavings_eew" else "Q-pop Cost Savings"
         colorbar.set_label(label)
         ax.set_title(label)
         

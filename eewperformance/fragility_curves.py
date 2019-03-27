@@ -29,7 +29,7 @@ class Constant(object):
 
         :returns: Cost at points given by x.
         """
-        return self.y
+        return self.y*numpy.ones(x.shape)
 
 
 class LinearRamp(object):
@@ -75,6 +75,45 @@ class LinearRamp(object):
         return cost
 
 
+class Sigmoid(object):
+    """Sigmoid function that is y_low at x=-infinity, 0.5*(y_low+y_high) at x=x_middle, and
+    y_high at x=+infinity.
+
+    """
+
+    def __init__(self, x_middle=0.4, y_low=0.0, y_high=1.0, slope=2.0):
+        """Constructor.
+
+        :type x_middle: float
+        :param x_middle: x value at middle value between y_low and y_high.
+
+        :type y_low: float
+        :param y_low: y value at x=-infinity.
+
+        :type y_high: float
+        :param y_high: y value at x=+infinity.
+
+        :type slope: float
+        :param slope: Slope at x=x_middle
+        """
+        self.x_middle = x_middle
+        self.y_low = y_low
+        self.y_high = y_high
+        self.slope = slope
+        return
+
+    def cost(self, x):
+        """Compute cost.
+
+        :type x: float
+        :param x: Predictor variable.
+
+        :returns: Cost at points given by x.
+        """
+        cost = 1.0 / (1.0+numpy.exp(-self.slope*(x-self.x_middle)))
+        return cost
+
+
 class CostActionDamage(object):
     """Abstract base class for computing cost of action and damage.
     """
@@ -107,81 +146,6 @@ class CostActionDamage(object):
         return self.damage.cost(mmi_obs)
 
 
-class PublicFearAvoidance(CostActionDamage):
-    """Rough estimate of cost of action and damage for public
-    fear avoidance (public perception of utility of EEW).
-
-    Cost of action is 1/10 of maximum cost of damage and uniform with
-    respect to MMI, while cost of damage is a linear ramp.
-
-    """
-
-    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=5.5):
-        CostActionDamage.__init__(self)
-
-        self.action = Constant(cost_action)
-        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
-        return
-
-
-class PublicFearAvoidance20(CostActionDamage):
-    """Rough estimate of cost of action and damage for public
-    fear avoidance (public perception of utility of EEW).
-
-    Cost of action is 1/20 of maximum cost of damage and uniform with
-    respect to MMI, while cost of damage is a linear ramp.
-
-    """
-
-    def __init__(self, cost_action=0.05, damage_low_mmi=2.5, damage_high_mmi=5.5):
-        CostActionDamage.__init__(self)
-
-        self.action = Constant(cost_action)
-        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
-        return
-
-
-class PublicFearAvoidance50(CostActionDamage):
-    """Rough estimate of cost of action and damage for public
-    fear avoidance (public perception of utility of EEW).
-
-    Cost of action is 1/50 of maximum cost of damage and uniform with
-    respect to MMI, while cost of damage is a linear ramp.
-
-    """
-
-    def __init__(self, cost_action=0.02, damage_low_mmi=2.5, damage_high_mmi=5.5):
-        CostActionDamage.__init__(self)
-
-        self.action = Constant(cost_action)
-        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
-        return
-
-
-class PublicInjury(CostActionDamage):
-    """Rough estimate of cost of action and damage for public
-    injuries.
-
-    Cost of action is uniform with respect to MMI, while cost of
-    damage is a linear ramp.
-    """
-
-    def __init__(self, cost_action=0.1, damage_low_mmi=4.5, damage_high_mmi=7.5):
-        """Constructor.
-
-        :type cost_action: float
-        :param cost_action: Cost of action relative to maximum cost of damage.
-
-        :type damage_mmi: float
-        :param damage_mmi: MMI associated with onset of damage.
-        """
-        CostActionDamage.__init__(self)
-
-        self.action = Constant(cost_action)
-        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
-        return
-
-
 class StepDamage(CostActionDamage):
     """Damage with uniform cost of action and heavy-side step function for
     cost of damage.
@@ -202,6 +166,40 @@ class StepDamage(CostActionDamage):
 
         self.action = Constant(cost_action)
         self.damage = LinearRamp(damage_mmi - EPSILON, damage_mmi + EPSILON, 0.0, 1.0)
+        return
+
+
+class LinearDamage(CostActionDamage):
+    """Damage with uniform cost of action and linear increase in cost of
+    damage over some finite interval.
+    """
+
+    def __init__(self, cost_action=0.1, damage_low_mmi=2.5, damage_high_mmi=4.5):
+        CostActionDamage.__init__(self)
+
+        self.action = Constant(cost_action)
+        self.damage = LinearRamp(damage_low_mmi, damage_high_mmi, 0.0, 1.0)
+        return
+
+
+class SigmoidDamage(CostActionDamage):
+    """Damage with uniform cost of action and sigmoid function for cost of
+    damage.
+    """
+
+    def __init__(self, cost_action=0.1, damage_middle_mmi=3.5, damage_slope=3.0):
+        """Constructor.
+
+        :type cost_action: float
+        :param cost_action: Cost of action relative to maximum cost of damage.
+
+        :type damage_mmi: float
+        :param damage_mmi: MMI associated with 50% damage.
+        """
+        CostActionDamage.__init__(self)
+
+        self.action = Constant(cost_action)
+        self.damage = Sigmoid(x_middle=damage_middle_mmi, slope=damage_slope)
         return
 
 

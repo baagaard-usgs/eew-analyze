@@ -51,7 +51,7 @@ def analysis_event_label(params, eqid, magThreshold=None, mmiThreshold=None):
     """
     server = params.get("shakealert.production", "server")
     gmpe = params.get("mmi_predicted", "gmpe")
-    fragility = params.get("fragility_curves", "object").split(".")[-1]
+    fragility = params.get("fragility_curves", "label")
     if magThreshold is None:
         magThreshold = params.getfloat("alerts", "magnitude_threshold")
     if mmiThreshold is None:
@@ -68,7 +68,7 @@ def analysis_label(params, magThreshold=None, mmiThreshold=None):
     """
     server = params.get("shakealert.production", "server")
     gmpe = params.get("mmi_predicted", "gmpe")
-    fragility = params.get("fragility_curves", "object").split(".")[-1]
+    fragility = params.get("fragility_curves", "label")
     if magThreshold is None:
         magThreshold = params.getfloat("alerts", "magnitude_threshold")
     if mmiThreshold is None:
