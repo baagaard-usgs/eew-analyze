@@ -11,10 +11,13 @@
 import os
 import sys
 import logging
+import argparse
 from importlib import import_module
 import multiprocessing
 import numpy
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as pyplot
 import matplotlib_extras.colors
 
@@ -98,7 +101,7 @@ height_in = 5.3
 warning_time_contour_interval = 2.0
 
 [plots]
-raster = false
+raster = False
 
 [files]
 event_dir = ./data/[EVENTID]/
@@ -214,22 +217,40 @@ class Event(object):
         # Analsis DB data (event and alerts)
         self.event = self.db.comcat_event(self.eqId)
         server = self.config.get("shakealert.production", "server")
-        if not server.startswith("catalog-magnitude"):
+
+        if not self.config.has_section("theoretical"):
             self.alerts = self.db.alerts(self.eqId, server)
         else:
-            self.alerts = [{
-                "event_id": -111,
-                "longitude": self.event["longitude"],
-                "latitude": self.event["latitude"],
-                "depth_km": self.event["depth_km"],
-                "origin_time": self.event["origin_time"],
-                "magnitude": self.event["magnitude"],
-                "timestamp": self.event["origin_time"],
+            event_id = self.config.get("theoretical", "event_id")
+            use_first_alert_time = self.config.getboolean("theoretical", "use_first_alert_time")
+            latency = self.config.getfloat("theoretical", "alert_offset")
+            add_bias = self.config.getboolean("theoretical", "add_magnitude_bias")
+            bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"] if add_bias else 0.0
+            if use_first_alert_time:
+                alerts = self.db.alerts(self.eqId, server)
+                if len(alerts) == 0:
+                    self.alerts = []
+                else:
+                    alert_time = self.db.alerts(self.eqId, server)[0]["timestamp"]
+                    self.alerts = [{
+                        "event_id": event_id,
+                        "longitude": self.event["longitude"],
+                        "latitude": self.event["latitude"],
+                        "depth_km": self.event["depth_km"],
+                        "origin_time": self.event["origin_time"],
+                        "magnitude": self.event["magnitude"] + bias,
+                        "timestamp": alert_time,
+                    }]
+            else:
+                self.alerts = [{
+                    "event_id": event_id,
+                    "longitude": self.event["longitude"],
+                    "latitude": self.event["latitude"],
+                    "depth_km": self.event["depth_km"],
+                    "origin_time": self.event["origin_time"],
+                    "magnitude": self.event["magnitude"] + bias,
+                    "timestamp": self.event["origin_time"],
                 }]
-            if server == "catalog-magnitude-bias":
-                bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"]
-                self.alerts[0]["magnitude"] += bias
-                self.alerts[0]["event_id"] = -222
 
         # Shaking time
         functionPath = self.config.get("shaking_time", "function").split(".")
@@ -498,8 +519,6 @@ class EEWAnalyzeApp(object):
     def _parse_command_line(self):
         """Parse command line arguments.
         """
-        import argparse
-
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
