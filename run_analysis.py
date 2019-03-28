@@ -66,6 +66,8 @@ class App(object):
             })
 
         costfns = COSTFNS if args.all else args.costfns.split(",")
+        if costfns == [""]:
+            return
         for costfn in costfns:
             self._run_costfn(costfn)
             
@@ -102,19 +104,24 @@ class App(object):
         })
         self._run_analyzer(**args)
         
-        # Catalog magnitude
-        args = defaults.copy()
+        # First alert, catalog magnitude
         args.update({
-            "config": ",".join(EQSETS + [costfn, "catalog_magnitude.cfg"]),
-            "nthreads": self.nthreads,
-            "optimize_events": True,
+            "config": ",".join(EQSETS + [costfn, "first_alert_catalog_magnitude.cfg"]),
             "plot_event_maps": "alert",
         })
-        self._run_analyzer(**args)
+        #self._run_analyzer(**args)
 
-        # Catalog magitude + bias
-        args.update({"config": ",".join(EQSETS + [costfn, "catalog_magnitude_bias.cfg"])})
-        self._run_analyzer(**args)
+        # First alert, catalog magitude + bias
+        args.update({"config": ",".join(EQSETS + [costfn, "first_alert_catalog_magnitude_bias.cfg"])})
+        #self._run_analyzer(**args)
+
+        # Zero latency, catalog magnitude
+        args.update({"config": ",".join(EQSETS + [costfn, "zero_latency_catalog_magnitude.cfg"])})
+        #self._run_analyzer(**args)
+
+        # Zero latency, catalog magitude + bias
+        args.update({"config": ",".join(EQSETS + [costfn, "zero_latency_catalog_magnitude_bias.cfg"])})
+        #self._run_analyzer(**args)
 
         # Summary
         args = defaults.copy()
@@ -126,7 +133,7 @@ class App(object):
         })
         self._run_analyzer(**args)
         if os.path.isfile("report.pdf"):
-            shutil.move("report.pdf", "report_SF+LA_{}.pdf")
+            shutil.move("report.pdf", "report_SF+LA_{}.pdf".format(costfn.replace(".cfg","")))
             
         return
 
@@ -134,14 +141,14 @@ class App(object):
         app = analyzer.EEWAnalyzeApp()
         if self.show_progress:
             print("Running analyzer app w/config: {}".format(kwargs))
-        #app.main(**kwargs)
+        app.main(**kwargs)
         return
     
     def _parse_command_line(cls):
         """Parse command line arguments.
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("--costfns", action="store", dest="costfns", choices=COSTFNS+[None])
+        parser.add_argument("--costfns", action="store", dest="costfns", default="", choices=COSTFNS+[None])
         parser.add_argument("--all", action="store_true", dest="all")
 
         parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg")
