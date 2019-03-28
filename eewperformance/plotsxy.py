@@ -344,11 +344,13 @@ class SummaryFigures(object):
 
     def metric_theoretical(self):
         FIG_SIZE = (8.0, 3.5)
-        MARGINS = ((0.7, 0.7, 0.2), (0.6, 0, 0.3))
+        MARGINS = ((0.7, 0.7, 0.2), (1.0, 0, 0.3))
         servers = [
             (self.config.get("shakealert.production", "server"), "ShakeAlert"),
-            ("catalog-magnitude", "ANSS Mw"),
-            ("catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ("first-alert-catalog-magnitude", "ANSS Mw"),
+            ("first-alert-catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ("zero-latency-catalog-magnitude", "ANSS Mw @ OT"),
+            ("zero-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT"),
             ]
 
         gmpe = self.config.get("mmi_predicted", "gmpe")
@@ -369,33 +371,38 @@ class SummaryFigures(object):
 
         xticks = numpy.arange(1.0, len(servers)+0.01, 1.0)
         xlabels = [label for fn,label in servers]
-        
+
         # Q-area
         fc, ec = self.COLORS["area_costsavings_eew"]
         ax = figure.add_axes(rectFactory.rect(row=1, col=1))
         ax.bar(xticks, areaMetric, fc=fc, ec=ec)
         ax.set_xticks(xticks)
-        ax.set_xticklabels(xlabels, fontsize="smaller")
+        ax.set_xticklabels(xlabels, fontsize="smaller", rotation=30, ha="right")
         ax.set_title("Q-area", weight="bold")
-        ax.set_xlabel("Theoretical Improvements")
         ax.set_ylabel("Q-area")
         ax.set_ylim((0.0, 1.0))
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-        ax.text(1.5, 0.5*(areaMetric[0]+areaMetric[1]+0.2), "No latency\nANSS Mw",
-                ha="center", va="center", rotation=45,
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
-        ax.text(2.5, 0.5*(areaMetric[1]+areaMetric[2]+0.2), "Add event\nbias",
-                ha="center", va="center", rotation=45,
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
         
+        ax.text(1.5, 0.3, "ANSS Mw",
+                ha="center", va="center", rotation=0, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
+        ax.text(2.5, 0.45, "Add event\nbias",
+                ha="center", va="center", rotation=0, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
+        ax.text(3.5, 0.65, "No latency",
+                ha="center", va="center", rotation=0, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
+        ax.text(4.5, 0.9, "Add event\nbias",
+                ha="center", va="center", rotation=0, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
         # Q-pop
         fc, ec = self.COLORS["population_costsavings_eew"]
         ax = figure.add_axes(rectFactory.rect(row=1, col=2))
         ax.bar(xticks, popMetric, fc=fc, ec=ec)
         ax.set_xticks(xticks)
-        ax.set_xticklabels(xlabels, fontsize="smaller")
+        ax.set_xticklabels(xlabels, fontsize="smaller", rotation=30, ha="right")
         ax.set_title("Q-pop", weight="bold")
         ax.set_xlabel("Theoretical Improvements")
         ax.set_ylabel("Q-pop")
