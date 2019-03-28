@@ -223,7 +223,7 @@ class Event(object):
         else:
             event_id = self.config.get("theoretical", "event_id")
             use_first_alert_time = self.config.getboolean("theoretical", "use_first_alert_time")
-            latency = self.config.getfloat("theoretical", "alert_offset")
+            latency = self.config.getint("theoretical", "alert_offset_sec")
             add_bias = self.config.getboolean("theoretical", "add_magnitude_bias")
             bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"] if add_bias else 0.0
             if use_first_alert_time:
@@ -232,6 +232,7 @@ class Event(object):
                     self.alerts = []
                 else:
                     alert_time = self.db.alerts(self.eqId, server)[0]["timestamp"]
+                    tstamp = numpy.datetime64(alert_time) + numpy.timedelta64(latency, "s")
                     self.alerts = [{
                         "event_id": event_id,
                         "longitude": self.event["longitude"],
@@ -239,9 +240,10 @@ class Event(object):
                         "depth_km": self.event["depth_km"],
                         "origin_time": self.event["origin_time"],
                         "magnitude": self.event["magnitude"] + bias,
-                        "timestamp": alert_time,
+                        "timestamp": str(tstamp),
                     }]
             else:
+                tstamp = numpy.datetime64(self.event["origin_time"]) + numpy.timedelta64(latency, "s")
                 self.alerts = [{
                     "event_id": event_id,
                     "longitude": self.event["longitude"],
@@ -249,7 +251,7 @@ class Event(object):
                     "depth_km": self.event["depth_km"],
                     "origin_time": self.event["origin_time"],
                     "magnitude": self.event["magnitude"] + bias,
-                    "timestamp": self.event["origin_time"],
+                    "timestamp": str(tstamp),
                 }]
 
         # Shaking time
