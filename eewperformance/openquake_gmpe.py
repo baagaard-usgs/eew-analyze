@@ -10,11 +10,12 @@
 import logging
 import numpy
 
+from . import greatcircle
+
 import openquake.hazardlib.gsim.base
 import openquake.hazardlib.imt
 import openquake.hazardlib.const
 
-import greatcircle
 
 # ----------------------------------------------------------------------
 class OpenQuakeGMPE(object):
@@ -75,7 +76,7 @@ class OpenQuakeGMPE(object):
         numFields = len(fields.keys())
         numPoints = points["longitude"].shape[0]
         dtype = {
-            "names": [s.encode("UTF8") for s in sorted(fields.keys())],
+            "names": [s for s in sorted(fields.keys())],
             "formats": ["float64"]*numFields,
         }
         data = numpy.zeros(numPoints, dtype=dtype)

@@ -11,8 +11,8 @@ import logging
 from importlib import import_module
 import numpy
 
-import analysis_utils
-import gdalraster
+from . import analysis_utils
+from . import gdalraster
 
 class CostSavings(object):
     """Cost savings weighted by area and population.
@@ -98,7 +98,8 @@ class CostSavings(object):
         objectPath = self.config.get("fragility_curves", "object").split(".")
         fragilityOptions = dict(self.config.items("fragility_curves"))
         fragilityOptions.pop("object")
-        fragilityOptions = {k: float(v) for k,v in fragilityOptions.iteritems()}
+        fragilityOptions.pop("label")
+        fragilityOptions = {k: float(v) for k,v in fragilityOptions.items()}
         fragility = getattr(import_module(".".join(objectPath[:-1])), objectPath[-1])(**fragilityOptions)
         
         costDamage = fragility.cost_damage(mmiObs)
@@ -111,14 +112,12 @@ class CostSavings(object):
         areaCostNoEEW = numpy.sum(pixelArea * costNoEEW)
         areaCostPerfectEEW = numpy.sum(pixelArea * costPerfectEEW)
         areaCostEEW = numpy.sum(pixelArea * costEEW)
-        areaMetric = (areaCostNoEEW - areaCostEEW) / (areaCostNoEEW - areaCostPerfectEEW)
         areaDamage = numpy.sum(pixelArea * (costDamage > 0.0))
         areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
         
         popCostNoEEW = numpy.sum(populationDensity * pixelArea * costNoEEW)
         popCostPerfectEEW = numpy.sum(populationDensity * pixelArea * costPerfectEEW)
         popCostEEW = numpy.sum(populationDensity * pixelArea * costEEW)
-        popMetric = (popCostNoEEW - popCostEEW) / (popCostNoEEW - popCostPerfectEEW)
         popDamage = numpy.sum(pixelArea * populationDensity * (costDamage > 0.0))
         popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
 
@@ -148,16 +147,12 @@ class CostSavings(object):
         metrics = {
             "area_damage": areaDamage,
             "area_alert": areaAlert,
-            "area_cost_eew": areaCostEEW,
-            "area_cost_noeew": areaCostNoEEW,
-            "area_cost_perfecteew": areaCostPerfectEEW,
-            "area_metric": areaMetric,
+            "area_costsavings_eew": areaCostNoEEW - areaCostEEW,
+            "area_costsavings_perfecteew": areaCostNoEEW - areaCostPerfectEEW,
             "population_damage": popDamage,
             "population_alert": popAlert,
-            "population_cost_eew": popCostEEW,
-            "population_cost_noeew": popCostNoEEW,
-            "population_cost_perfecteew": popCostPerfectEEW,
-            "population_metric": popMetric,
+            "population_costsavings_eew": popCostNoEEW - popCostEEW,
+            "population_costsavings_perfecteew": popCostNoEEW - popCostPerfectEEW,
             }
         return metrics
 

@@ -7,12 +7,12 @@
 #
 
 import gzip
-import cStringIO
+import io
 import numpy
 import logging
 from lxml import etree
 
-from openquake_gmpe import OpenQuakeGMPE
+from .openquake_gmpe import OpenQuakeGMPE
 
 class ShakeMap(object):
     """ShakeMap reader.
@@ -91,7 +91,7 @@ class ShakeMap(object):
         :param projection: Name of projection in the form EPSF:XXXX.
         """
         from osgeo import osr
-        import greatcircle
+        from . import greatcircle
         
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(int(projection.replace("EPSG:","")))
@@ -135,7 +135,8 @@ class ShakeMap(object):
         colNames = "longitude, latitude, mmi, pga, pgv, vs30"
         colFormats = "float32, float32, float32, float32, float32, float32"
 
-        data = numpy.loadtxt(cStringIO.StringIO(elRoot.xpath("ns:grid_data", namespaces=namespaces)[0].text), usecols=colIndices)
+        from six import u as unicode
+        data = numpy.loadtxt(io.StringIO(unicode(elRoot.xpath("ns:grid_data", namespaces=namespaces)[0].text)), usecols=colIndices)
         self.data = numpy.core.records.fromarrays(data.transpose(), names=colNames, formats=colFormats)
         if self.gmice:
             self.data["mmi"] = self.gmice(self.data["pga"], self.data["pgv"])
@@ -219,7 +220,7 @@ def mmi_AllenEtal2012(event, points, options):
     :type points: Numpy structured array
     :param points: Array with 'longitude' and 'latitude' point locations.
     """
-    import greatcircle
+    from . import greatcircle
 
     SLOPE = 0.062 # Vs30 = 400 m/s
     ALPHA = -8.54
@@ -315,7 +316,7 @@ if __name__ == "__main__":
     mmiWorden = mmi_via_gmpe_gmice(event, points, gmpe, gmice="WordenEtal2012")
     mmiWald = mmi_via_gmpe_gmice(event, points, gmpe, gmice="WaldEtal1999")
 
-    import greatcircle
+    from . import greatcircle
     distKm = 1.0e-3 * greatcircle.distance(event["longitude"], event["latitude"], points["longitude"], points["latitude"])
     import matplotlib.pyplot as pyplot
     pyplot.plot(distKm, mmiWorden, 'r-', distKm, mmiWald, 'b--')

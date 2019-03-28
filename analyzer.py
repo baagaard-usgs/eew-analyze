@@ -16,7 +16,7 @@ import multiprocessing
 import numpy
 
 import matplotlib.pyplot as pyplot
-import matplotlib_extras
+import matplotlib_extras.colors
 
 import h5py # avoid gdal loading incompatible HDF5 library
 from eewperformance import analysisdb
@@ -27,20 +27,34 @@ from eewperformance import plotsxy
 from eewperformance import reports
 from eewperformance import analysis_utils
 from eewperformance import gdalraster
+from eewperformance import local_color
 
-DEFAULTS = """
+DEFAULTS = u"""
 [events]
 # Example:
 # nc72923380 = Mw 4.6 Paicines, 2017-11-13
+
+[shakealert.production]
+login_url = None
+log_url = None
+server = eew-bk-prod1
+username = None
+password = None
+
+[shakealert.demonstration]
+login_url = None
+log_url = None
+server = eew2demo
+username = None
+password = None
 
 [shakemap]
 projection = EPSG:3311
 
 [shaking_time]
 function = eewperformance.userdisplay.shaking_time_vs
-#vs_kmps = 3.55 ; User display
-#vs_kmps = 3.4 ; From NC record section
-vs_kmps = 3.5 ; Avg NC/SC
+vs_kmps = 3.5
+vp_kmps = 6.1
 
 [mmi_predicted]
 function = eewperformance.shakemap.mmi_via_gmpe_gmice
@@ -61,10 +75,8 @@ mmi_threshold = 3.5
 magnitude_threshold = 3.95001
 
 [fragility_curves]
-object = eewperformance.fragility_curves.PublicFearAvoidance
-cost_action = 0.1
-damage_low_mmi = 2.5
-damage_high_mmi = 5.5
+object = eewperformance.fragility_curves.LinearDamage
+label = FearAvoidanceLinear
 
 [optimize]
 mmi_threshold_min = 2.0
@@ -85,6 +97,9 @@ height_in = 5.3
 
 warning_time_contour_interval = 2.0
 
+[plots]
+raster = false
+
 [files]
 event_dir = ./data/[EVENTID]/
 analysis_cache_dir = ./data/cache/
@@ -92,7 +107,7 @@ plots_dir = ./data/plots/
 report = report.pdf
 
 analysis_db = ./data/analysisdb.sqlite
-population_density = ~/data/gis/populationdensity.tiff
+population_density = ~/data/gis/census/populationdensity.tiff
 """
 
 # ----------------------------------------------------------------------
@@ -246,7 +261,7 @@ class Event(object):
             "dm_id": self.alerts[0]["event_id"] if len(self.alerts) > 0 else -1,
             "dm_timestamp": self.alerts[0]["timestamp"] if len(self.alerts) > 0 else "",
             "gmpe": self.config.get("mmi_predicted", "gmpe"),
-            "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
+            "fragility": self.config.get("fragility_curves", "label"),
             "magnitude_threshold": magAlertThreshold,
             "mmi_threshold": mmiAlertThreshold,
             })
@@ -277,7 +292,7 @@ class Event(object):
             "dm_id": self.alerts[0]["event_id"] if len(self.alerts) > 0 else -1,
             "dm_timestamp": self.alerts[0]["timestamp"] if len(self.alerts) > 0 else "",
             "gmpe": self.config.get("mmi_predicted", "gmpe"),
-            "fragility": self.config.get("fragility_curves", "object").split(".")[-1],
+            "fragility": self.config.get("fragility_curves", "label"),
             }
         
         costSavings = perfmetrics.CostSavings(self.config)
@@ -321,7 +336,8 @@ class Event(object):
         selection = self.steps.plot_event_figures or "all"
         figures = plotsxy.EventFigures(self.config, self.event)
         if "alert_error" in selection or "all" == selection:
-            figures.alert_error(self.alerts)
+            mmi_bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"]
+            figures.alert_error(self.alerts, mmi_bias)
         if "mmi_correlation" in selection or "all" == selection:
             figures.mmi_correlation()
         if "warning_time_mmi" in selection or "all" == selection:
@@ -342,11 +358,11 @@ class EEWAnalyzeApp(object):
         self.showProgress = False
         return
 
-    def main(self):
+    def main(self, **kwargs):
         """Main entry point
         """
         # Initialization
-        args = self._parse_command_line()
+        args = argparse.Namespace(**kwargs) if kwargs else self._parse_command_line()
         logLevel = logging.DEBUG if args.debug else logging.INFO
         logging.basicConfig(level=logLevel, filename="analyzer.log")
         if args.show_progress:
@@ -360,6 +376,10 @@ class EEWAnalyzeApp(object):
         pyplot.style.use("size-presentation")
         pyplot.style.use("color-"+args.color_style)
         matplotlib_extras.colors.add_general()
+        if args.color_style == "lightbg":
+            local_color.lightbg()
+        else:
+            local_color.darkbg()
             
         # Event processing
         if args.process_events or args.optimize_events or args.plot_event_maps or args.plot_event_figures or args.all:
@@ -387,7 +407,7 @@ class EEWAnalyzeApp(object):
 
         # Generate report
         if args.generate_report or args.all:
-            self.generate_report()
+            self.generate_report("True" if args.generate_report == "summary" else False)
         return
 
     def initialize(self, config_filenames):
@@ -396,11 +416,18 @@ class EEWAnalyzeApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import ConfigParser
         import io
-        config = ConfigParser.SafeConfigParser()
-        config.readfp(io.BytesIO(DEFAULTS))
+        import six
+        if six.PY2:
+            import ConfigParser
+            config = ConfigParser.SafeConfigParser()
+        else:    
+            import configparser
+            config = configparser.SafeConfigParser()
+        config.readfp(io.StringIO(DEFAULTS))
         for filename in config_filenames.split(","):
+            if not os.path.isfile(filename):
+                raise IOError("Could not find configuration file '{}'.".format(filename))
             if self.showProgress:
                 print("Fetching parameters from {}...".format(filename))
             config.read(filename)
@@ -428,8 +455,8 @@ class EEWAnalyzeApp(object):
         if "events" in selection or "all" == selection:
             figures.earthquakes()
         if "performance" in selection or "all" == selection:
-            figures.performance_metric("area_metric")
-            figures.performance_metric("population_metric")
+            figures.cost_savings("area_costsavings_eew")
+            figures.cost_savings("population_costsavings_eew")
         return
     
     def plot_summary_figures(self, selection):
@@ -447,22 +474,24 @@ class EEWAnalyzeApp(object):
         if "optimum_thresholds" in selection or "all" == selection:
             figures.optimal_mmithresholds()
         if "metric_time" in selection or "all" == selection:
-            figures.metric_versus_time()
+            figures.costsavings_versus_time()
         if "metric_magnitude" in selection or "all" == selection:
-            figures.metric_versus_magnitude()
-        if "metric_depth" in selection or "all" == selection:
-            figures.metric_versus_depth()
-        if "magnitude_correlation" in selection or "all" == selection:
-            figures.magnitude_correlation()
+            figures.costsavings_versus_magnitude()
+        if "cost_functions" in selection or "all" == selection:
+            figures.cost_functions()
+        if "metric_cost_functions" in selection or "all" == selection:
+            figures.metric_cost_functions()
+        if "metric_theoretical" in selection or "all" == selection:
+            figures.metric_theoretical()
         return
     
-    def generate_report(self):
+    def generate_report(self, summary_only=True):
         """Assemble plots, etc into PDF file.
         """
         if self.showProgress:
             print("Generating report...")
 
-        summary = reports.AnalysisSummary(self.config)
+        summary = reports.AnalysisSummary(self.config, summary_only)
         summary.generate(self.config.options("events"))
         return
         
@@ -480,13 +509,13 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation", "warning_time_mmi"])
         parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events", "performance"])
-        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "metric_depth", "magnitude_correlation"])
-        parser.add_argument("--generate-report", action="store_true", dest="generate_report")
+        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "cost_functions", "metric_cost_functions", "metric_theoretical"])
+        parser.add_argument("--generate-report", action="store", dest="generate_report", default=None, choices=[None,"summary", "full"])
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug", default=True)
-        parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg")
+        parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg", choices=["darkbg", "lightbg"])
         return parser.parse_args()
 
 # ======================================================================
