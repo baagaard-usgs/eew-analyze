@@ -343,13 +343,15 @@ class SummaryFigures(object):
         return
 
     def metric_theoretical(self):
-        FIG_SIZE = (8.0, 3.5)
-        MARGINS = ((0.7, 0.7, 0.2), (1.0, 0, 0.3))
+        FIG_SIZE = (8.0, 4.5)
+        MARGINS = ((0.7, 0.7, 0.2), (1.2, 0, 0.3))
         servers = [
             (self.config.get("shakealert.production", "server"), "ShakeAlert"),
             ("first-alert-catalog-magnitude", "ANSS Mw"),
-            ("first-alert-catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ("five-latency-catalog-magnitude", "ANSS Mw @ OT+5s"),
             ("zero-latency-catalog-magnitude", "ANSS Mw @ OT"),
+            ("first-alert-catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ("five-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT+5s"),
             ("zero-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT"),
             ]
 
@@ -360,22 +362,34 @@ class SummaryFigures(object):
 
         areaMetric = []
         popMetric = []
+        ec = []
+        fc = []
         for server, label in servers:
             perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
 
             areaMetric.append(numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"]))
             popMetric.append(numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"]))
+            c_fc = "local:q_shakealert_fc"
+            c_ec = "local:q_shakealert_ec"  
+            if server.endswith("catalog-magnitude"):
+                c_fc = "local:q_catmag_fc"
+                c_ec = "local:q_catmag_ec"
+            elif server.endswith("catalog-magnitude-bias"):
+                c_fc = "local:q_catmagbias_fc"
+                c_ec = "local:q_catmagbias_ec"
+            fc.append(c_fc)
+            ec.append(c_ec)
 
         figure = pyplot.figure(figsize=FIG_SIZE)
         rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=MARGINS)
+        fg = pyplot.rcParams["axes.edgecolor"]
 
         xticks = numpy.arange(1.0, len(servers)+0.01, 1.0)
         xlabels = [label for fn,label in servers]
 
         # Q-area
-        fc, ec = self.COLORS["area_costsavings_eew"]
         ax = figure.add_axes(rectFactory.rect(row=1, col=1))
-        ax.bar(xticks, areaMetric, fc=fc, ec=ec)
+        ax.bar(xticks, areaMetric, color=fc, ec=fg)
         ax.set_xticks(xticks)
         ax.set_xticklabels(xlabels, fontsize="smaller", rotation=30, ha="right")
         ax.set_title("Q-area", weight="bold")
@@ -384,27 +398,24 @@ class SummaryFigures(object):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-        
-        ax.text(1.5, 0.3, "ANSS Mw",
+        ax.text(1.5, 0.8, "ANSS Mw",
                 ha="center", va="center", rotation=0, fontsize="x-small",
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
-        ax.text(2.5, 0.45, "Add event\nbias",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        ax.text(3.0, areaMetric[2]+0.1, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        ax.text(4.5, 0.8, "Add event\nbias",
                 ha="center", va="center", rotation=0, fontsize="x-small",
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
-        ax.text(3.5, 0.65, "No latency",
-                ha="center", va="center", rotation=0, fontsize="x-small",
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
-        ax.text(4.5, 0.9, "Add event\nbias",
-                ha="center", va="center", rotation=0, fontsize="x-small",
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        ax.text(6.0, areaMetric[5]+0.1, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
         # Q-pop
-        fc, ec = self.COLORS["population_costsavings_eew"]
         ax = figure.add_axes(rectFactory.rect(row=1, col=2))
-        ax.bar(xticks, popMetric, fc=fc, ec=ec)
+        ax.bar(xticks, popMetric, color=fc, ec=fg)
         ax.set_xticks(xticks)
         ax.set_xticklabels(xlabels, fontsize="smaller", rotation=30, ha="right")
         ax.set_title("Q-pop", weight="bold")
-        ax.set_xlabel("Theoretical Improvements")
         ax.set_ylabel("Q-pop")
         ax.set_ylim((0.0, 1.0))
         ax.spines["top"].set_visible(False)
