@@ -40,12 +40,12 @@ class EventFigures(object):
         self.event = event
         return
 
-    def _save(self, figure, label):
+    def _save(self, figure, label, force_raster=False):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
-        outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
+        outputFormat = "png" if self.config.getboolean("plots", "raster") or force_raster else "pdf"
         filename += "-{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
         pyplot.close(figure)
@@ -136,7 +136,6 @@ class EventFigures(object):
             layers[description] = data
 
 
-        #import pdb; pdb.set_trace()
         if numpy.isscalar(layers["mmi_pred"].mask):
             mmiObs = layers["mmi_obs"].ravel().data
             mmiPred = layers["mmi_pred"].ravel().data
@@ -214,7 +213,7 @@ class EventFigures(object):
 
 
             
-        self._save(figure, "mmi_correlation")
+        self._save(figure, "mmi_correlation", force_raster=True)
         return
     
     def warning_time_mmi(self):
@@ -269,7 +268,7 @@ class EventFigures(object):
             ax.errorbar(bcenters, wtMean, yerr=wtStd, fmt="none", ecolor="c_ltgreen", elinewidth=2, capthick=1.5, capwidth=6.0, zorder=4)
             ax.plot(bcenters, wtMean, marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
         
-        self._save(figure, "warning_time_mmi")
+        self._save(figure, "warning_time_mmi", force_raster=True)
         return
     
 
@@ -712,6 +711,101 @@ class SummaryFigures(object):
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
+        return
+    
+
+    def costsavings_warningtime(self):
+        """Plot fraction of warning area/population with cost savings above some value and warning time above some value.
+        """
+        FIG_SIZE = (8.0, 3.5)
+        MARGINS = ((0.6, 1.0, 0.1), (0.5, 0, 0.3)) 
+        nrows = 1
+        ncols = 2
+
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=nrows, ncols=ncols, margins=MARGINS)
+        
+        cacheDir = self.config.get("files", "analysis_cache_dir")
+
+        warningThresholds = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 20.0]
+        costThresholds = [0.0, 0.25, 0.5, 0.75]
+
+        areaData = numpy.zeros((len(costThresholds), len(warningThresholds)), numpy.float32)
+        popData = numpy.zeros((len(costThresholds), len(warningThresholds)), numpy.float32)
+        areaPerfect = 0.0
+        popPerfect = 0.0
+        
+        for eqId in self.events:
+            
+            filename = "analysis_" + analysis_utils.analysis_event_label(self.config, eqId) + ".tiff"
+            rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
+            
+            layers = {}
+            for iband in range(rasterData.RasterCount):
+                band = rasterData.GetRasterBand(1+iband)
+                description = band.GetDescription()
+                data = numpy.array(band.ReadAsArray())
+                data = numpy.ma.masked_values(data, band.GetNoDataValue())
+                layers[description] = data
+
+            categoryTN = 0.0
+            categoryFN = 1.0
+            categoryTP = 3.0
+            maskTN = numpy.ma.masked_values(layers["alert_category"], categoryTN).mask
+            maskFN = numpy.ma.masked_values(layers["alert_category"], categoryFN).mask
+            maskTP = numpy.ma.masked_values(layers["alert_category"], categoryTP).mask
+            maskAlert = layers["alert_category"] > 1.5
+            popDensity = layers["population_density"]
+        
+            costSavings = maskAlert*(layers["cost_no_eew"]-layers["cost_eew"]) - maskFN*(layers["cost_no_eew"]-layers["cost_perfect_eew"])
+            costSavingsPerfect = numpy.logical_or(maskTP, maskFN)*(layers["cost_no_eew"]-layers["cost_perfect_eew"])
+            warningTime = layers["warning_time"]
+
+            mask = costSavingsPerfect > 0.0
+            areaPerfect += numpy.sum(mask)
+            popPerfect += numpy.sum(popDensity*mask)
+            
+            for icost, costThreshold in enumerate(costThresholds):
+                for iwtime, warningThreshold in enumerate(warningThresholds):
+                    mask = numpy.logical_and(warningTime > warningThreshold, costSavings > costThreshold)
+                    areaData[icost, iwtime] += numpy.sum(mask.data)
+                    popData[icost, iwtime] += numpy.sum(popDensity*mask.data)
+        
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(col=1))
+        for icost, costThreshold in enumerate(costThresholds):
+            ax.semilogx(warningThresholds, areaData[icost,:]/areaPerfect, label="{:4.2f}".format(costThreshold))
+
+        ax.set_title("Area w/Cost Savings", weight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_label_text("Fraction of Perfect Alert Area")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+        ax.xaxis.set_label_text("Warning Time (s)")
+        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper right",
+                      title="Min. Cost Savings")
+
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(col=2))
+        for icost, costThreshold in enumerate(costThresholds):
+            ax.semilogx(warningThresholds, popData[icost,:]/popPerfect, label="{:4.2f}".format(costThreshold))
+
+        ax.set_title("Population w/Cost Savings", weight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_label_text("Fraction of Perfect Alert Population")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+        ax.xaxis.set_label_text("Warning Time (s)")
+
+        self._save(figure, "costsavings_warningtime")
         return
     
 
