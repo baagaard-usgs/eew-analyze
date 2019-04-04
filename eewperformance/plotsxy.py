@@ -17,6 +17,7 @@ import matplotlib
 import matplotlib.pyplot as pyplot
 import matplotlib.ticker as ticker
 import matplotlib.patches as patches
+import matplotlib.colors as colors
 
 from osgeo import gdal, osr
 import matplotlib_extras
@@ -119,6 +120,9 @@ class EventFigures(object):
     def mmi_correlation(self):
         """Plot observed versus predicted MMI.
         """
+        FIG_SIZE = (4.0, 4.0)
+        MARGINS = ((0.50, 0, 0.02), (0.45, 0, 0.1))
+
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = "analysis_" + analysis_utils.analysis_event_label(self.config, self.event["event_id"]) + ".tiff"
         rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
@@ -132,23 +136,33 @@ class EventFigures(object):
             layers[description] = data
 
 
+        #import pdb; pdb.set_trace()
         if numpy.isscalar(layers["mmi_pred"].mask):
             mmiObs = layers["mmi_obs"].ravel().data
             mmiPred = layers["mmi_pred"].ravel().data
+            warningTime = layers["warning_time"].ravel().data
         else:
             mask = ~layers["mmi_pred"].ravel().mask
             mmiObs = layers["mmi_obs"].ravel()[mask]
             mmiPred = layers["mmi_pred"].ravel()[mask]
+            warningTime = layers["warning_time"].ravel()[mask]
+            maskWarning = ~layers["warning_time"].ravel().mask[mask]
 
-        figure = pyplot.figure(figsize=(4.0, 4.0))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.60, 0, 0.2), (0.45, 0, 0.1)))
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=MARGINS)
+        fg = pyplot.rcParams["axes.edgecolor"]
         
         # Correlation
         maxMMI = 10.0
         if mmiObs.shape[0] > 0:
             maxMMI = numpy.maximum(5.0, numpy.maximum(numpy.max(mmiPred), numpy.max(mmiObs)))
         ax = figure.add_axes(rectFactory.rect())
-        ax.plot(mmiPred, mmiObs, marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
+
+        im = ax.scatter(mmiPred[maskWarning], mmiObs[maskWarning], c=warningTime[maskWarning],
+                        norm=colors.LogNorm(vmin=1.0, vmax=20.0),
+                        s=2, marker="o", edgecolors=fg, lw=0, alpha=0.67, zorder=1)
+        ax.scatter(mmiPred[~maskWarning], mmiObs[~maskWarning], c="darkgray",
+                   s=2, marker="o", edgecolors=fg, lw=0, alpha=0.67, zorder=1)
         ax.plot([1,maxMMI],[1,maxMMI], "--", color="c_ltblue", zorder=2)
 
         ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
@@ -162,6 +176,10 @@ class EventFigures(object):
         ax.set_xlim(1, maxMMI)
         ax.set_ylim(1, maxMMI)
         ax.set_aspect("equal")
+
+        cbax = figure.add_axes([0.84, 0.15, 0.02, 0.40])
+        colorbar = pyplot.colorbar(im, cax=cbax, format="%2.0f", ticks=ticker.LogLocator(subs=[1,2,4,8]))
+        colorbar.set_label("Warning Time (s)")
 
         if mmiObs.shape[0] > 0:
         
@@ -185,7 +203,7 @@ class EventFigures(object):
             residualMean = numpy.mean(residual)
             residualStd = numpy.std(residual)
             axin = inset_axes(ax, width="33%", height="25%", loc=2, borderpad=1.7)
-            axin.hist(residual, bins=bins, density=True, align="mid", color="c_ltred", ec="c_red")
+            axin.hist(residual, bins=bins, density=True, align="mid", color="c_ltblue", ec=fg)
             axin.set_yticks([])
             axin.xaxis.set_ticks_position("bottom")
             for label in axin.xaxis.get_ticklabels():
@@ -194,6 +212,8 @@ class EventFigures(object):
             axin.text(0.05, 0.95, "mean={m:.2f}\nstd={s:.2f}".format(m=residualMean, s=residualStd), transform=axin.transAxes, va="top", ha="left", fontsize=fontsize)
             axin.set_title("Residual (Obs-Pred)", fontsize=fontsize)
 
+
+            
         self._save(figure, "mmi_correlation")
         return
     
