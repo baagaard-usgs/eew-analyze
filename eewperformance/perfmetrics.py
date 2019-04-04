@@ -114,12 +114,14 @@ class CostSavings(object):
         areaCostEEW = numpy.sum(pixelArea * costEEW)
         areaDamage = numpy.sum(pixelArea * (costDamage > 0.0))
         areaAlert = numpy.sum(pixelArea * (mmiPred >= mmiAlertThreshold))
+        areaAlertPerfect = numpy.sum(pixelArea * (costDamage > costActionObs))
         
         popCostNoEEW = numpy.sum(populationDensity * pixelArea * costNoEEW)
         popCostPerfectEEW = numpy.sum(populationDensity * pixelArea * costPerfectEEW)
         popCostEEW = numpy.sum(populationDensity * pixelArea * costEEW)
         popDamage = numpy.sum(pixelArea * populationDensity * (costDamage > 0.0))
         popAlert = numpy.sum(pixelArea * populationDensity * (mmiPred >= mmiAlertThreshold))
+        popAlertPerfect = numpy.sum(pixelArea * populationDensity * (costDamage > costActionObs))
 
         # Alert categories TN(0),FN(1),FP(2),TP(3)
         alertCategory = numpy.zeros(costDamage.shape)
@@ -138,6 +140,7 @@ class CostSavings(object):
             ("cost_perfect_eew", costPerfectEEW,),
             ("cost_eew", costEEW,),
             ("alert_category", alertCategory,),
+            ("pixel_area", pixelArea,),
             ]
         cacheDir = self.config.get("files", "analysis_cache_dir")
         if not os.path.isdir(cacheDir):
@@ -147,10 +150,12 @@ class CostSavings(object):
         metrics = {
             "area_damage": areaDamage,
             "area_alert": areaAlert,
+            "area_alert_perfect": areaAlertPerfect,
             "area_costsavings_eew": areaCostNoEEW - areaCostEEW,
             "area_costsavings_perfecteew": areaCostNoEEW - areaCostPerfectEEW,
             "population_damage": popDamage,
             "population_alert": popAlert,
+            "population_alert_perfect": popAlertPerfect,
             "population_costsavings_eew": popCostNoEEW - popCostEEW,
             "population_costsavings_perfecteew": popCostNoEEW - popCostPerfectEEW,
             }

@@ -736,7 +736,6 @@ class SummaryFigures(object):
         popPerfect = 0.0
         
         for eqId in self.events:
-            
             filename = "analysis_" + analysis_utils.analysis_event_label(self.config, eqId) + ".tiff"
             rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
             
@@ -762,15 +761,15 @@ class SummaryFigures(object):
             warningTime = layers["warning_time"]
 
             mask = costSavingsPerfect > 0.0
-            areaPerfect += numpy.sum(mask)
-            popPerfect += numpy.sum(popDensity*mask)
+            areaPerfect += numpy.sum(layers["pixel_area"]*mask)
+            popPerfect += numpy.sum(popDensity*layers["pixel_area"]*mask)
             
             for icost, costThreshold in enumerate(costThresholds):
                 for iwtime, warningThreshold in enumerate(warningThresholds):
                     mask = numpy.logical_and(warningTime > warningThreshold, costSavings > costThreshold)
-                    areaData[icost, iwtime] += numpy.sum(mask.data)
-                    popData[icost, iwtime] += numpy.sum(popDensity*mask.data)
-        
+                    areaData[icost, iwtime] += numpy.sum(layers["pixel_area"]*mask.data)
+                    popData[icost, iwtime] += numpy.sum(popDensity*layers["pixel_area"]*mask.data)
+
         # Q-area
         ax = figure.add_axes(rectFactory.rect(col=1))
         for icost, costThreshold in enumerate(costThresholds):
