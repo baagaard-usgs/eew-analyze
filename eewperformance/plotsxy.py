@@ -805,6 +805,61 @@ class SummaryFigures(object):
         ax.xaxis.set_label_text("Warning Time (s)")
 
         self._save(figure, "costsavings_warningtime")
+
+    def magnitude_correlation(self):
+        """Plot catalog magnitude versus ShakeAlert magnitude.
+        """
+        server = self.config.get("shakealert.production", "server")
+
+        numEvents = len(self.events)
+        dtype = [
+            ("catalog", "float32",),
+            ("catalog+bias", "float32"),
+            ("alert_final", "float32",),
+            ("alert_min", "float32",),
+            ("alert_max", "float32",),
+            ]
+        mag = numpy.zeros(numEvents, dtype=dtype)
+        for i,eqId in enumerate(self.events):
+            event = self.db.comcat_event(eqId)
+            magCat = event["magnitude"]
+
+            shakemap = self.db.comcat_shakemap(eqId)
+            magBias = shakemap["mmi_bias"]
+
+            alerts = self.db.alerts(eqId, server)
+            if len(alerts) > 0:
+                magFinal = alerts[-1]["magnitude"]
+                alertMag = numpy.array([alert["magnitude"] for alert in alerts])
+                magMin = numpy.min(alertMag)
+                magMax = numpy.max(alertMag)
+            else:
+                magFinal = -999
+                magMin = -999
+                magMax = -999
+            mag[i] = (magCat, magCat+magBias, magFinal, magMin, magMax)
+
+        figure = pyplot.figure(figsize=(4.0, 4.0))
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.5, 0, 0.15), (0.5, 0.2, 0.25)))
+        ax = figure.add_axes(rectFactory.rect())
+        ax.scatter(mag["alert_final"], mag["catalog"], s=8, c="c_ltred", edgecolors="c_red", alpha=0.67, zorder=3)
+        x = numpy.vstack((mag["alert_min"], mag["alert_max"]))
+        y = numpy.vstack((mag["catalog"], mag["catalog"]))
+        ax.plot(x, y, lw=1, color="c_orange", alpha=0.67, zorder=1)
+        x = numpy.vstack((mag["alert_final"], mag["alert_final"]))
+        y = numpy.vstack((mag["catalog"], mag["catalog+bias"]))
+        ax.plot(x, y, lw=1, color="blue", alpha=0.67, zorder=2)
+
+        ax.plot([0,8.0], [0,8.0], lw=1, linestyle="--", color="black", alpha=0.67, zorder=4)
+        ax.set_title("ComCat versus ShakeAlert Magnitude")
+        ax.set_xlabel("ShakeAlert Magnitude")
+        ax.set_ylabel("ComCat Magnitude")
+        ax.set_aspect("equal")
+        ax.set_xlim(3,8)
+        ax.set_ylim(3,8)
+
+        self._save(figure, "magnitude_correlation")
+        pyplot.close(figure)
         return
     
 
