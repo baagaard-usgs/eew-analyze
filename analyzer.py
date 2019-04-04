@@ -11,10 +11,13 @@
 import os
 import sys
 import logging
+import argparse
 from importlib import import_module
 import multiprocessing
 import numpy
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as pyplot
 import matplotlib_extras.colors
 
@@ -98,7 +101,7 @@ height_in = 5.3
 warning_time_contour_interval = 2.0
 
 [plots]
-raster = false
+raster = False
 
 [files]
 event_dir = ./data/[EVENTID]/
@@ -214,22 +217,42 @@ class Event(object):
         # Analsis DB data (event and alerts)
         self.event = self.db.comcat_event(self.eqId)
         server = self.config.get("shakealert.production", "server")
-        if not server.startswith("catalog-magnitude"):
+
+        if not self.config.has_section("theoretical"):
             self.alerts = self.db.alerts(self.eqId, server)
         else:
-            self.alerts = [{
-                "event_id": -111,
-                "longitude": self.event["longitude"],
-                "latitude": self.event["latitude"],
-                "depth_km": self.event["depth_km"],
-                "origin_time": self.event["origin_time"],
-                "magnitude": self.event["magnitude"],
-                "timestamp": self.event["origin_time"],
+            event_id = self.config.get("theoretical", "event_id")
+            use_first_alert_time = self.config.getboolean("theoretical", "use_first_alert_time")
+            latency = self.config.getint("theoretical", "alert_offset_sec")
+            add_bias = self.config.getboolean("theoretical", "add_magnitude_bias")
+            bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"] if add_bias else 0.0
+            if use_first_alert_time:
+                alerts = self.db.alerts(self.eqId, server)
+                if len(alerts) == 0:
+                    self.alerts = []
+                else:
+                    alert_time = self.db.alerts(self.eqId, server)[0]["timestamp"]
+                    tstamp = numpy.datetime64(alert_time) + numpy.timedelta64(latency, "s")
+                    self.alerts = [{
+                        "event_id": event_id,
+                        "longitude": self.event["longitude"],
+                        "latitude": self.event["latitude"],
+                        "depth_km": self.event["depth_km"],
+                        "origin_time": self.event["origin_time"],
+                        "magnitude": self.event["magnitude"] + bias,
+                        "timestamp": str(tstamp),
+                    }]
+            else:
+                tstamp = numpy.datetime64(self.event["origin_time"]) + numpy.timedelta64(latency, "s")
+                self.alerts = [{
+                    "event_id": event_id,
+                    "longitude": self.event["longitude"],
+                    "latitude": self.event["latitude"],
+                    "depth_km": self.event["depth_km"],
+                    "origin_time": self.event["origin_time"],
+                    "magnitude": self.event["magnitude"] + bias,
+                    "timestamp": str(tstamp),
                 }]
-            if server == "catalog-magnitude-bias":
-                bias = self.db.comcat_shakemap(self.eqId)["mmi_bias"]
-                self.alerts[0]["magnitude"] += bias
-                self.alerts[0]["event_id"] = -222
 
         # Shaking time
         functionPath = self.config.get("shaking_time", "function").split(".")
@@ -483,6 +506,8 @@ class EEWAnalyzeApp(object):
             figures.metric_cost_functions()
         if "metric_theoretical" in selection or "all" == selection:
             figures.metric_theoretical()
+        if "costsavings_warningtime" in selection or "all" == selection:
+            figures.costsavings_warningtime()
         return
     
     def generate_report(self, summary_only=True):
@@ -498,8 +523,6 @@ class EEWAnalyzeApp(object):
     def _parse_command_line(self):
         """Parse command line arguments.
         """
-        import argparse
-
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", action="store", dest="config", required=True)
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
@@ -509,7 +532,7 @@ class EEWAnalyzeApp(object):
         parser.add_argument("--plot-event-maps", action="store", dest="plot_event_maps", default=None, choices=[None, "all", "mmi", "alert"])
         parser.add_argument("--plot-event-figures", action="store", dest="plot_event_figures", default=None, choices=[None, "all", "alert_error", "mmi_correlation", "warning_time_mmi"])
         parser.add_argument("--plot-summary-maps", action="store", dest="plot_summary_maps", default=None, choices=[None, "all", "events", "performance"])
-        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "cost_functions", "metric_cost_functions", "metric_theoretical"])
+        parser.add_argument("--plot-summary-figures", action="store", dest="plot_summary_figures", default=None, choices=[None, "all", "magnitude_time", "optimum_thresholds", "metric_time", "metric_magnitude", "cost_functions", "metric_cost_functions", "metric_theoretical", "costsavings_warningtime"])
         parser.add_argument("--generate-report", action="store", dest="generate_report", default=None, choices=[None,"summary", "full"])
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=0)
         parser.add_argument("--all", action="store_true", dest="all")

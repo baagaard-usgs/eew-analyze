@@ -17,6 +17,13 @@ def lightbg():
 
         "local:qpop_fc": name_map["c_ltblue"],
         "local:qpop_ec": name_map["c_blue"],
+
+        "local:q_shakealert_fc": name_map["c_ltred"],
+        "local:q_shakealert_ec": name_map["c_red"],
+        "local:q_catmag_fc": name_map["c_ltpurple"],
+        "local:q_catmag_ec": name_map["c_purple"],
+        "local:q_catmagbias_fc": name_map["c_ltgreen"],
+        "local:q_catmagbias_ec": name_map["c_green"],
     }
     ColorConverter.colors.update(colors)
     return
@@ -31,6 +38,13 @@ def darkbg():
 
         "local:qpop_fc": name_map["c_ltblue"],
         "local:qpop_ec": name_map["c_blue"],
+
+        "local:q_shakealert_fc": name_map["c_ltred"],
+        "local:q_shakealert_ec": name_map["c_red"],
+        "local:q_catmag_fc": name_map["c_ltpurple"],
+        "local:q_catmag_ec": name_map["c_purple"],
+        "local:q_catmagbias_fc": name_map["c_ltgreen"],
+        "local:q_catmagbias_ec": name_map["c_green"],
     }
     ColorConverter.colors.update(colors)
     return

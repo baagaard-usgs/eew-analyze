@@ -32,6 +32,9 @@ class AnalysisSummary(object):
     YTOP = PAGE_HEIGHT - MARGIN - HEADER
     YBOT = MARGIN
     XLEFT = MARGIN
+
+    CATALOG_MAGNITUDE = "zero-latency-catalog-magnitude"
+    CATALOG_MAGNITUDE_BIAS = "zero-latency-catalog-magnitude-bias"
     
     def __init__(self, config, summary_only=True):
         """Constructor.
@@ -78,8 +81,8 @@ class AnalysisSummary(object):
         gmpe = self.config.get("mmi_predicted", "gmpe")
         fragility = self.config.get("fragility_curves", "label")
         perfEEW = numpy.array(db.performance_stats(eqId, server, gmpe, fragility))
-        perfTheoryMag = numpy.array(db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility))
-        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility))
+        perfTheoryMag = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility))
+        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility))
 
         # Page 1
         self._render_event_header(event)
@@ -173,13 +176,13 @@ class AnalysisSummary(object):
         self._figure_label(x, y+imageHeight, "ShakeAlert")
         
         (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=2)
-        filenameMag = filename.replace(server, "catalog-magnitude")
+        filenameMag = filename.replace(server, self.CATALOG_MAGNITUDE)
         if os.path.isfile(filenameMag):
             imageWidth, imageHeight, self._render_image(filenameMag, x, y, width=mapW)
             self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag.")
 
         (x, y, mapW, mapH) = self._calc_figure_size(nrows, ncols, row=row, col=3)
-        filenameMagBias = filename.replace(server, "catalog-magnitude-bias")
+        filenameMagBias = filename.replace(server, self.CATALOG_MAGNITUDE_BIAS)
         if os.path.isfile(filenameMagBias):
             imageWidth, imageHeight = self._render_image(filenameMagBias, x, y, width=mapW)
             self._figure_label(x, y+imageHeight, "Theoretical Ideal: Catalog Mag. w/Bias")
@@ -440,7 +443,7 @@ class AnalysisSummary(object):
         """Map of events in earthquake set."""
         plotsDir = self.config.get("files", "plots_dir")
 
-        filename = os.path.join(plotsDir, "eqset-map_events.jpg")
+        filename = os.path.join(plotsDir, "eqset_map_events.jpg")
         imageWidth, imageHeight = self._render_image(filename, x, y, height=figH)
         self._figure_label(x, y+imageHeight, "Earthquake Set")
         return (imageWidth, imageHeight)
@@ -522,8 +525,8 @@ class AnalysisSummary(object):
         population_metric = numpy.where(perfs["population_costsavings_perfecteew"] > 0.0, perfs["population_costsavings_eew"] / perfs["population_costsavings_perfecteew"], numpy.nan)
         perfs = append_fields(perfs, ("area_metric_eew", "population_metric_eew"), (area_metric, population_metric), dtypes=("float32", "float32"), usemask=False)
 
-        perfsTheoryMag = numpy.array([db.performance_stats(eqId, "catalog-magnitude", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
-        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, "catalog-magnitude-bias", gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfsTheoryMag = numpy.array([db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
         theader = [
             [

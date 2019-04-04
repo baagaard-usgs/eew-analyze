@@ -17,6 +17,7 @@ import matplotlib
 import matplotlib.pyplot as pyplot
 import matplotlib.ticker as ticker
 import matplotlib.patches as patches
+import matplotlib.colors as colors
 
 from osgeo import gdal, osr
 import matplotlib_extras
@@ -39,12 +40,12 @@ class EventFigures(object):
         self.event = event
         return
 
-    def _save(self, figure, label):
+    def _save(self, figure, label, force_raster=False):
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)
         filename = analysis_utils.analysis_event_label(self.config, self.event["event_id"])
-        outputFormat = "png" if self.config.getboolean("plots", "raster") else "pdf"
+        outputFormat = "png" if self.config.getboolean("plots", "raster") or force_raster else "pdf"
         filename += "-{}.{}".format(label, outputFormat)
         figure.savefig(os.path.join(plotsDir, filename))
         pyplot.close(figure)
@@ -119,6 +120,9 @@ class EventFigures(object):
     def mmi_correlation(self):
         """Plot observed versus predicted MMI.
         """
+        FIG_SIZE = (4.0, 4.0)
+        MARGINS = ((0.50, 0, 0.02), (0.45, 0, 0.1))
+
         cacheDir = self.config.get("files", "analysis_cache_dir")
         filename = "analysis_" + analysis_utils.analysis_event_label(self.config, self.event["event_id"]) + ".tiff"
         rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
@@ -135,20 +139,29 @@ class EventFigures(object):
         if numpy.isscalar(layers["mmi_pred"].mask):
             mmiObs = layers["mmi_obs"].ravel().data
             mmiPred = layers["mmi_pred"].ravel().data
+            warningTime = layers["warning_time"].ravel().data
         else:
             mask = ~layers["mmi_pred"].ravel().mask
             mmiObs = layers["mmi_obs"].ravel()[mask]
             mmiPred = layers["mmi_pred"].ravel()[mask]
+            warningTime = layers["warning_time"].ravel()[mask]
+            maskWarning = ~layers["warning_time"].ravel().mask[mask]
 
-        figure = pyplot.figure(figsize=(4.0, 4.0))
-        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=((0.60, 0, 0.2), (0.45, 0, 0.1)))
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=MARGINS)
+        fg = pyplot.rcParams["axes.edgecolor"]
         
         # Correlation
         maxMMI = 10.0
         if mmiObs.shape[0] > 0:
             maxMMI = numpy.maximum(5.0, numpy.maximum(numpy.max(mmiPred), numpy.max(mmiObs)))
         ax = figure.add_axes(rectFactory.rect())
-        ax.plot(mmiPred, mmiObs, marker="o", ms=2, mec="c_red", mfc="c_ltred", lw=0, alpha=0.67, zorder=1)
+
+        im = ax.scatter(mmiPred[maskWarning], mmiObs[maskWarning], c=warningTime[maskWarning],
+                        norm=colors.LogNorm(vmin=1.0, vmax=20.0),
+                        s=2, marker="o", edgecolors=fg, lw=0, alpha=0.67, zorder=1)
+        ax.scatter(mmiPred[~maskWarning], mmiObs[~maskWarning], c="darkgray",
+                   s=2, marker="o", edgecolors=fg, lw=0, alpha=0.67, zorder=1)
         ax.plot([1,maxMMI],[1,maxMMI], "--", color="c_ltblue", zorder=2)
 
         ax.xaxis.set_major_locator(ticker.MultipleLocator(1.0))
@@ -162,6 +175,10 @@ class EventFigures(object):
         ax.set_xlim(1, maxMMI)
         ax.set_ylim(1, maxMMI)
         ax.set_aspect("equal")
+
+        cbax = figure.add_axes([0.84, 0.15, 0.02, 0.40])
+        colorbar = pyplot.colorbar(im, cax=cbax, format="%2.0f", ticks=ticker.LogLocator(subs=[1,2,4,8]))
+        colorbar.set_label("Warning Time (s)")
 
         if mmiObs.shape[0] > 0:
         
@@ -185,7 +202,7 @@ class EventFigures(object):
             residualMean = numpy.mean(residual)
             residualStd = numpy.std(residual)
             axin = inset_axes(ax, width="33%", height="25%", loc=2, borderpad=1.7)
-            axin.hist(residual, bins=bins, density=True, align="mid", color="c_ltred", ec="c_red")
+            axin.hist(residual, bins=bins, density=True, align="mid", color="c_ltblue", ec=fg)
             axin.set_yticks([])
             axin.xaxis.set_ticks_position("bottom")
             for label in axin.xaxis.get_ticklabels():
@@ -194,7 +211,9 @@ class EventFigures(object):
             axin.text(0.05, 0.95, "mean={m:.2f}\nstd={s:.2f}".format(m=residualMean, s=residualStd), transform=axin.transAxes, va="top", ha="left", fontsize=fontsize)
             axin.set_title("Residual (Obs-Pred)", fontsize=fontsize)
 
-        self._save(figure, "mmi_correlation")
+
+            
+        self._save(figure, "mmi_correlation", force_raster=True)
         return
     
     def warning_time_mmi(self):
@@ -249,7 +268,7 @@ class EventFigures(object):
             ax.errorbar(bcenters, wtMean, yerr=wtStd, fmt="none", ecolor="c_ltgreen", elinewidth=2, capthick=1.5, capwidth=6.0, zorder=4)
             ax.plot(bcenters, wtMean, marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
         
-        self._save(figure, "warning_time_mmi")
+        self._save(figure, "warning_time_mmi", force_raster=True)
         return
     
 
@@ -343,12 +362,16 @@ class SummaryFigures(object):
         return
 
     def metric_theoretical(self):
-        FIG_SIZE = (8.0, 3.5)
-        MARGINS = ((0.7, 0.7, 0.2), (0.6, 0, 0.3))
+        FIG_SIZE = (8.0, 4.5)
+        MARGINS = ((0.7, 0.7, 0.2), (1.2, 0, 0.3))
         servers = [
             (self.config.get("shakealert.production", "server"), "ShakeAlert"),
-            ("catalog-magnitude", "ANSS Mw"),
-            ("catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ("first-alert-catalog-magnitude", "ANSS Mw @ 1st Alert"),
+            ("five-latency-catalog-magnitude", "ANSS Mw @ OT+5s"),
+            ("zero-latency-catalog-magnitude", "ANSS Mw @ OT"),
+            ("first-alert-catalog-magnitude-bias", "ANSS Mw+Bias @ 1st Alert"),
+            ("five-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT+5s"),
+            ("zero-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT"),
             ]
 
         gmpe = self.config.get("mmi_predicted", "gmpe")
@@ -358,50 +381,73 @@ class SummaryFigures(object):
 
         areaMetric = []
         popMetric = []
+        ec = []
+        fc = []
         for server, label in servers:
             perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
 
             areaMetric.append(numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"]))
             popMetric.append(numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"]))
+            c_fc = "local:q_shakealert_fc"
+            c_ec = "local:q_shakealert_ec"  
+            if server.endswith("catalog-magnitude"):
+                c_fc = "local:q_catmag_fc"
+                c_ec = "local:q_catmag_ec"
+            elif server.endswith("catalog-magnitude-bias"):
+                c_fc = "local:q_catmagbias_fc"
+                c_ec = "local:q_catmagbias_ec"
+            fc.append(c_fc)
+            ec.append(c_ec)
 
         figure = pyplot.figure(figsize=FIG_SIZE)
         rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=1, ncols=2, margins=MARGINS)
+        fg = pyplot.rcParams["axes.edgecolor"]
 
         xticks = numpy.arange(1.0, len(servers)+0.01, 1.0)
         xlabels = [label for fn,label in servers]
-        
+
         # Q-area
-        fc, ec = self.COLORS["area_costsavings_eew"]
         ax = figure.add_axes(rectFactory.rect(row=1, col=1))
-        ax.bar(xticks, areaMetric, fc=fc, ec=ec)
+        ax.bar(xticks, areaMetric, color=fc, ec=fg)
         ax.set_xticks(xticks)
-        ax.set_xticklabels(xlabels, fontsize="smaller")
+        ax.set_xticklabels(xlabels, fontsize="smaller", rotation=30, ha="right")
         ax.set_title("Q-area", weight="bold")
-        ax.set_xlabel("Theoretical Improvements")
         ax.set_ylabel("Q-area")
         ax.set_ylim((0.0, 1.0))
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-        ax.text(1.5, 0.5*(areaMetric[0]+areaMetric[1]+0.2), "No latency\nANSS Mw",
-                ha="center", va="center", rotation=45,
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
-        ax.text(2.5, 0.5*(areaMetric[1]+areaMetric[2]+0.2), "Add event\nbias",
-                ha="center", va="center", rotation=45,
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc=fc, ec=ec, alpha=0.5))
-        
+        ax.text(3.0, areaMetric[2]+0.13, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        ax.text(6.0, areaMetric[5]+0.13, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+
         # Q-pop
-        fc, ec = self.COLORS["population_costsavings_eew"]
         ax = figure.add_axes(rectFactory.rect(row=1, col=2))
-        ax.bar(xticks, popMetric, fc=fc, ec=ec)
+        ax.bar(xticks, popMetric, color=fc, ec=fg)
         ax.set_xticks(xticks)
-        ax.set_xticklabels(xlabels, fontsize="smaller")
+        ax.set_xticklabels(xlabels, fontsize="smaller", rotation=30, ha="right")
         ax.set_title("Q-pop", weight="bold")
-        ax.set_xlabel("Theoretical Improvements")
         ax.set_ylabel("Q-pop")
         ax.set_ylim((0.0, 1.0))
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
+
+        ax.text(3.0, popMetric[2]+0.16, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        ax.text(6.0, popMetric[5]+0.16, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        
+        legend_patches = [
+            patches.Patch(color="local:q_shakealert_fc", ec=fg, label="ShakeAlert"),
+            patches.Patch(color="local:q_catmag_fc", ec=fg, label="ANSS Mw"),
+            patches.Patch(color="local:q_catmagbias_fc", ec=fg, label="ANSS Mw+Bias"),
+            ]
+        ax.legend(handles=legend_patches, loc="upper left")
         
         self._save(figure, "theoretical_metric")
         return
@@ -665,6 +711,100 @@ class SummaryFigures(object):
         pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
+        return
+    
+
+    def costsavings_warningtime(self):
+        """Plot fraction of warning area/population with cost savings above some value and warning time above some value.
+        """
+        FIG_SIZE = (8.0, 3.5)
+        MARGINS = ((0.6, 1.0, 0.1), (0.5, 0, 0.3)) 
+        nrows = 1
+        ncols = 2
+
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=nrows, ncols=ncols, margins=MARGINS)
+        
+        cacheDir = self.config.get("files", "analysis_cache_dir")
+
+        warningThresholds = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 20.0]
+        costThresholds = [0.0, 0.25, 0.5, 0.75]
+
+        areaData = numpy.zeros((len(costThresholds), len(warningThresholds)), numpy.float32)
+        popData = numpy.zeros((len(costThresholds), len(warningThresholds)), numpy.float32)
+        areaPerfect = 0.0
+        popPerfect = 0.0
+        
+        for eqId in self.events:
+            filename = "analysis_" + analysis_utils.analysis_event_label(self.config, eqId) + ".tiff"
+            rasterData = gdal.Open(os.path.join(cacheDir, filename), gdal.GA_ReadOnly)
+            
+            layers = {}
+            for iband in range(rasterData.RasterCount):
+                band = rasterData.GetRasterBand(1+iband)
+                description = band.GetDescription()
+                data = numpy.array(band.ReadAsArray())
+                data = numpy.ma.masked_values(data, band.GetNoDataValue())
+                layers[description] = data
+
+            categoryTN = 0.0
+            categoryFN = 1.0
+            categoryTP = 3.0
+            maskTN = numpy.ma.masked_values(layers["alert_category"], categoryTN).mask
+            maskFN = numpy.ma.masked_values(layers["alert_category"], categoryFN).mask
+            maskTP = numpy.ma.masked_values(layers["alert_category"], categoryTP).mask
+            maskAlert = layers["alert_category"] > 1.5
+            popDensity = layers["population_density"]
+        
+            costSavings = maskAlert*(layers["cost_no_eew"]-layers["cost_eew"]) - maskFN*(layers["cost_no_eew"]-layers["cost_perfect_eew"])
+            costSavingsPerfect = numpy.logical_or(maskTP, maskFN)*(layers["cost_no_eew"]-layers["cost_perfect_eew"])
+            warningTime = layers["warning_time"]
+
+            mask = costSavingsPerfect > 0.0
+            areaPerfect += numpy.sum(layers["pixel_area"]*mask)
+            popPerfect += numpy.sum(popDensity*layers["pixel_area"]*mask)
+            
+            for icost, costThreshold in enumerate(costThresholds):
+                for iwtime, warningThreshold in enumerate(warningThresholds):
+                    mask = numpy.logical_and(warningTime > warningThreshold, costSavings > costThreshold)
+                    areaData[icost, iwtime] += numpy.sum(layers["pixel_area"]*mask.data)
+                    popData[icost, iwtime] += numpy.sum(popDensity*layers["pixel_area"]*mask.data)
+
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(col=1))
+        for icost, costThreshold in enumerate(costThresholds):
+            ax.semilogx(warningThresholds, areaData[icost,:]/areaPerfect, label="{:4.2f}".format(costThreshold))
+
+        ax.set_title("Area w/Cost Savings", weight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_label_text("Fraction of Perfect Alert Area")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+        ax.xaxis.set_label_text("Warning Time (s)")
+        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper right",
+                      title="Min. Cost Savings")
+
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(col=2))
+        for icost, costThreshold in enumerate(costThresholds):
+            ax.semilogx(warningThresholds, popData[icost,:]/popPerfect, label="{:4.2f}".format(costThreshold))
+
+        ax.set_title("Population w/Cost Savings", weight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_label_text("Fraction of Perfect Alert Population")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+        ax.xaxis.set_label_text("Warning Time (s)")
+
+        self._save(figure, "costsavings_warningtime")
         return
     
 
