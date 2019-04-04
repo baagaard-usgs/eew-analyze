@@ -347,10 +347,10 @@ class SummaryFigures(object):
         MARGINS = ((0.7, 0.7, 0.2), (1.2, 0, 0.3))
         servers = [
             (self.config.get("shakealert.production", "server"), "ShakeAlert"),
-            ("first-alert-catalog-magnitude", "ANSS Mw"),
+            ("first-alert-catalog-magnitude", "ANSS Mw @ 1st Alert"),
             ("five-latency-catalog-magnitude", "ANSS Mw @ OT+5s"),
             ("zero-latency-catalog-magnitude", "ANSS Mw @ OT"),
-            ("first-alert-catalog-magnitude-bias", "ANSS Mw+Bias"),
+            ("first-alert-catalog-magnitude-bias", "ANSS Mw+Bias @ 1st Alert"),
             ("five-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT+5s"),
             ("zero-latency-catalog-magnitude-bias", "ANSS Mw+Bias @ OT"),
             ]
@@ -398,18 +398,13 @@ class SummaryFigures(object):
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-        ax.text(1.5, 0.8, "ANSS Mw",
-                ha="center", va="center", rotation=0, fontsize="x-small",
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
-        ax.text(3.0, areaMetric[2]+0.1, "Reducing latency",
+        ax.text(3.0, areaMetric[2]+0.13, "Reducing latency",
                 ha="center", va="center", rotation=45, fontsize="x-small",
                 bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
-        ax.text(4.5, 0.8, "Add event\nbias",
-                ha="center", va="center", rotation=0, fontsize="x-small",
-                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
-        ax.text(6.0, areaMetric[5]+0.1, "Reducing latency",
+        ax.text(6.0, areaMetric[5]+0.13, "Reducing latency",
                 ha="center", va="center", rotation=45, fontsize="x-small",
                 bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+
         # Q-pop
         ax = figure.add_axes(rectFactory.rect(row=1, col=2))
         ax.bar(xticks, popMetric, color=fc, ec=fg)
@@ -420,6 +415,20 @@ class SummaryFigures(object):
         ax.set_ylim((0.0, 1.0))
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
+
+        ax.text(3.0, popMetric[2]+0.16, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        ax.text(6.0, popMetric[5]+0.16, "Reducing latency",
+                ha="center", va="center", rotation=45, fontsize="x-small",
+                bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
+        
+        legend_patches = [
+            patches.Patch(color="local:q_shakealert_fc", ec=fg, label="ShakeAlert"),
+            patches.Patch(color="local:q_catmag_fc", ec=fg, label="ANSS Mw"),
+            patches.Patch(color="local:q_catmagbias_fc", ec=fg, label="ANSS Mw+Bias"),
+            ]
+        ax.legend(handles=legend_patches, loc="upper left")
         
         self._save(figure, "theoretical_metric")
         return
