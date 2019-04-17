@@ -425,6 +425,13 @@ class SummaryFigures(object):
                 ha="center", va="center", rotation=45, fontsize="x-small",
                 bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
 
+        legend_patches = [
+            patches.Patch(color="local:q_shakealert_fc", ec=fg, label="ShakeAlert"),
+            patches.Patch(color="local:q_catmag_fc", ec=fg, label="ANSS Mw"),
+            patches.Patch(color="local:q_catmagbias_fc", ec=fg, label="ANSS Mw+Bias"),
+            ]
+        ax.legend(handles=legend_patches, loc="upper left")
+
         # Q-pop
         ax = figure.add_axes(rectFactory.rect(row=1, col=2))
         ax.bar(xticks, popMetric, color=fc, ec=fg)
@@ -442,13 +449,6 @@ class SummaryFigures(object):
         ax.text(6.0, popMetric[5]+0.16, "Reducing latency",
                 ha="center", va="center", rotation=45, fontsize="x-small",
                 bbox=dict(boxstyle="rarrow,pad=0.2", fc="c_mdgray", ec=fg, alpha=0.5))
-        
-        legend_patches = [
-            patches.Patch(color="local:q_shakealert_fc", ec=fg, label="ShakeAlert"),
-            patches.Patch(color="local:q_catmag_fc", ec=fg, label="ANSS Mw"),
-            patches.Patch(color="local:q_catmagbias_fc", ec=fg, label="ANSS Mw+Bias"),
-            ]
-        ax.legend(handles=legend_patches, loc="upper left")
         
         self._save(figure, "theoretical_metric")
         return
