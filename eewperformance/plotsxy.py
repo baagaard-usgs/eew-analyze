@@ -140,6 +140,7 @@ class EventFigures(object):
             mmiObs = layers["mmi_obs"].ravel().data
             mmiPred = layers["mmi_pred"].ravel().data
             warningTime = layers["warning_time"].ravel().data
+            maskWarning = ~layers["warning_time"].ravel().mask
         else:
             mask = ~layers["mmi_pred"].ravel().mask
             mmiObs = layers["mmi_obs"].ravel()[mask]
