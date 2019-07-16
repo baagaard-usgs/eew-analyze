@@ -596,7 +596,9 @@ class SummaryFigures(object):
             event = self.db.comcat_event(p["comcat_id"].decode())
             originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             magnitude[i] = event["magnitude"]
-
+        ot = originTime.astype(datetime)
+        duration = numpy.max(ot) - numpy.min(ot)
+            
         ms = 5.0e-4 * 10**magnitude
 
         # Q-area
@@ -605,35 +607,35 @@ class SummaryFigures(object):
         labels = ["Perfect EEW", "ShakeAlert"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
-            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
-        connectors_ot = [ot.astype(datetime) for ot in originTime]
+            ax.scatter(ot, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
         connectors_perf = numpy.array([[perfPerfect, perfEEW] for perfPerfect, perfEEW in zip(perfs[metrics[0]], perfs[metrics[1]])])
-        ax.vlines(connectors_ot, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
+        ax.vlines(ot, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
         ax.set_title("Q-area vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
+        ax.set_xlim(numpy.min(ot)-0.05*duration, numpy.max(ot)+0.05*duration)        
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%4.0f"))
         ax.yaxis.set_label_text("Q-area Cost Savings")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        pyplot.legend(markerscale=0.2, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper right")
 
         # Q-pop
         ax = figure.add_axes(rectFactory.rect(row=2))
         metrics = ["population_costsavings_perfecteew", "population_costsavings_eew"]
         for metric, label in zip(metrics, labels):
             fc, ec = self.COLORS[metric]
-            ax.scatter(originTime.astype(datetime), perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
-        connectors_ot = [ot.astype(datetime) for ot in originTime]
+            ax.scatter(ot, perfs[metric], s=ms, c=fc, edgecolors=ec, alpha=0.67, lw=1.5, label=label)
         connectors_perf = numpy.array([[perfPerfect, perfEEW] for perfPerfect, perfEEW in zip(perfs[metrics[0]], perfs[metrics[1]])])
-        ax.vlines(connectors_ot, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
+        ax.vlines(ot, connectors_perf[:,1], connectors_perf[:,0], lw=1, color=ec, alpha=0.67)
         ax.set_title("Q-pop vs. Origin Time", weight="bold")
         ax.set_ylim(0.0, ax.get_ylim()[1])
+        ax.set_xlim(numpy.min(ot)-0.05*duration, numpy.max(ot)+0.05*duration)        
         ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%7.1e"))
         ax.yaxis.set_label_text("Q-pop Cost Savings")
         ax.xaxis.set_label_text("Origin Time (UTC)")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        pyplot.legend(markerscale=0.2, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper right")
 
         self._save(figure, "costsavings_time")
         return
@@ -686,7 +688,7 @@ class SummaryFigures(object):
         else:
             ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
         ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        pyplot.legend(markerscale=0.2, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         # Q-pop
         ax = figure.add_axes(rectFactory.rect(row=2))
@@ -709,7 +711,7 @@ class SummaryFigures(object):
         else:
             ax.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
         ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
-        pyplot.legend(handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
+        pyplot.legend(markerscale=0.2, handlelength=0.8, borderpad=0.3, labelspacing=0.2, loc="upper left")
 
         self._save(figure, "costsavings_magnitude")
         return
@@ -881,7 +883,7 @@ class SummaryFigures(object):
             originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             magnitude[i] = event["magnitude"]
 
-        from matplotlib.dates import YearLocator,date2num,DateFormatter
+        from matplotlib.dates import date2num,AutoDateLocator,ConciseDateFormatter
         figure = pyplot.figure(figsize=FIG_SIZE)
         rectFactory = matplotlib_extras.axes.RectFactory(figure, margins=MARGINS)
         
@@ -901,7 +903,9 @@ class SummaryFigures(object):
             ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.1))
         else:
             ax.yaxis.set_major_locator(ticker.MultipleLocator(0.1))
-
+        duration = numpy.max(ot) - numpy.min(ot)
+        ax.set_xlim(numpy.min(ot)-0.05*duration, numpy.max(ot)+0.05*duration)
+            
         plotsDir = self.config.get("files", "plots_dir")
         if not os.path.isdir(plotsDir):
             os.makedirs(plotsDir)

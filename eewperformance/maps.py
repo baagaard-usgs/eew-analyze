@@ -424,14 +424,25 @@ class SummaryMaps(object):
         self.db = db
         return
 
-    def _create_figure(self, extent):
+    def _create_figure(self, eqs):
         tilerPath = self.config.get("maps", "tiler").split(".")
         tilerObj = getattr(import_module(".".join(tilerPath[:-1])), tilerPath[-1])
         tilerStyle = self.config.get("maps", "tiler_style")
-        tilerZoom = 6
         tilesDir = self.config.get("maps", "tiler_cache_dir")
         tiler = cached_tiler.CachedTiler(tilerObj(desired_tile_form="L", style=tilerStyle), cache_dir=tilesDir)
 
+        lonMax = numpy.max(eqs["longitude"])
+        lonMin = numpy.min(eqs["longitude"])
+        latMax = numpy.max(eqs["latitude"])
+        latMin = numpy.min(eqs["latitude"])
+        lonMid = 0.5*(lonMax+lonMin)
+        latMid = 0.5*(latMax+latMin)
+        dLon = max(1.5, lonMax-lonMin)
+        dLat = max(1.0, latMax-latMin)
+        extent = [lonMid-0.5*dLon, lonMid+0.5*dLon, latMid-0.5*dLat, latMid+0.5*dLat]
+        
+        #tilerZoom = 6
+        tilerZoom = 9
         figWidthIn = 1.5*5.0
         figHeightIn = 1.5*4.2
         figure = pyplot.figure(figsize=(figWidthIn, figHeightIn))
@@ -473,15 +484,10 @@ class SummaryMaps(object):
             event = self.db.comcat_event(eqId)
             ot = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             eqs[i] = (event["longitude"], event["latitude"], event["magnitude"], ot)
-            
-        extent = [
-            numpy.min(eqs["longitude"])-2.0, numpy.max(eqs["longitude"])+2.0,
-            numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
-        ]
 
         from matplotlib.dates import YearLocator,MonthLocator,DayLocator,date2num,DateFormatter
             
-        figure = self._create_figure(extent)
+        figure = self._create_figure(eqs)
         ax = figure.gca()
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
         ot = date2num(eqs["origin_time"].astype(datetime))
@@ -491,8 +497,10 @@ class SummaryMaps(object):
         cbax = figure.add_axes([0.03, 0.02, 0.02, 0.33])
         if numpy.max(ot) - numpy.min(ot) > 365:
             colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=YearLocator(), format=DateFormatter('%Y'))
-        elif numpy.max(ot) - numpy.min(ot) > 1:
+        elif numpy.max(ot) - numpy.min(ot) > 30:
             colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=MonthLocator(), format=DateFormatter('%Y-%m'))
+        elif numpy.max(ot) - numpy.min(ot) > 1:
+            colorbar = pyplot.colorbar(mappable=sc, cax=cbax, ticks=DayLocator(), format=DateFormatter('%Y-%m-%d'))
         else:
             colorbar = pyplot.colorbar(mappable=sc, cax=cbax)
         colorbar.set_label("Origin Time")
@@ -541,7 +549,7 @@ class SummaryMaps(object):
         
         eqs = numpy.zeros(len(self.events), dtype=COLS)
         for i,p in enumerate(perfs):
-            event = self.db.comcat_event(p["comcat_id"])
+            event = self.db.comcat_event(p["comcat_id"].decode())
             eqs[i] = (event["longitude"], event["latitude"], event["magnitude"], p[metric])
             
         extent = [
@@ -549,7 +557,7 @@ class SummaryMaps(object):
             numpy.min(eqs["latitude"])-0.5, numpy.max(eqs["latitude"])+0.5,
         ]
 
-        figure = self._create_figure(extent)
+        figure = self._create_figure(eqs)
         ax = figure.gca()
         ms = 0.05 * 10**(0.75*eqs["magnitude"])
         vmax = 10**(0.1*numpy.ceil(10*numpy.log10(numpy.max(eqs["cost_savings"]))))
