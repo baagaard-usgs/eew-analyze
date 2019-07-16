@@ -204,7 +204,7 @@ class Event(object):
             shakemapInfo = self.db.comcat_shakemap(self.eqId)
             if "Wald99" in shakemapInfo["pgm2mi"]:
                 gmiceGrid = "WaldEtal1999"
-            elif "WGRW11" in shakemapInfo["pgm2mi"]:
+            elif "WGRW11" in shakemapInfo["pgm2mi"] or "WGRW12" in shakemapInfo["pgm2mi"]:
                 gmiceGrid = "WordenEtal2012"
             else:
                 gmiceGrid = None

@@ -593,7 +593,7 @@ class SummaryFigures(object):
         originTime = numpy.zeros(perfs.shape, dtype="datetime64[s]")
         magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
         for i,p in enumerate(perfs):
-            event = self.db.comcat_event(p["comcat_id"])
+            event = self.db.comcat_event(p["comcat_id"].decode())
             originTime[i] = numpy.datetime64(dateutil.parser.parse(event["origin_time"]))
             magnitude[i] = event["magnitude"]
 
@@ -660,7 +660,7 @@ class SummaryFigures(object):
 
         magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
         for i,p in enumerate(perfs):
-            event = self.db.comcat_event(p["comcat_id"])
+            event = self.db.comcat_event(p["comcat_id"].decode())
             magnitude[i] = event["magnitude"]
 
         ms = 5.0e-4 * 10**magnitude

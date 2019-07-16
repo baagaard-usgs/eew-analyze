@@ -256,18 +256,22 @@ class AnalysisData(object):
             "psa30_bias": 0.0,
             "psa30_max": 0.0,
             "gmpe": gmmod["gmpe"]["module"],
-            "pgm2mi": gmmod["pgm2mi"]["module"],
+            "pgm2mi": gmmod["pgm2mi"]["module"] if "pgm2mi" in gmmod.keys() else gmmod["gmice"]["module"],
             "software_version": info["processing"]["shakemap_versions"]["shakemap_revision"],
         }
         # Update infoDict with available values.
         gm = info["output"]["ground_motions"]
         for key,value in gm.items():
-            if key != "intensity":
-                infoDict[key+"_bias"] = value["bias"]
-                infoDict[key+"_max"] = value["max"]
+            if key.startswith("SA"):
+                dkey = key.replace("SA(","psa").replace(")","").replace(".","")
+                infoDict[dkey+"_bias"] = value["bias"] or 0.0
+                infoDict[dkey+"_max"] = value["max"] or 0.0       
+            elif key != "intensity":
+                infoDict[key.lower()+"_bias"] = value["bias"] or 0.0
+                infoDict[key.lower()+"_max"] = value["max"] or 0.0
             else:
-                infoDict["mmi_bias"] = value["bias"]
-                infoDict["mmi_max"] = value["max"]
+                infoDict["mmi_bias"] = value["bias"] or 0.0
+                infoDict["mmi_max"] = value["max"] or 0.0
         infoValues = tuple([infoDict[col] for col in COLUMNS])
         valueCols = ",".join("?"*len(infoValues))
         cmd = "INSERT"
