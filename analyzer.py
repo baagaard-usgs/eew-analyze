@@ -443,11 +443,11 @@ class EEWAnalyzeApp(object):
         import six
         if six.PY2:
             import ConfigParser
-            config = ConfigParser.SafeConfigParser()
+            config = ConfigParser.ConfigParser()
         else:    
             import configparser
-            config = configparser.SafeConfigParser()
-        config.readfp(io.StringIO(DEFAULTS))
+            config = configparser.ConfigParser()
+        config.read_file(io.StringIO(DEFAULTS))
         for filename in config_filenames.split(","):
             if not os.path.isfile(filename):
                 raise IOError("Could not find configuration file '{}'.".format(filename))

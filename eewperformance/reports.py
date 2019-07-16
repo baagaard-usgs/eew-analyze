@@ -566,7 +566,7 @@ class AnalysisSummary(object):
 
         tdata = []
         for iperf, perf in enumerate(perfs):
-            event = db.comcat_event(perf["comcat_id"])
+            event = db.comcat_event(perf["comcat_id"].decode())
             ot = dateutil.parser.parse(event["origin_time"])
             row = [s.format(ot=ot, event=event) for s in eventCols]
 

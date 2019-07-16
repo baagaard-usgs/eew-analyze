@@ -413,8 +413,8 @@ class DownloaderApp(object):
         """
         import configparser
         import io
-        config = configparser.SafeConfigParser()
-        config.readfp(io.StringIO(DEFAULTS))
+        config = configparser.ConfigParser()
+        config.read_file(io.StringIO(DEFAULTS))
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:
