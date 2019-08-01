@@ -71,6 +71,7 @@ TABLES = [
         "fragility TEXT NOT NULL",
         "magnitude_threshold REAL NOT NULL",
         "mmi_threshold REAL NOT NULL",
+        "alert_latency_sec REAL NOT NULL",
         "area_damage REAL NOT NULL",
         "area_alert REAL NOT NULL",
         "area_alert_perfect REAL NOT NULL",
@@ -300,6 +301,7 @@ class AnalysisData(object):
             "fragility",
             "magnitude_threshold",
             "mmi_threshold",
+            "alert_latency_sec",
             "area_damage",
             "area_alert",
             "area_alert_perfect",
@@ -417,7 +419,7 @@ class AnalysisData(object):
             alerts = op.cursor.fetchall()
         return alerts
 
-    def performance_stats(self, comcatId, server, gmpe, fragility, magnitudeThreshold=None, mmiThreshold=None):
+    def performance_stats(self, comcatId, server, gmpe, fragility, alert_latency_sec, magnitudeThreshold=None, mmiThreshold=None):
         """
         """
         conditions = [
@@ -425,12 +427,14 @@ class AnalysisData(object):
             "eew_server=?",
             "gmpe=?",
             "fragility=?",
+            "alert_latency_sec=?",
             ]
         values = (
             comcatId,
             server,
             gmpe,
             fragility,
+            alert_latency_sec,
             )
         with self.operation() as op:
             op.cursor.execute("SELECT * FROM performance WHERE " + " AND ".join(conditions) + " ORDER BY magnitude_threshold,mmi_threshold", values)
@@ -445,6 +449,7 @@ class AnalysisData(object):
                 ("fragility", "|S32"),
                 ("magnitude_threshold", "float32"),
                 ("mmi_threshold", "float32"),
+                ("alert_latency_sec", "float32"),
                 ("area_damage", "float32"),
                 ("area_alert", "float32"),
                 ("area_alert_perfect", "float32"),
@@ -551,11 +556,11 @@ class AnalysisData(object):
     
             # Performance
             sout += "\nPerformance Data\n"
-            op.cursor.execute("SELECT * FROM performance ORDER BY comcat_id,fragility,gmpe,magnitude_threshold,mmi_threshold")
+            op.cursor.execute("SELECT * FROM performance ORDER BY comcat_id,fragility,gmpe,magnitude_threshold,mmi_threshold,alert_latency_sec")
             rows = op.cursor.fetchall()
             for row in rows:
                 event = self.comcat_event(row["comcat_id"])
-                sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_costsavings_eew]:6.2f} {row[area_costsavings_perfecteew]:6.2f} {row[population_costsavings_eew]:6.2f} {row[population_costsavings_perfecteew]:6.2f} {event[description]}\n".format(row=row, event=event)
+                sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[alert_latency_sec]:3.1f} {row[area_costsavings_eew]:6.2f} {row[area_costsavings_perfecteew]:6.2f} {row[population_costsavings_eew]:6.2f} {row[population_costsavings_perfecteew]:6.2f} {event[description]}\n".format(row=row, event=event)
         return sout
 
     def show_matches(self, server):

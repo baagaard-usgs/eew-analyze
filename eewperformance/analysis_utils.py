@@ -56,8 +56,10 @@ def analysis_event_label(params, eqid, magThreshold=None, mmiThreshold=None):
         magThreshold = params.getfloat("alerts", "magnitude_threshold")
     if mmiThreshold is None:
         mmiThreshold = params.getfloat("alerts", "mmi_threshold")
-    label = "{eqid}-{server}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}".format(
-        eqid=eqid, server=server, gmpe=gmpe, fragility=fragility, magThreshold=magThreshold, mmiThreshold=mmiThreshold)
+    alertLatency = params.getfloat("alerts", "alert_latency_sec")
+    label = "{eqid}-{server}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}-AL{latency:.1f}".format(
+        eqid=eqid, server=server, gmpe=gmpe, fragility=fragility, magThreshold=magThreshold, mmiThreshold=mmiThreshold,
+        latency=alertLatency)
     return label
     
 def analysis_label(params, magThreshold=None, mmiThreshold=None):
@@ -73,7 +75,9 @@ def analysis_label(params, magThreshold=None, mmiThreshold=None):
         magThreshold = params.getfloat("alerts", "magnitude_threshold")
     if mmiThreshold is None:
         mmiThreshold = params.getfloat("alerts", "mmi_threshold")
-    label = "{server}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}".format(
-        server=server, gmpe=gmpe, fragility=fragility, magThreshold=magThreshold, mmiThreshold=mmiThreshold)
+    alertLatency = params.getfloat("alerts", "alert_latency_sec")
+    label = "{server}-{gmpe}-{fragility}-M{magThreshold:.1f}-MMI{mmiThreshold:.1f}-AL{latency:.1f}".format(
+        server=server, gmpe=gmpe, fragility=fragility, magThreshold=magThreshold, mmiThreshold=mmiThreshold,
+        latency=alertLatency)
     return label
     

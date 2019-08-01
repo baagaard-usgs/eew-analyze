@@ -290,7 +290,7 @@ class EventMaps(object):
         if tmax > tmin:
             cstep = self.config.getfloat("maps", "warning_time_contour_interval")
             contourLevels = numpy.arange(cstep*numpy.floor(0.5*tmin), numpy.ceil(tmax)+0.01, cstep)
-            chandle = ax.contour(warningTime, levels=contourLevels, colors="black", origin="upper", extent=dataExtent, transform=dataCRS, linewidth=0.5, zorder=4)
+            chandle = ax.contour(warningTime, levels=contourLevels, colors="black", origin="upper", extent=dataExtent, transform=dataCRS, linewidths=0.5, zorder=4)
             ax.clabel(chandle, inline=True, fmt="%.0f s")
         
         ax.plot(self.event["longitude"], self.event["latitude"], transform=wgs84CRS, marker="*", mfc="c_yellow", mec="black", c="white", ms=15, zorder=7)
@@ -532,10 +532,11 @@ class SummaryMaps(object):
         server = self.config.get("shakealert.production", "server")
         gmpe = self.config.get("mmi_predicted", "gmpe")
         fragility = self.config.get("fragility_curves", "label")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
         
         perfs = None
         for eqId in self.events:
-            p = self.db.performance_stats(eqId, server, gmpe, fragility)
+            p = self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency)
             if perfs is None:
                 perfs = p
             else:

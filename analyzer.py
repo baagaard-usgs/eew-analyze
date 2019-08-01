@@ -65,6 +65,7 @@ gmpe = ASK2014
 gmice = default
 
 [alerts]
+alert_latency_sec = 0.0
 # Current User Display?
 #mmi_threshold = 0.0
 #magnitude_threshold = 2.95001
@@ -101,7 +102,7 @@ height_in = 5.3
 warning_time_contour_interval = 2.0
 
 [plots]
-raster = False
+raster = True
 
 [files]
 event_dir = ./data/[EVENTID]/
@@ -273,8 +274,9 @@ class Event(object):
         """
         magAlertThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiAlertThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
         if self.showProgress:
-            print("Processing event {event[event_id]} with alert thresholds M{mag} and MMI {mmi} ...".format(event=self.event, mag=magAlertThreshold, mmi=mmiAlertThreshold))
+            print("Processing event {event[event_id]} with alert thresholds M{mag} and MMI {mmi} and alert latency {latency:3.1f}s ...".format(event=self.event, mag=magAlertThreshold, mmi=mmiAlertThreshold, latency=alertLatency))
             
         costSavings = perfmetrics.CostSavings(self.config)
         stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, magAlertThreshold, mmiAlertThreshold, plot_alert_maps)
@@ -287,6 +289,7 @@ class Event(object):
             "fragility": self.config.get("fragility_curves", "label"),
             "magnitude_threshold": magAlertThreshold,
             "mmi_threshold": mmiAlertThreshold,
+            "alert_latency_sec": self.config.getfloat("alerts", "alert_latency_sec"),
             })
         self.db.add_performance(stats, replace=True)
 
@@ -309,6 +312,8 @@ class Event(object):
         thresholdStep = self.config.getfloat("optimize", "magnitude_threshold_step")
         magThresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
+        
         statsExtra = {
             "comcat_id": self.event["event_id"],
             "eew_server": self.config.get("shakealert.production", "server"),
@@ -316,13 +321,14 @@ class Event(object):
             "dm_timestamp": self.alerts[0]["timestamp"] if len(self.alerts) > 0 else "",
             "gmpe": self.config.get("mmi_predicted", "gmpe"),
             "fragility": self.config.get("fragility_curves", "label"),
+            "alert_latency_sec": self.config.getfloat("alerts", "alert_latency_sec"),
             }
         
         costSavings = perfmetrics.CostSavings(self.config)
         for magnitude in magThresholds:
             for mmi in mmiThresholds:
                 if self.showProgress:
-                    print("Processing event {event[event_id]} with alert thresholds M{mag} and MMI {mmi} ...".format(event=self.event, mag=magnitude, mmi=mmi))
+                    print("Processing event {event[event_id]} with alert thresholds M{mag} and MMI {mmi} and alert latency {latency:3.1f}s ...".format(event=self.event, mag=magnitude, mmi=mmi, latency=alertLatency))
 
                 stats = costSavings.compute(self.event, self.shakemap, self.alerts, self.shakingTime, self.populationDensity, magnitude, mmi)
                 stats.update(statsExtra)

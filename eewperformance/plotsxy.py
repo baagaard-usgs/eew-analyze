@@ -189,6 +189,7 @@ class EventFigures(object):
             count, bedges = numpy.histogram(mmiPred, bins=bins)
             sum1, bedges = numpy.histogram(mmiPred, bins=bins, weights=mmiObs)
             sum2, bedges = numpy.histogram(mmiPred, bins=bins, weights=mmiObs**2)
+            count = numpy.maximum(count, 1)
             mmiMean = sum1 / count
             mmiStd = numpy.sqrt(sum2/count - mmiMean**2)
             bcenters = 0.5*(bedges[1:] + bedges[:-1])
@@ -263,6 +264,7 @@ class EventFigures(object):
             count, bedges = numpy.histogram(mmiObs, bins=bins)
             sum1, bedges = numpy.histogram(mmiObs, bins=bins, weights=warningTime)
             sum2, bedges = numpy.histogram(mmiObs, bins=bins, weights=warningTime**2)
+            count = numpy.maximum(count, 1)
             wtMean = sum1 / count
             wtStd = numpy.sqrt(sum2/count - wtMean**2)
             bcenters = 0.5*(bedges[1:] + bedges[:-1])
@@ -318,11 +320,12 @@ class SummaryFigures(object):
         gmpe = self.config.get("mmi_predicted", "gmpe")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
 
         areaMetric = []
         popMetric = []
         for fragility, label in FRAGILITIES:
-            perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+            perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
 
             areaMetric.append(numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"]))
             popMetric.append(numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"]))
@@ -379,13 +382,14 @@ class SummaryFigures(object):
         fragility = self.config.get("fragility_curves", "label")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
 
         areaMetric = []
         popMetric = []
         ec = []
         fc = []
         for server, label in servers:
-            perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+            perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
 
             areaMetric.append(numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"]))
             popMetric.append(numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"]))
@@ -470,7 +474,9 @@ class SummaryFigures(object):
         thresholdStep = self.config.getfloat("optimize", "magnitude_threshold_step")
         magThresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
-        perfs = numpy.concatenate([self.db.performance_stats(eqId, server, gmpe, fragility) for eqId in self.events])
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
+        
+        perfs = numpy.concatenate([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency) for eqId in self.events])
         
         dtype = [
             ("area_metric", "float32",),
@@ -587,8 +593,9 @@ class SummaryFigures(object):
         fragility = self.config.get("fragility_curves", "label")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
         
-        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
         
         originTime = numpy.zeros(perfs.shape, dtype="datetime64[s]")
         magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
@@ -657,8 +664,9 @@ class SummaryFigures(object):
         fragility = self.config.get("fragility_curves", "label")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
         
-        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
 
         magnitude = numpy.zeros(perfs.shape, dtype=numpy.float32)
         for i,p in enumerate(perfs):

@@ -80,9 +80,10 @@ class AnalysisSummary(object):
         #comcat_id, eew_server, gmpe, fragility, magnitude_threshold
         gmpe = self.config.get("mmi_predicted", "gmpe")
         fragility = self.config.get("fragility_curves", "label")
-        perfEEW = numpy.array(db.performance_stats(eqId, server, gmpe, fragility))
-        perfTheoryMag = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility))
-        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility))
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
+        perfEEW = numpy.array(db.performance_stats(eqId, server, gmpe, fragility, alertLatency))
+        perfTheoryMag = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility, alert_latency_sec=0.0))
+        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility, alert_latency_sec=0.0))
 
         # Page 1
         self._render_event_header(event)
@@ -516,17 +517,19 @@ class AnalysisSummary(object):
         fragility = self.config.get("fragility_curves", "label")
         magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
         mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
         
         db = AnalysisData(self.config.get("files", "analysis_db"))
-        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfs = numpy.array([db.performance_stats(eqId, server, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
         from numpy.lib.recfunctions import append_fields
         area_metric = numpy.where(perfs["area_costsavings_perfecteew"] > 0.0, perfs["area_costsavings_eew"] / perfs["area_costsavings_perfecteew"], numpy.nan)
         population_metric = numpy.where(perfs["population_costsavings_perfecteew"] > 0.0, perfs["population_costsavings_eew"] / perfs["population_costsavings_perfecteew"], numpy.nan)
         perfs = append_fields(perfs, ("area_metric_eew", "population_metric_eew"), (area_metric, population_metric), dtypes=("float32", "float32"), usemask=False)
 
-        perfsTheoryMag = numpy.array([db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
-        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        alertLatency = 0.0
+        perfsTheoryMag = numpy.array([db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
+        perfsTheoryMagBias = numpy.array([db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility, alertLatency, magThreshold, mmiThreshold) for eqId in eqIds]).ravel()
 
         theader = [
             [
