@@ -80,8 +80,8 @@ class App(object):
                 "debug": True,
             })
 
-        costfns = COSTFNS if args.all or args.costfns == "all" else args.costfns.split(",")
-        alert_latencies = ALERT_LATENCIES if args.all or args.alert_latencies == "all" else args.alert_latencies.split(",")
+        costfns = COSTFNS if args.costfns == "all" else args.costfns.split(",")
+        alert_latencies = ALERT_LATENCIES if args.alert_latencies == "all" else args.alert_latencies.split(",")
         for costfn in costfns:
             self._run_analysis(args.analysis_label, costfn, alert_latencies)
             
@@ -172,8 +172,8 @@ class App(object):
         """Parse command line arguments.
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("--costfns", action="store", dest="costfns", default="all", choices=COSTFNS+[None])
-        parser.add_argument("--alert-latencies", action="store", dest="alert_latencies", default="all", choices=ALERT_LATENCIES+[None])
+        parser.add_argument("--costfns", action="store", dest="costfns", default="all", choices=COSTFNS+["all"])
+        parser.add_argument("--alert-latencies", action="store", dest="alert_latencies", default="all", choices=ALERT_LATENCIES+["all"])
         parser.add_argument("--all", action="store_true", dest="all")
 
         parser.add_argument("--analysis-label", action="store", required=True)
