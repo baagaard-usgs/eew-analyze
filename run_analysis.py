@@ -124,27 +124,27 @@ class App(object):
             "config": ",".join(EQSETS + [costfn, "first_alert_catalog_magnitude.cfg"]),
             "plot_event_maps": "alert",
         })
-        #self._run_analyzer(**args)
+        self._run_analyzer(**args)
 
         # First alert, catalog magitude + bias
         args.update({"config": ",".join(EQSETS + [costfn, "first_alert_catalog_magnitude_bias.cfg"])})
-        #self._run_analyzer(**args)
+        self._run_analyzer(**args)
 
         # Alert 5s after OT, catalog magnitude
         args.update({"config": ",".join(EQSETS + [costfn, "five_latency_catalog_magnitude.cfg"])})
-        #self._run_analyzer(**args)
+        self._run_analyzer(**args)
 
         # Alert 5s after OT, catalog magitude + bias
         args.update({"config": ",".join(EQSETS + [costfn, "five_latency_catalog_magnitude_bias.cfg"])})
-        #self._run_analyzer(**args)
+        self._run_analyzer(**args)
 
         # Alert at OT, catalog magnitude
         args.update({"config": ",".join(EQSETS + [costfn, "zero_latency_catalog_magnitude.cfg"])})
-        #self._run_analyzer(**args)
+        self._run_analyzer(**args)
 
         # Alert at OT, catalog magitude + bias
         args.update({"config": ",".join(EQSETS + [costfn, "zero_latency_catalog_magnitude_bias.cfg"])})
-        #self._run_analyzer(**args)
+        self._run_analyzer(**args)
 
         # Summary
         args = defaults.copy()
