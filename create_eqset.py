@@ -10,6 +10,8 @@
 
 import os
 import logging
+import configparser
+import io
 
 
 DEFAULTS = u"""
@@ -53,6 +55,8 @@ ci37359312 = M4.0 8km NW of Delta, B.C., MX, 2015-04-08
 ci38232616 = M4.0 71km ENE of Maneadero, B.C., MX, 2018-07-29
 ci37265488 = M4.0 56km WSW of Rosarito, B.C., MX, 2014-09-07
 ci11248258 = M4.0 66km WSW of Rosarito, B.C., MX, 2013-02-23
+# No CI ShakeMap
+us70004bqm = M4.7 1km ENE of Ridgecrest, California, 2019-07-06
 
 [files]
 filename_template = ./eqsets/[DOMAIN].cfg
@@ -86,11 +90,11 @@ class CreateEqSetApp(object):
             self.show_parameters()
 
         if args.create or args.all:
-            self.create(args.domain)
+            self.create(args.domain, args.exclude)
 
         return
 
-    def create(self, domain):
+    def create(self, domain, filename_exclude=None):
         """Fetch events from ComCat catalog and create earthquake set .cfg file.
 
         :type domain: str
@@ -113,6 +117,12 @@ class CreateEqSetApp(object):
 
 
         blacklist = self.params.options("blacklist")
+        ignorelist = []
+        if filename_exclude:
+            iconfig = configparser.ConfigParser()
+            iconfig.read(filename_exclude)
+            ignorelist = iconfig.options("events")
+
         filename = self.params.get("files", "filename_template").replace("[DOMAIN]", domain)
         path = os.path.split(filename)[0]
         if not os.path.isdir(path):
@@ -131,11 +141,11 @@ class CreateEqSetApp(object):
                     "date": str(event.preferred_origin().time.date),
                     "description": description,
                 }
+                if eqid in ignorelist:
+                    continue
                 if eqid in blacklist:
                     fout.write("#") # Blacklisted events will be commented out.
                 fout.write("{info[eqid]} = M{info[mag]:.1f} {info[description]}, {info[date]}\n".format(info=info))
-                    
-
         return
 
     def initialize(self, config_filenames):
@@ -144,8 +154,6 @@ class CreateEqSetApp(object):
         :type config_filename: str
         :param config_filename: Name of configuration (INI) file with parameters.
         """
-        import configparser
-        import io
         config = configparser.ConfigParser()
         config.read_file(io.StringIO(DEFAULTS))
         if config_filenames:
@@ -175,6 +183,7 @@ class CreateEqSetApp(object):
         parser.add_argument("--domain", action="store", dest="domain", default="sanfrancisco")
         parser.add_argument("--show-parameters", action="store_true", dest="show_parameters")
         parser.add_argument("--create", action="store_true", dest="create")
+        parser.add_argument("--exclude", action="store", dest="exclude", default=None)
         parser.add_argument("--all", action="store_true", dest="all")
         parser.add_argument("--quiet", action="store_false", dest="show_progress", default=True)
         parser.add_argument("--debug", action="store_true", dest="debug")
