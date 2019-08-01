@@ -82,8 +82,8 @@ class AnalysisSummary(object):
         fragility = self.config.get("fragility_curves", "label")
         alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
         perfEEW = numpy.array(db.performance_stats(eqId, server, gmpe, fragility, alertLatency))
-        perfTheoryMag = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility, alert_latency_sec=0.0))
-        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility, alert_latency_sec=0.0))
+        perfTheoryMag = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE, gmpe, fragility, alertLatencySec=0.0))
+        perfTheoryMagBias = numpy.array(db.performance_stats(eqId, self.CATALOG_MAGNITUDE_BIAS, gmpe, fragility, alertLatencySec=0.0))
 
         # Page 1
         self._render_event_header(event)

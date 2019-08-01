@@ -82,7 +82,7 @@ TABLES = [
         "population_alert_perfect REAL NOT NULL",
         "population_costsavings_eew REAL NOT NULL",
         "population_costsavings_perfecteew REAL NOT NULL",
-        "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
+        "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, alert_latency_sec, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
     ]),
 ]
 
@@ -419,7 +419,7 @@ class AnalysisData(object):
             alerts = op.cursor.fetchall()
         return alerts
 
-    def performance_stats(self, comcatId, server, gmpe, fragility, alert_latency_sec, magnitudeThreshold=None, mmiThreshold=None):
+    def performance_stats(self, comcatId, server, gmpe, fragility, alertLatencySec, magnitudeThreshold=None, mmiThreshold=None):
         """
         """
         conditions = [
@@ -427,14 +427,12 @@ class AnalysisData(object):
             "eew_server=?",
             "gmpe=?",
             "fragility=?",
-            "alert_latency_sec=?",
             ]
         values = (
             comcatId,
             server,
             gmpe,
             fragility,
-            alert_latency_sec,
             )
         with self.operation() as op:
             op.cursor.execute("SELECT * FROM performance WHERE " + " AND ".join(conditions) + " ORDER BY magnitude_threshold,mmi_threshold", values)
@@ -462,12 +460,14 @@ class AnalysisData(object):
                 ("population_costsavings_perfecteew", "float32"),
             ]
             results = op.cursor.fetchall()
-
+            
         nrows = len(results)
         stats = numpy.zeros(nrows, dtype=dtype)
         for iresult, result in enumerate(results):
             stats[iresult] = tuple([result[key] for key in result.keys()])
 
+        mask = numpy.ma.masked_values(stats["alert_latency_sec"], alertLatencySec).mask
+        stats = stats[mask]
         if magnitudeThreshold:
             mask = numpy.ma.masked_values(stats["magnitude_threshold"], magnitudeThreshold).mask
             stats = stats[mask]

@@ -475,8 +475,7 @@ class SummaryFigures(object):
         magThresholds = numpy.arange(thresholdStart, thresholdStop+0.1*thresholdStep, thresholdStep)
 
         alertLatency = self.config.getfloat("alerts", "alert_latency_sec")
-        
-        perfs = numpy.concatenate([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency) for eqId in self.events])
+        perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility, alertLatency) for eqId in self.events]).ravel()
         
         dtype = [
             ("area_metric", "float32",),
