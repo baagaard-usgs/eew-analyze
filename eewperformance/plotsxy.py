@@ -262,14 +262,15 @@ class EventFigures(object):
             bwidth = 0.5
             bins = numpy.arange(1.0-0.5*bwidth, 10.01+0.5*bwidth, bwidth)
             count, bedges = numpy.histogram(mmiObs, bins=bins)
+            maskBins = count > 0
             sum1, bedges = numpy.histogram(mmiObs, bins=bins, weights=warningTime)
             sum2, bedges = numpy.histogram(mmiObs, bins=bins, weights=warningTime**2)
             count = numpy.maximum(count, 1)
             wtMean = sum1 / count
             wtStd = numpy.sqrt(sum2/count - wtMean**2)
             bcenters = 0.5*(bedges[1:] + bedges[:-1])
-            ax.errorbar(bcenters, wtMean, yerr=wtStd, fmt="none", ecolor="c_ltgreen", elinewidth=2, capthick=1.5, capwidth=6.0, zorder=4)
-            ax.plot(bcenters, wtMean, marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
+            ax.errorbar(bcenters[maskBins], wtMean[maskBins], yerr=wtStd[maskBins], fmt="none", ecolor="c_ltgreen", elinewidth=2, capthick=1.5, capwidth=6.0, zorder=4)
+            ax.plot(bcenters[maskBins], wtMean[maskBins], marker="s", lw=0, ms=6, mec="c_green", mfc="c_ltgreen", zorder=5)
         
         self._save(figure, "warning_time_mmi", force_raster=True)
         return
