@@ -21,7 +21,7 @@ import downloader
 #    "fragility_injury_w2.cfg",
 #]
 EQSETS = [
-    "eqsets/ridgecrest-sequence-M6.cfg",
+    "eqsets/ridgecrest-sequence-M5.cfg",
 ]
 
 COSTFNS = [
