@@ -722,7 +722,96 @@ class SummaryFigures(object):
 
         self._save(figure, "costsavings_magnitude")
         return
-    
+
+    def costsavings_alertlatency(self):
+        """Plot cost savings versus alert latency."""
+        FIG_SIZE = (6.0, 4.5)
+        MARGINS = ((0.6, 0, 0.1), (0.5, 0.7, 0.3)) 
+        NROWS = 2
+        NCOLS = 1
+        MARKERSZ= 6
+        LINEWIDTH = 1.5
+        
+        figure = pyplot.figure(figsize=FIG_SIZE)
+        rectFactory = matplotlib_extras.axes.RectFactory(figure, nrows=NROWS, ncols=NCOLS, margins=MARGINS)
+        
+        server = self.config.get("shakealert.production", "server")
+        gmpe = self.config.get("mmi_predicted", "gmpe")
+        mmiThreshold = self.config.getfloat("alerts", "mmi_threshold")
+        magThreshold = self.config.getfloat("alerts", "magnitude_threshold")
+
+        costfns = [
+            ("InjuryLinear4", "Injury Prevention"),
+            ("FearAvoidanceLinear", "Fear Avoidance"),
+            ]
+        alertLatency = numpy.array([0.0, 2.0, 5.0, 10.0])
+        xmin = alertLatency[0] - 0.4
+        xmax = alertLatency[-1] + 0.4
+        
+        dtype = [
+            ("area_metric", "float32",),
+            ("population_metric", "float32",),
+        ]
+        metricAllEqs = numpy.zeros((len(alertLatency),len(costfns)), dtype=dtype)
+
+        for ilatency,latency in enumerate(alertLatency):
+            for ifragility, fragility in enumerate(costfns):
+                perfs = numpy.array([self.db.performance_stats(eqId, server, gmpe, fragility[0], latency, magThreshold, mmiThreshold) for eqId in self.events]).ravel()
+
+                areaMetric = numpy.sum(perfs["area_costsavings_eew"]) / numpy.sum(perfs["area_costsavings_perfecteew"])
+                popMetric = numpy.sum(perfs["population_costsavings_eew"]) / numpy.sum(perfs["population_costsavings_perfecteew"])
+                
+                metricAllEqs[ilatency, ifragility] = (areaMetric, popMetric,)
+        
+        # Q-area
+        ax = figure.add_axes(rectFactory.rect(row=1))
+        ax.plot(alertLatency, metricAllEqs["area_metric"], ms=MARKERSZ, lw=LINEWIDTH, marker='o')
+        ax.set_title("Q-area vs. Alert Latency", weight="bold")
+        ax.set_ylim(0.0, 1.0)
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_label_text("Q-area Cost Savings")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.set_xlim(xmin, xmax)
+        ax.xaxis.set_ticks(alertLatency)
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%2.0f"))
+
+        for x,y in zip(alertLatency,metricAllEqs[:,0]["area_metric"]):
+            label = "{:.2f}".format(y)
+            ax.annotate(label, (x,y), textcoords="offset points", xytext=(0,+5), ha='center', va='bottom', fontsize='smaller')
+        for x,y in zip(alertLatency,metricAllEqs[:,1]["area_metric"]):
+            label = "{:.2f}".format(y)
+            ax.annotate(label, (x,y), textcoords="offset points", xytext=(0,-5), ha='center', va='top', fontsize='smaller')
+
+        ax.legend(labels=[fragility[1] for fragility in costfns], loc="upper right")
+            
+        # Q-pop
+        ax = figure.add_axes(rectFactory.rect(row=2))
+        ax.plot(alertLatency, metricAllEqs["population_metric"], ms=MARKERSZ, lw=LINEWIDTH, marker='o')
+        ax.set_title("Q-pop vs. Alert Latency", weight="bold")
+        ax.set_ylim(-0.15, 1.0)
+        ax.yaxis.set_major_formatter(ticker.FormatStrFormatter("%3.1f"))
+        ax.yaxis.set_label_text("Q-pop Cost Savings")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+        ax.xaxis.set_label_text("Alert Latency (s)")
+        ax.set_xlim(xmin, xmax)
+        ax.xaxis.set_ticks(alertLatency)
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(1.0))
+        ax.xaxis.set_major_formatter(ticker.FormatStrFormatter("%2.0f"))
+
+        for x,y in zip(alertLatency,metricAllEqs[:,0]["population_metric"]):
+            label = "{:.2f}".format(y)
+            ax.annotate(label, (x,y), textcoords="offset points", xytext=(0,+5), ha='center', va='bottom', fontsize='smaller')
+        for x,y in zip(alertLatency,metricAllEqs[:,1]["population_metric"]):
+            label = "{:.2f}".format(y)
+            ax.annotate(label, (x,y), textcoords="offset points", xytext=(0,-5), ha='center', va='top', fontsize='smaller')
+
+        self._save(figure, "costsavings_alertlatency")
+        return
 
     def costsavings_warningtime(self):
         """Plot fraction of warning area/population with cost savings above some value and warning time above some value.
