@@ -34,12 +34,15 @@ class CostSavings(object):
 
         gmpe = self.config.get("mmi_predicted", "gmpe")
         gmice = self.config.get("mmi_predicted", "gmice")
+        alertLatency = numpy.timedelta64(int(self.config.getfloat("alerts", "alert_latency_sec")*1.0e+3), "ms")
         if gmice == "default":
             gmice = shakemap.gmiceGrid
         
         thresholdReached = False
         for alert in alerts:
-            if numpy.datetime64(alert["timestamp"]) > numpy.max(shakingTime):
+            alertTime = numpy.datetime64(alert["timestamp"]) + alertLatency
+
+            if alertTime > numpy.max(shakingTime):
                 # Skip alerts with no positive warning times in
                 # domain. Changes in estimated earthquake location
                 # could result in later alerts having positive warning
@@ -50,14 +53,13 @@ class CostSavings(object):
                 continue
             else:
                 if not thresholdReached:
-                    tstamp = numpy.datetime64(alert["timestamp"])
-                    wtime = analysis_utils.timedelta_to_seconds(tstamp - numpy.datetime64(event["origin_time"]))
-                    msg = "Alert threshold reached at {tstamp}, {wtime:.1f}s after origin time.".format(tstamp=tstamp, wtime=wtime)
+                    wtime = analysis_utils.timedelta_to_seconds(alertTime - numpy.datetime64(event["origin_time"]))
+                    msg = "Alert threshold reached at {tstamp}, {wtime:.1f}s after origin time.".format(tstamp=alertTime, wtime=wtime)
                     logging.getLogger(__name__).info(msg)
                     thresholdReached = True
                 
             mmiPredCur = fn(alert, shakemap.data, gmpe, gmice)
-            warningTimeCur = shakingTime - numpy.datetime64(alert["timestamp"])
+            warningTimeCur = shakingTime - alertTime
             
             if plotAlertMaps:
                 plotsDir = self.config.get("files", "plots_dir")
@@ -71,7 +73,7 @@ class CostSavings(object):
                 gdalraster.write(filename, values, shakemap.num_lon(), shakemap.num_lat(), shakemap.spatial_ref(), shakemap.geo_transform())
                 mapPanels = maps.MapPanels(self.config)
                 mapPanels.load_data(event["event_id"], alert=alert)
-                tafterOT = analysis_utils.timedelta_to_seconds(numpy.datetime64(alert["timestamp"])-numpy.datetime64(event["origin_time"]))
+                tafterOT = analysis_utils.timedelta_to_seconds(alertTime-numpy.datetime64(event["origin_time"]))
                 mapPanels.mmi_warning_time(tafterOT)
             
             # Update alert time if greater than previous

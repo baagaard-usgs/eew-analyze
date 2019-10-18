@@ -287,7 +287,7 @@ def mmi_via_gmpe_gmice(alert, points, gmpe="ASK2014", gmice="WaldEtal1999"):
     elif gmice == "WaldEtal1999":
         gmiceFn = mmi_WaldEtal1999
     else:
-        raise ValueError("Unknown GMIC '{}'.".format(gmice))
+        raise ValueError("Unknown GMICE '{}'.".format(gmice))
         
     return gmiceFn(values["pgaG"]*100.0, values["pgvCmps"])
 

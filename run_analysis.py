@@ -7,19 +7,34 @@ import os
 import analyzer
 import downloader
 
+#EQSETS = [
+#    "eqsets/sanfrancisco.cfg",
+#    "eqsets/losangeles.cfg",
+#]
+
+#COSTFNS = [
+#    "fragility_fearavoidance.cfg",
+#    "fragility_fearavoidance_step.cfg",
+#    "fragility_fearavoidance_sigmoid.cfg",
+#    "fragility_fearavoidance_r20.cfg",
+#    "fragility_injury.cfg",
+#    "fragility_injury_w2.cfg",
+#]
 EQSETS = [
-    "eqsets/sanfrancisco.cfg",
-    "eqsets/losangeles.cfg",
+    "eqsets/ridgecrest-sequence-M6.cfg",
 ]
 
 COSTFNS = [
     "fragility_fearavoidance.cfg",
-    "fragility_fearavoidance_step.cfg",
-    "fragility_fearavoidance_sigmoid.cfg",
-    "fragility_fearavoidance_r20.cfg",
     "fragility_injury.cfg",
-    "fragility_injury_w2.cfg",
 ]
+ALERT_LATENCIES = [
+    "alert_latency_zero.cfg",
+    "alert_latency_two.cfg",
+    "alert_latency_five.cfg",
+    "alert_latency_ten.cfg",
+]
+    
 
 class App(object):
     """Application for running EEW cost/benefit analysis for various cost functions.
@@ -65,16 +80,15 @@ class App(object):
                 "debug": True,
             })
 
-        costfns = COSTFNS if args.all else args.costfns.split(",")
-        if costfns == [""]:
-            return
+        costfns = COSTFNS if args.costfns == "all" else args.costfns.split(",")
+        alert_latencies = ALERT_LATENCIES if args.alert_latencies == "all" else args.alert_latencies.split(",")
         for costfn in costfns:
-            self._run_costfn(costfn)
+            self._run_analysis(args.analysis_label, costfn, alert_latencies)
             
         return
 
 
-    def _run_costfn(self, costfn):
+    def _run_analysis(self, analysis_label, costfn, alert_latencies):
         defaults = {
             "config": None,
             "show_parameters": False,
@@ -95,14 +109,15 @@ class App(object):
             
         # ShakeAlert
         args = defaults.copy()
-        args.update({
-            "config": ",".join(EQSETS + [costfn]),
-            "nthreads": self.nthreads,
-            "optimize_events": True,
-            "plot_event_maps": "all",
-            "plot_event_figures": "all",
-        })
-        self._run_analyzer(**args)
+        for alert_latency in alert_latencies:
+            args.update({
+                "config": ",".join(EQSETS + [costfn] + [alert_latency]),
+                "nthreads": self.nthreads,
+                "optimize_events": True,
+                "plot_event_maps": "all",
+                "plot_event_figures": "all",
+                })
+            self._run_analyzer(**args)
         
         # First alert, catalog magnitude
         args.update({
@@ -123,25 +138,26 @@ class App(object):
         args.update({"config": ",".join(EQSETS + [costfn, "five_latency_catalog_magnitude_bias.cfg"])})
         self._run_analyzer(**args)
 
-        # Zero latency, catalog magnitude
+        # Alert at OT, catalog magnitude
         args.update({"config": ",".join(EQSETS + [costfn, "zero_latency_catalog_magnitude.cfg"])})
         self._run_analyzer(**args)
 
-        # Zero latency, catalog magitude + bias
+        # Alert at OT, catalog magitude + bias
         args.update({"config": ",".join(EQSETS + [costfn, "zero_latency_catalog_magnitude_bias.cfg"])})
         self._run_analyzer(**args)
 
         # Summary
         args = defaults.copy()
-        args.update({
-            "config": ",".join(EQSETS + [costfn]),
-            "plot_summary_figures": "all",
-            "plot_summary_maps": "all",
-            "generate_report": "full",
-        })
-        self._run_analyzer(**args)
-        if os.path.isfile("report.pdf"):
-            shutil.move("report.pdf", "report_SF+LA_{}.pdf".format(costfn.replace(".cfg","")))
+        for alert_latency in alert_latencies:
+            args.update({
+                "config": ",".join(EQSETS + [costfn] + [alert_latency]),
+                "plot_summary_figures": "all",
+                "plot_summary_maps": "all",
+                "generate_report": "full",
+                })
+            self._run_analyzer(**args)
+            if os.path.isfile("report.pdf"):
+                shutil.move("report.pdf", "report_{}_{}_{}.pdf".format(analysis_label, costfn.replace(".cfg",""), alert_latency.replace(".cfg","")))
             
         return
 
@@ -156,9 +172,12 @@ class App(object):
         """Parse command line arguments.
         """
         parser = argparse.ArgumentParser()
-        parser.add_argument("--costfns", action="store", dest="costfns", default="", choices=COSTFNS+[None])
+        parser.add_argument("--costfns", action="store", dest="costfns", default="all", choices=COSTFNS+["all"])
+        parser.add_argument("--alert-latencies", action="store", dest="alert_latencies", default="all", choices=ALERT_LATENCIES+["all"])
         parser.add_argument("--all", action="store_true", dest="all")
 
+        parser.add_argument("--analysis-label", action="store", required=True)
+        
         parser.add_argument("--color-style", action="store", dest="color_style", default="lightbg")
         parser.add_argument("--num-threads", action="store", type=int, dest="nthreads", default=16)
         parser.add_argument("--init-perf-db", action="store_true", dest="init_perf_db", default=False)

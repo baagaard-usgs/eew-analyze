@@ -39,6 +39,9 @@ server = eew2demo
 username = None
 password = None
 
+[shakemap]
+preferred_order = ci
+
 [files]
 dmlogs_dir = ./data/dmlogs/[SERVER]/
 event_dir = ./data/[EVENTID]/
@@ -154,14 +157,19 @@ class DownloaderApp(object):
 
             
             dataDir = dirTemplate.replace("[EVENTID]", eqId)
-            event.load(os.path.join(dataDir, eqId+".geojson"))
+            try:
+                event.load(os.path.join(dataDir, eqId+".geojson"))
+            except IOError:
+                logging.getLogger(__name__).error("Could not fetch ShakeMap for {}.".format(eqId))
+                continue
             shakemaps = event.get_product("shakemap", source="all")
             shakemap = shakemaps[0]
             if len(shakemaps) > 1:
-                # Avoid "atlas" source
-                for candidate in shakemaps:
-                    if candidate.source != "atlas":
-                        shakemap = candidate
+                preferredOrder = self.config.get("shakemap", "preferred_order").split(",")
+                shakemapSources = [candidate.source for candidate in shakemaps]
+                for preferred in preferredOrder:
+                    if preferred in shakemapSources:
+                        shakemap = shakemaps[shakemapSources.index(preferred)]
                         break
             shakemap.fetch("grid.xml", dataDir)
             shakemap.fetch("info.json", dataDir)
@@ -413,8 +421,8 @@ class DownloaderApp(object):
         """
         import configparser
         import io
-        config = configparser.SafeConfigParser()
-        config.readfp(io.StringIO(DEFAULTS))
+        config = configparser.ConfigParser()
+        config.read_file(io.StringIO(DEFAULTS))
         if config_filenames:
             for filename in config_filenames.split(","):
                 if self.showProgress:

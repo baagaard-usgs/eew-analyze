@@ -71,6 +71,7 @@ TABLES = [
         "fragility TEXT NOT NULL",
         "magnitude_threshold REAL NOT NULL",
         "mmi_threshold REAL NOT NULL",
+        "alert_latency_sec REAL NOT NULL",
         "area_damage REAL NOT NULL",
         "area_alert REAL NOT NULL",
         "area_alert_perfect REAL NOT NULL",
@@ -81,7 +82,7 @@ TABLES = [
         "population_alert_perfect REAL NOT NULL",
         "population_costsavings_eew REAL NOT NULL",
         "population_costsavings_perfecteew REAL NOT NULL",
-        "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
+        "UNIQUE(comcat_id, eew_server, dm_id, gmpe, fragility, alert_latency_sec, magnitude_threshold, mmi_threshold) ON CONFLICT FAIL",
     ]),
 ]
 
@@ -256,18 +257,22 @@ class AnalysisData(object):
             "psa30_bias": 0.0,
             "psa30_max": 0.0,
             "gmpe": gmmod["gmpe"]["module"],
-            "pgm2mi": gmmod["pgm2mi"]["module"],
+            "pgm2mi": gmmod["pgm2mi"]["module"] if "pgm2mi" in gmmod.keys() else gmmod["gmice"]["module"],
             "software_version": info["processing"]["shakemap_versions"]["shakemap_revision"],
         }
         # Update infoDict with available values.
         gm = info["output"]["ground_motions"]
         for key,value in gm.items():
-            if key != "intensity":
-                infoDict[key+"_bias"] = value["bias"]
-                infoDict[key+"_max"] = value["max"]
+            if key.startswith("SA"):
+                dkey = key.replace("SA(","psa").replace(")","").replace(".","")
+                infoDict[dkey+"_bias"] = value["bias"] or 0.0
+                infoDict[dkey+"_max"] = value["max"] or 0.0       
+            elif key != "intensity":
+                infoDict[key.lower()+"_bias"] = value["bias"] or 0.0
+                infoDict[key.lower()+"_max"] = value["max"] or 0.0
             else:
-                infoDict["mmi_bias"] = value["bias"]
-                infoDict["mmi_max"] = value["max"]
+                infoDict["mmi_bias"] = value["bias"] or 0.0
+                infoDict["mmi_max"] = value["max"] or 0.0
         infoValues = tuple([infoDict[col] for col in COLUMNS])
         valueCols = ",".join("?"*len(infoValues))
         cmd = "INSERT"
@@ -296,6 +301,7 @@ class AnalysisData(object):
             "fragility",
             "magnitude_threshold",
             "mmi_threshold",
+            "alert_latency_sec",
             "area_damage",
             "area_alert",
             "area_alert_perfect",
@@ -413,7 +419,7 @@ class AnalysisData(object):
             alerts = op.cursor.fetchall()
         return alerts
 
-    def performance_stats(self, comcatId, server, gmpe, fragility, magnitudeThreshold=None, mmiThreshold=None):
+    def performance_stats(self, comcatId, server, gmpe, fragility, alertLatencySec, magnitudeThreshold=None, mmiThreshold=None):
         """
         """
         conditions = [
@@ -441,6 +447,7 @@ class AnalysisData(object):
                 ("fragility", "|S32"),
                 ("magnitude_threshold", "float32"),
                 ("mmi_threshold", "float32"),
+                ("alert_latency_sec", "float32"),
                 ("area_damage", "float32"),
                 ("area_alert", "float32"),
                 ("area_alert_perfect", "float32"),
@@ -453,12 +460,14 @@ class AnalysisData(object):
                 ("population_costsavings_perfecteew", "float32"),
             ]
             results = op.cursor.fetchall()
-
+            
         nrows = len(results)
         stats = numpy.zeros(nrows, dtype=dtype)
         for iresult, result in enumerate(results):
             stats[iresult] = tuple([result[key] for key in result.keys()])
 
+        mask = numpy.ma.masked_values(stats["alert_latency_sec"], alertLatencySec).mask
+        stats = stats[mask]
         if magnitudeThreshold:
             mask = numpy.ma.masked_values(stats["magnitude_threshold"], magnitudeThreshold).mask
             stats = stats[mask]
@@ -547,11 +556,11 @@ class AnalysisData(object):
     
             # Performance
             sout += "\nPerformance Data\n"
-            op.cursor.execute("SELECT * FROM performance ORDER BY comcat_id,fragility,gmpe,magnitude_threshold,mmi_threshold")
+            op.cursor.execute("SELECT * FROM performance ORDER BY comcat_id,fragility,gmpe,magnitude_threshold,mmi_threshold,alert_latency_sec")
             rows = op.cursor.fetchall()
             for row in rows:
                 event = self.comcat_event(row["comcat_id"])
-                sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[area_costsavings_eew]:6.2f} {row[area_costsavings_perfecteew]:6.2f} {row[population_costsavings_eew]:6.2f} {row[population_costsavings_perfecteew]:6.2f} {event[description]}\n".format(row=row, event=event)
+                sout += "{row[comcat_id]} {event[magnitude_type]:3s}{event[magnitude]:.2f} {row[gmpe]} {row[fragility]} {row[magnitude_threshold]:3.1f} {row[mmi_threshold]:3.1f} {row[alert_latency_sec]:3.1f} {row[area_costsavings_eew]:6.2f} {row[area_costsavings_perfecteew]:6.2f} {row[population_costsavings_eew]:6.2f} {row[population_costsavings_perfecteew]:6.2f} {event[description]}\n".format(row=row, event=event)
         return sout
 
     def show_matches(self, server):
